@@ -30,7 +30,7 @@ trackingGeometry = detector.trackingGeometry()
 field = acts.examples.MagneticFieldMapXyz(str(geo_dir / "bfield/ATLAS-BField-xyz.root"))
 rnd = acts.examples.RandomNumbers(seed=42)
 
-s = acts.examples.Sequencer(events=100, numThreads=1, outputDir=str(outputDir))
+s = acts.examples.Sequencer(events=2, numThreads=1, outputDir=str(outputDir))
 
 if not ttbar_pu200:
     addParticleGun(
@@ -104,7 +104,7 @@ addSeeding(
     ConnectorInputConfigFile=geo_dir / "itk-hgtd/binTables_ITK_RUN4.txt",
     outputDirRoot=outputDir,
 )
-
+print("Jasper: AddSeeding is called in examples/scripts/Python/full_chain_itk_Gbts.py")
 addCKFTracks(
     s,
     trackingGeometry,

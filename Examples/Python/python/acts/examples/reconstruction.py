@@ -353,7 +353,7 @@ def addSeeding(
     rnd : RandomNumbers, None
         random number generator. Only used by SeedingAlgorithm.TruthSmeared.
     """
-
+    print("Jasper: calling addseeding  in Examples/Python/python/acts/examples/reconstruction")
     logLevel = acts.examples.defaultLogging(s, logLevel)()
     logger = acts.logging.getLogger("addSeeding")
     logger.setLevel(logLevel)
@@ -418,8 +418,10 @@ def addSeeding(
             houghTransformConfig.trackingGeometry = trackingGeometry
             seeds = addHoughTransformSeeding(s, houghTransformConfig, logLevel)
         elif seedingAlgorithm == SeedingAlgorithm.Gbts:
+            
             logger.info("Using Gbts seeding")
             # output of algs changed, only one output now
+            
             seeds = addGbtsSeeding(
                 s,
                 spacePoints,
@@ -1090,7 +1092,7 @@ def addGbtsSeeding(
     ConnectorInputConfigFile: Union[Path, str] = None,
 ):
     """Gbts seeding"""
-
+    print("Jasper: calling addgbtsSeeding  in Examples/Python/python/acts/examples/reconstruction.py")
     logLevel = acts.examples.defaultLogging(sequence, logLevel)()
     layerMappingFile = str(layerMappingConfigFile)  # turn path into string
     ConnectorInputFileStr = str(ConnectorInputConfigFile)
@@ -1114,7 +1116,7 @@ def addGbtsSeeding(
             bFieldInZ=seedFinderOptionsArg.bFieldInZ,
         )
     )
-
+    
     seedingAlg = acts.examples.GbtsSeedingAlgorithm(
         level=logLevel,
         inputSpacePoints=[spacePoints],
