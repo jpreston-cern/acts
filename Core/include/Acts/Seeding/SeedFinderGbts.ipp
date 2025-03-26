@@ -38,12 +38,18 @@ SeedFinderGbts<external_spacepoint_t>::SeedFinderGbts(
     : m_config(config),
       m_storage(
           std::make_unique<GbtsDataStorage<external_spacepoint_t>>(gbtsGeo)),
-      m_logger(std::move(logger)) {}
+      m_logger(std::move(logger)) {
+        
+        cout<<"Jasper: an instance pf SeedFinderGbts has been created (constructor called)"<<std::endl;
+      }
 
 // define loadspace points function
 template <typename external_spacepoint_t>
 void SeedFinderGbts<external_spacepoint_t>::loadSpacePoints(
     const std::vector<GbtsSP<external_spacepoint_t>>& gbtsSPvect) {
+
+  cout<<"Jasper: loadSpacePoints has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+
   ACTS_VERBOSE("Loading space points");
   for (const auto& gbtssp : gbtsSPvect) {
     m_storage->addSpacePoint(gbtssp, (m_config.m_useClusterWidth > 0));
@@ -61,6 +67,9 @@ void SeedFinderGbts<external_spacepoint_t>::runGbts_TrackFinder(
     std::vector<GbtsTrigTracklet<external_spacepoint_t>>& vTracks,
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo) {
+
+  cout<<"Jasper: runGbts_TrackFinder has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+
   ACTS_VERBOSE("Running GBTS Track Finder");
   const float min_z0 = roi.zedMinus();
   const float max_z0 = roi.zedPlus();
@@ -637,6 +646,9 @@ void SeedFinderGbts<external_spacepoint_t>::createSeeds(
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo,
     output_container_t& out_cont) {
+
+  cout<<"Jasper: createSeeds has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+
   ACTS_VERBOSE("Creating seeds");
   std::vector<GbtsTrigTracklet<external_spacepoint_t>>
       vTracks;  // make empty vector
@@ -702,6 +714,9 @@ std::vector<Seed<external_spacepoint_t>>
 SeedFinderGbts<external_spacepoint_t>::createSeeds(
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo) {
+
+  cout<<"Jasper: CreateSeeds (returning a vector) has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  
   std::vector<seed_t> r;
   createSeeds(roi, gbtsGeo, r);
   return r;
