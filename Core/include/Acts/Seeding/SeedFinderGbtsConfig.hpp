@@ -75,6 +75,8 @@ struct SeedFinderGbtsConfig {
   ////
   // 2 member functions
   SeedFinderGbtsConfig calculateDerivedQuantities() const {
+
+    cout<<"Jasper: calculateDerivedQuantities is called in Acts/Seeding/SeedFinderGbtsConfig.hpp"
     // thorw statement if the isInternalUnits member is false, ie if dont call
     // this function
     SeedFinderGbtsConfig config = *this;
@@ -84,6 +86,8 @@ struct SeedFinderGbtsConfig {
   }
 
   SeedFinderGbtsConfig toInternalUnits() const {
+
+    cout<<"Jasper: toInternalUnits is called in Acts/Seeding/SeedFinderGbtsConfig.hpp"
     // throw statement if the isInternalUnits member is false, ie if dont call
     // this function
     SeedFinderGbtsConfig config = *this;

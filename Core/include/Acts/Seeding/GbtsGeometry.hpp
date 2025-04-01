@@ -32,7 +32,7 @@ class TrigInDetSiLayer {
         m_type(type),
         m_refCoord(center),
         m_minBound(min),
-        m_maxBound(max) {}
+        m_maxBound(max) {std::cout<<"Jasper: Instance of TrigInDetSiLayer created (constructor called)"<<std::endl;}
 };
 
 template <typename space_point_t>
@@ -40,6 +40,8 @@ class GbtsLayer {
  public:
   GbtsLayer(const TrigInDetSiLayer &ls, float ew, int bin0)
       : m_layer(ls), m_etaBinWidth(ew) {
+
+        cout<<"Jasper: Instance of GbtsLayer created (constructor called)"<<std::endl;
     if (m_layer.m_type == 0) {  // barrel
       m_r1 = m_layer.m_refCoord;
       m_r2 = m_layer.m_refCoord;
@@ -142,6 +144,8 @@ class GbtsLayer {
   }
 
   int getEtaBin(float zh, float rh) const {
+
+    cout<<"Jasper: getEtaBin member function in GbtsLayer class called in GbtsGeometry.hpp"<<std::endl;
     if (m_bins.size() == 1) {
       return m_bins.at(0);
     }
@@ -160,6 +164,7 @@ class GbtsLayer {
   }
 
   float getMinBinRadius(int idx) const {
+    cout<<"Jasper: getMinBinRadius member function in GbtsLayer class called in GbtsGeometry.hpp"<<std::endl;
     if (idx >= static_cast<int>(m_minRadius.size())) {
       idx = idx - 1;
     }
@@ -170,6 +175,7 @@ class GbtsLayer {
   }
 
   float getMaxBinRadius(int idx) const {
+    "Jasper: getMaxBinRadius member function in GbtsLayer class called in GbtsGeometry.hpp"<<std::endl;
     if (idx >= static_cast<int>(m_maxRadius.size())) {
       idx = idx - 1;
     }
@@ -179,10 +185,13 @@ class GbtsLayer {
     return m_maxRadius.at(idx);
   }
 
-  int num_bins() const { return m_bins.size(); }
+  int num_bins() const { 
+    cout<<"Jasper: num_bins member function in GbtsLayer class called in GbtsGeometry.hpp"<<std::endl;
+    return m_bins.size(); }
 
   bool verifyBin(const GbtsLayer<space_point_t> *pL, int b1, int b2,
                  float min_z0, float max_z0) const {
+    cout<<"Jasper: verifyBin member function in GbtsLayer class called in GbtsGeometry.hpp"<<std::endl;
     float z1min = m_minBinCoord.at(b1);
     float z1max = m_maxBinCoord.at(b1);
     float r1 = m_layer.m_refCoord;
@@ -267,6 +276,7 @@ class GbtsGeometry {
                std::unique_ptr<GbtsConnector> &conn)
 
       : m_connector(std::move(conn)) {
+    cout<<"Jasper: Instance of GbtsGeometry created (contructor called)"<<std::endl;
     const float min_z0 = -168.0;
     const float max_z0 = 168.0;
 
@@ -319,6 +329,7 @@ class GbtsGeometry {
   GbtsGeometry &operator=(const GbtsGeometry &) = delete;
 
   const GbtsLayer<space_point_t> *getGbtsLayerByKey(unsigned int key) const {
+    cout<<"Jasper: getGbtsLayerByKey member function in GbtsGeometry class called in GbtsGeometry.hpp"<<std::endl;
     typename std::map<unsigned int, GbtsLayer<space_point_t> *>::const_iterator
         it = m_layMap.find(key);
     if (it == m_layMap.end()) {
@@ -329,16 +340,22 @@ class GbtsGeometry {
   }
 
   const GbtsLayer<space_point_t> *getGbtsLayerByIndex(int idx) const {
+    cout<<"Jasper: getGbtsLayerByIndex member function in GbtsGeometry class called in GbtsGeometry.hpp"<<std::endl;
     return m_layArray.at(idx).get();
   }
 
-  int num_bins() const { return m_nEtaBins; }
+  int num_bins() const {
+    cout<<"Jasper: num_bins member function in GbtsGeometry class called in GbtsGeometry.hpp"<<std::endl;
+    return m_nEtaBins; }
 
-  GbtsConnector *connector() const { return m_connector.get(); }
+  GbtsConnector *connector() const { 
+    cout<<"Jasper: connector member function in GbtsGeometry class called in GbtsGeometry.hpp"<<std::endl;
+    return m_connector.get(); }
 
  protected:
   const GbtsLayer<space_point_t> *addNewLayer(const TrigInDetSiLayer &l,
                                               int bin0) {
+    cout<<"Jasper: addNewLayer member function in GbtsGeometry class called in GbtsGeometry.hpp"<<std::endl;                                            
     unsigned int layerKey = l.m_subdet;  // this should be combined ID
     float ew = m_etaBinWidth;
 

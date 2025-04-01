@@ -715,7 +715,7 @@ SeedFinderGbts<external_spacepoint_t>::createSeeds(
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo) {
 
-  cout<<"Jasper: CreateSeeds (returning a vector) has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  cout<<"Jasper: CreateSeeds (The container?) has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
   
   std::vector<seed_t> r;
   createSeeds(roi, gbtsGeo, r);

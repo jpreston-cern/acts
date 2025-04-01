@@ -37,6 +37,7 @@ struct GbtsSP {
         gbtsID(id),
         combined_ID{combined_id},
         m_ClusterWidth(ClusterWidth) {
+    cout<<"Jasper: instance of GbtsSP struct was created in GbtsDataStorage.hpp"<<std::endl;
     m_phi = std::atan2(SP->y(), SP->x());
     m_r = std::sqrt((SP->x() * SP->x()) + (SP->y() * SP->y()));
   };
@@ -50,21 +51,24 @@ class GbtsNode {
  public:
   explicit GbtsNode(const GbtsSP<space_point_t> &spGbts, float minT = -100.0,
                     float maxT = 100.0)
-      : m_spGbts(spGbts), m_minCutOnTau(minT), m_maxCutOnTau(maxT) {}
+      : m_spGbts(spGbts), m_minCutOnTau(minT), m_maxCutOnTau(maxT) {cout<<"Jasper: an instance of GbtsNode was created (cosntructor called) in GbtsDataStorage"<<std::endl;}
 
   inline void addIn(int i) {
+    cout<<"Jasper: GbtsNode member function addIn was called in GbtsDataStorage.hpp"<<std::endl;
     if (m_in.size() < MAX_SEG_PER_NODE) {
       m_in.push_back(i);
     }
   }
 
   inline void addOut(int i) {
+    cout<<"Jasper: GbtsNode member function addOut was called in GbtsDataStorage.hpp"<<std::endl;
     if (m_out.size() < MAX_SEG_PER_NODE) {
       m_out.push_back(i);
     }
   }
 
   inline bool isConnector() const {
+    cout<<"Jasper: isConnector member function addIn was called in GbtsDataStorage.hpp"<<std::endl;
     if (m_in.empty() || m_out.empty()) {
       return false;
     }
@@ -72,6 +76,7 @@ class GbtsNode {
   }
 
   inline bool isFull() const {
+    cout<<"Jasper: GbtsNode member function isFull was called in GbtsDataStorage.hpp"<<std::endl;
     if (m_in.size() == MAX_SEG_PER_NODE && m_out.size() == MAX_SEG_PER_NODE) {
       return true;
     } else {
@@ -89,9 +94,13 @@ class GbtsNode {
 template <typename space_point_t>
 class GbtsEtaBin {
  public:
-  GbtsEtaBin() { m_vn.clear(); }
+  GbtsEtaBin() { 
+    
+    cout<<"Jasper: instance of GbtsEtaBin created (constructor called)"<<std::endl;
+    m_vn.clear(); }
 
   void sortByPhi() {
+    cout<<"Jasper: GbtsEtaBin member function sortByPhi was called in GbtsDataStorage.hpp"<<std::endl;
     std::ranges::sort(m_vn, [](const auto &n1, const auto &n2) {
       return (n1->m_spGbts.phi() < n2->m_spGbts.phi());
     });
@@ -100,6 +109,9 @@ class GbtsEtaBin {
   bool empty() const { return m_vn.empty(); }
 
   void generatePhiIndexing(float dphi) {
+
+    cout<<"Jasper: GbtsEtaBin member function generatePhiIndexing was called in GbtsDataStorage.hpp"<<std::endl;
+
     for (unsigned int nIdx = 0; nIdx < m_vn.size(); nIdx++) {
       GbtsNode<space_point_t> &pN = *m_vn.at(nIdx);
       // float phi = pN->m_sp.phi();
@@ -140,11 +152,14 @@ class GbtsDataStorage {
   explicit GbtsDataStorage(const GbtsGeometry<space_point_t> &g) : m_geo(g) {
     m_etaBins.reserve(g.num_bins());
     for (int k = 0; k < g.num_bins(); k++) {
+      cout<<"Jasper: instance of GbtsDataStorage created (constructor called)"<<std::endl;
       m_etaBins.emplace_back(GbtsEtaBin<space_point_t>());
     }
   }
 
   int addSpacePoint(const GbtsSP<space_point_t> &sp, bool useClusterWidth) {
+
+    cout<<"Jasper: GbtsDataStorage member function addSpacePoint was called in GbtsDataStorage.hpp"<<std::endl;
     const GbtsLayer<space_point_t> *pL =
         m_geo.getGbtsLayerByKey(sp.combined_ID);
 
@@ -193,6 +208,8 @@ class GbtsDataStorage {
   GbtsDataStorage &operator=(const GbtsDataStorage &) = delete;
 
   unsigned int numberOfNodes() const {
+
+    cout<<"Jasper: GbtsDataStorage member function numberOfNodes was called in GbtsDataStorage.hpp"<<std::endl;
     unsigned int n = 0;
 
     for (auto &b : m_etaBins) {
@@ -202,6 +219,8 @@ class GbtsDataStorage {
   }
 
   void getConnectingNodes(std::vector<const GbtsNode<space_point_t> *> &vn) {
+
+    cout<<"Jasper: GbtsDataStorage member function getConnectingNodes was called in GbtsDataStorage.hpp"<<std::endl;
     vn.clear();
     vn.reserve(numberOfNodes());
     for (const auto &b : m_etaBins) {
@@ -218,18 +237,23 @@ class GbtsDataStorage {
   }
 
   void sortByPhi() {
+    cout<<"Jasper: GbtsDataStorage member function sortByPhi was called in GbtsDataStorage.hpp"<<std::endl;
     for (auto &b : m_etaBins) {
       b.sortByPhi();
     }
   }
 
   void generatePhiIndexing(float dphi) {
+
+    cout<<"Jasper: GbtsDataStorage member function generatePhiIndexing was called in GbtsDataStorage.hpp"<<std::endl;
     for (auto &b : m_etaBins) {
       b.generatePhiIndexing(dphi);
     }
   }
 
   const GbtsEtaBin<space_point_t> &getEtaBin(int idx) const {
+
+    cout<<"Jasper: GbtsDataStorage member function getEtaBin was called in GbtsDataStorage.hpp"<<std::endl;
     if (idx >= static_cast<int>(m_etaBins.size())) {
       idx = idx - 1;
     }
@@ -255,13 +279,15 @@ class GbtsEdge {
   GbtsEdge(GbtsNode<space_point_t> *n1, GbtsNode<space_point_t> *n2, float p1,
            float p2, float p3, float p4)
       : m_n1(n1), m_n2(n2), m_level(1), m_next(1) {
+
+        cout<<"Jasper: Instance of GbtsEdge created (contructor called)"<<std::endl;
     m_p[0] = p1;
     m_p[1] = p2;
     m_p[2] = p3;
     m_p[3] = p4;
   }
 
-  GbtsEdge() : m_n1(nullptr), m_n2(nullptr), m_level(-1), m_next(-1) {}
+  GbtsEdge() : m_n1(nullptr), m_n2(nullptr), m_level(-1), m_next(-1) {cout<<"Jasper: Instance of GbtsEdge created (default constructor called)"<<std::endl;}
 
   // GbtsEdge(const GbtsEdge<space_point_t> &e)
   //     : m_n1(e.m_n1), m_n2(e.m_n2) {}
