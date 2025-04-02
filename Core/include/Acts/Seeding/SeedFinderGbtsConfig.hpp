@@ -76,7 +76,7 @@ struct SeedFinderGbtsConfig {
   // 2 member functions
   SeedFinderGbtsConfig calculateDerivedQuantities() const {
 
-    cout<<"Jasper: calculateDerivedQuantities is called in Acts/Seeding/SeedFinderGbtsConfig.hpp"
+    std::cout<<"Jasper: calculateDerivedQuantities is called in Acts/Seeding/SeedFinderGbtsConfig.hpp,\n no inputs and returns an instance of SeedFinderGbtsConfig class."<<std::endl;
     // thorw statement if the isInternalUnits member is false, ie if dont call
     // this function
     SeedFinderGbtsConfig config = *this;
@@ -87,7 +87,7 @@ struct SeedFinderGbtsConfig {
 
   SeedFinderGbtsConfig toInternalUnits() const {
 
-    cout<<"Jasper: toInternalUnits is called in Acts/Seeding/SeedFinderGbtsConfig.hpp"
+    std::cout<<"Jasper: toInternalUnits is called in Acts/Seeding/SeedFinderGbtsConfig.hpp,\n no inputs and returns an instance of SeedFinderGbtsConfig class"<<std::endl;
     // throw statement if the isInternalUnits member is false, ie if dont call
     // this function
     SeedFinderGbtsConfig config = *this;

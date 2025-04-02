@@ -40,7 +40,7 @@ SeedFinderGbts<external_spacepoint_t>::SeedFinderGbts(
           std::make_unique<GbtsDataStorage<external_spacepoint_t>>(gbtsGeo)),
       m_logger(std::move(logger)) {
         
-        cout<<"Jasper: an instance pf SeedFinderGbts has been created (constructor called)"<<std::endl;
+        std::cout<<"Jasper: an instance of SeedFinderGbts has been created (constructor called) in Acts/Seeding/SeedFinderGbts.hpp"<<std::endl;
       }
 
 // define loadspace points function
@@ -48,7 +48,7 @@ template <typename external_spacepoint_t>
 void SeedFinderGbts<external_spacepoint_t>::loadSpacePoints(
     const std::vector<GbtsSP<external_spacepoint_t>>& gbtsSPvect) {
 
-  cout<<"Jasper: loadSpacePoints has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  std::cout<<"Jasper: loadSpacePoints has been called in Acts/Seeding/SeedFinderGbts.ipp,\n it takes std::vector<GbtsSP<external_spacepoint_t>> as inputs and doesnt return anything.\n external_spacepoint_t is templated"<<std::endl;
 
   ACTS_VERBOSE("Loading space points");
   for (const auto& gbtssp : gbtsSPvect) {
@@ -68,7 +68,7 @@ void SeedFinderGbts<external_spacepoint_t>::runGbts_TrackFinder(
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo) {
 
-  cout<<"Jasper: runGbts_TrackFinder has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  std::cout<<"Jasper: runGbts_TrackFinder has been called in Acts/Seeding/SeedFinderGbts.ipp,\n it takes a vector of GbtsTrigTracklet<external_spacepoint_t> classes and doesnt return anything.\n external_spacepoint_t is templated"<<std::endl;
 
   ACTS_VERBOSE("Running GBTS Track Finder");
   const float min_z0 = roi.zedMinus();
@@ -647,7 +647,7 @@ void SeedFinderGbts<external_spacepoint_t>::createSeeds(
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo,
     output_container_t& out_cont) {
 
-  cout<<"Jasper: createSeeds has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  std::cout<<"Jasper: createSeeds has been called in Acts/Seeding/SeedFinderGbts.ipp,\n it takes classes RoiDescriptor and GbtsGeometry<external_spacepoint_t> as well as output_container_t type (templated), it doesnt return anything.\n external_spacepoint_t is templated "<<std::endl;
 
   ACTS_VERBOSE("Creating seeds");
   std::vector<GbtsTrigTracklet<external_spacepoint_t>>
@@ -715,7 +715,7 @@ SeedFinderGbts<external_spacepoint_t>::createSeeds(
     const RoiDescriptor& roi,
     const GbtsGeometry<external_spacepoint_t>& gbtsGeo) {
 
-  cout<<"Jasper: CreateSeeds (The container?) has been called in Acts/Seeding/SeedFinderGbts.ipp"<<std::endl;
+  std::cout<<"Jasper: CreateSeeds (The container?) has been called in Acts/Seeding/SeedFinderGbts.ipp,\n it takes classes RoiDescriptor and GbtsGeometry<external_spacepoint_t> and doesnt return anything. \n external_spacepoint_t is templated"<<std::endl;
   
   std::vector<seed_t> r;
   createSeeds(roi, gbtsGeo, r);

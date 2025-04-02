@@ -353,7 +353,7 @@ def addSeeding(
     rnd : RandomNumbers, None
         random number generator. Only used by SeedingAlgorithm.TruthSmeared.
     """
-    print("Jasper: calling addseeding  in Examples/Python/python/acts/examples/reconstruction")
+    print("Jasper: calling addseeding  in Examples/Python/python/acts/examples/reconstruction,\n This function takes in configuration data and returns the sequencer with addGbtsSeeding added")
     logLevel = acts.examples.defaultLogging(s, logLevel)()
     logger = acts.logging.getLogger("addSeeding")
     logger.setLevel(logLevel)
@@ -1116,7 +1116,7 @@ def addGbtsSeeding(
     ConnectorInputConfigFile: Union[Path, str] = None,
 ):
     """Gbts seeding"""
-    print("Jasper: calling addgbtsSeeding  in Examples/Python/python/acts/examples/reconstruction.py")
+    print("Jasper: calling addgbtsSeeding  in Examples/Python/python/acts/examples/reconstruction.py, \n it takes the sequemcer and config as inputs and seedingAlg.config.outputSeeds as output")
     logLevel = acts.examples.defaultLogging(sequence, logLevel)()
     layerMappingFile = str(layerMappingConfigFile)  # turn path into string
     ConnectorInputFileStr = str(ConnectorInputConfigFile)

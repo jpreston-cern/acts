@@ -27,10 +27,10 @@ class TrigInDetTriplet {
 
   TrigInDetTriplet(GbtsSP<space_point_t> s1, GbtsSP<space_point_t> s2,
                    GbtsSP<space_point_t> s3, float Q)
-      : m_s1(std::move(s1)), m_s2(std::move(s2)), m_s3(std::move(s3)), m_Q(Q) {cout<<"Jasper: instance of TrigInDetTriplet created (contructor no. 2 called)"<<std::endl;}
+      : m_s1(std::move(s1)), m_s2(std::move(s2)), m_s3(std::move(s3)), m_Q(Q) {std::cout<<"Jasper: instance of TrigInDetTriplet created (contructor no. 2 called) in Acts/Seeding/GbtsBase.hpp"<<std::endl;}
 
   explicit TrigInDetTriplet(TrigInDetTriplet* t)
-      : m_s1(t->m_s1), m_s2(t->m_s2), m_s3(t->m_s3), m_Q(t->m_Q) {cout<<"Jasper: instance of TrigInDetTriplet created (constructor no. 2 called)"<<std::endl;}
+      : m_s1(t->m_s1), m_s2(t->m_s2), m_s3(t->m_s3), m_Q(t->m_Q) {std::cout<<"Jasper: instance of TrigInDetTriplet created (constructor no. 3 called) in Acts/Seeding/GbtsBase.hpp"<<std::endl;}
 
   const GbtsSP<space_point_t>& s1() const { return m_s1; }
   const GbtsSP<space_point_t>& s2() const { return m_s2; }

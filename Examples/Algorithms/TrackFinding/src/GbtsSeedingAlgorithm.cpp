@@ -36,7 +36,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
 
-      cout<<"Jasper: Calling GbtsSeedingAlgorithm constructure from Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl;
+      std::cout<<"Jasper: Instance of GbtsSeedingAlgorithm created (contructor called) from Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl;
   // fill config struct
   m_cfg.layerMappingFile = m_cfg.layerMappingFile;
 
@@ -85,7 +85,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
     const AlgorithmContext &ctx) const {
       
-      cout<<"Jasper: Calling the Execute member functions of class GbtsSeedingAlgorithm in Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl; 
+      std::cout<<"Jasper: Calling the Execute member functions of class GbtsSeedingAlgorithm from Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n This takes an input of AlgorithmContext class and returns an instance of ProcessCode"<<std::endl; 
 
   std::vector<Acts::Experimental::GbtsSP<SimSpacePoint>> GbtsSpacePoints =
       MakeGbtsSpacePoints(ctx, m_cfg.ActsGbtsMap);
@@ -126,7 +126,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
 std::map<std::pair<int, int>, std::pair<int, int>>
 ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
 
-  cout<<"Jasper: Calling the makeActsGbtsMap member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl; 
+  std::cout<<"Jasper: Calling the makeActsGbtsMap member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n no input and returns a map of two pairs of integers "<<std::endl; 
   std::map<std::pair<int, int>, std::pair<int, int>> ActsGbts;
   std::ifstream data(
       m_cfg.layerMappingFile);  // 0 in this file refers to no Gbts ID
@@ -161,7 +161,7 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
 
-      cout<<"Jasper: Calling the MakeGbtsSpacePoints member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl; 
+      std::cout<<"Jasper: Calling the MakeGbtsSpacePoints member function of class GbtsSeedingAlgorithm from Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n inputs is the AlgorithmContext class and a map of pairs of ints. It returns an instance of the GbtsSP class"<<std::endl; 
   // create space point vectors
   std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
       gbtsSpacePoints;
@@ -242,7 +242,7 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
 std::vector<Acts::Experimental::TrigInDetSiLayer>
 ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
-  cout<<"Jasper: Calling the LayerNumbering member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl; 
+  std::cout<<"Jasper: Calling the LayerNumbering member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n it doesnt take inputs and returns a vector of instances of Acts::Experimental::TrigInDetSiLayer classes"<<std::endl; 
   std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector;
   std::vector<std::size_t> count_vector;
 

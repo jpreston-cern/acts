@@ -104,7 +104,7 @@ addSeeding(
     ConnectorInputConfigFile=geo_dir / "itk-hgtd/GbtsBinTable.txt",
     outputDirRoot=outputDir,
 )
-print("Jasper: AddSeeding is called in examples/scripts/Python/full_chain_itk_Gbts.py")
+
 addCKFTracks(
     s,
     trackingGeometry,

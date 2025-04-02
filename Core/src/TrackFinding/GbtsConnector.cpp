@@ -20,13 +20,13 @@ namespace Acts::Experimental {
 GbtsConnection::GbtsConnection(unsigned int s, unsigned int d)
     : m_src(s), m_dst(d) {
 
-    cout<<"Jasper: Instance of GbtsConnection created (constructor called)"<<std::endl;
+    std::cout<<"Jasper: Instance of GbtsConnection created (constructor called in Acts/TrackFinding/GbtsConnector.cpp)"<<std::endl;
     
     }
 
 GbtsConnector::GbtsConnector(std::ifstream &inFile) {
 
-  cout<<"Jasper: Instance of GbtsConnector created (constructor called)"<<std::endl;
+  std::cout<<"Jasper: Instance of GbtsConnector created (constructor called in Acts/TrackFinding/GbtsConnector.cpp)"<<std::endl;
 
   m_layerGroups.clear();
 

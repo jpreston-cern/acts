@@ -30,7 +30,7 @@ class GbtsConnector {
   struct LayerGroup {
     LayerGroup(unsigned int l1Key, const std::vector<const GbtsConnection *> &v)
         : m_dst(l1Key), m_sources(v) {
-        cout<<"Jasper: Instance of LayerGroup struct created (constructor called)"<<std::endl;
+        std::cout<<"Jasper: Instance of LayerGroup struct created (constructor called in Acts/TrackFinding/GbtsConnector.hpp)"<<std::endl;
         }
 
     unsigned int m_dst;  // the target layer of the group

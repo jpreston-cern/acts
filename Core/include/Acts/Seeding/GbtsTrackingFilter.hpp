@@ -33,11 +33,11 @@ struct GbtsEdgeState {
 
   GbtsEdgeState() = default;
 
-  explicit GbtsEdgeState(bool f) : m_initialized(f) {cout<<"Jasper: intance of GbtsEdgState struct created in GbtsTrackingFilter.hpp"<<std::endl;}
+  explicit GbtsEdgeState(bool f) : m_initialized(f) {std::cout<<"Jasper: intance of GbtsEdgState struct created in Acts/Seeding/GbtsTrackingFilter.hpp"<<std::endl;}
 
   void initialize(GbtsEdge<external_spacepoint_t>* pS) {
 
-    cout<<"Jasper: initilise function called in GbtsTrackingFilter.hpp"<<std::endl;
+    std::cout<<"Jasper: initilise function called in Acts/Seeding/GbtsTrackingFilter.hpp .\n it takes pointer to GbtsEdge<external_spacepoint_t> class as input and no return "<<std::endl;
 
     m_initialized = true;
 
@@ -87,7 +87,7 @@ struct GbtsEdgeState {
 
   void clone(const struct GbtsEdgeState& st) {
 
-    cout<<"Jasper: clone fucntion called in GbtsTrackingFilter.hpp"<<std::endl;
+    std::cout<<"Jasper: clone function called in Acts/Seeding/GbtsTrackingFilter.hpp .\n has input of GbtsEdgeState class and no return "<<std::endl;
 
     memcpy(&m_X[0], &st.m_X[0], sizeof(m_X));
     memcpy(&m_Y[0], &st.m_Y[0], sizeof(m_Y));
@@ -125,12 +125,12 @@ class GbtsTrackingFilter {
                      std::unique_ptr<const Acts::Logger> logger =
                          Acts::getDefaultLogger("Filter",
                                                 Acts::Logging::Level::INFO))
-      : m_geo(g), m_segStore(sb), m_logger(std::move(logger)) {cout<<"Jasper: instance of GbtsTrackingFilter class created in GbtsTrackingFilter.hpp"<<std::endl;}
+      : m_geo(g), m_segStore(sb), m_logger(std::move(logger)) {std::cout<<"Jasper: instance of GbtsTrackingFilter class created in Acts/Seeding/GbtsTrackingFilter.hpp"<<std::endl;}
 
   void followTrack(GbtsEdge<external_spacepoint_t>* pS,
                    GbtsEdgeState<external_spacepoint_t>& output) {
 
-    cout<<"Jasper: followTrack fucntion called in GbtsTrackingFilter.hpp"<<std::endl;
+    std::cout<<"Jasper: followTrack function called in Acts/Seeding/GbtsTrackingFilter.hpp,\n it has input of classes GbtsEdge and gbtsEdgeState and has no return"<<std::endl;
 
     if (pS->m_level == -1) {
       return;  // already collected
@@ -166,7 +166,7 @@ class GbtsTrackingFilter {
  protected:
   void propagate(GbtsEdge<external_spacepoint_t>* pS,
                  GbtsEdgeState<external_spacepoint_t>& ts) {
-    cout<<"Jasper: propagate function calld in gbtsTrackingFilter.hpp"<<std::endl;
+    std::cout<<"Jasper: propagate function called in Acts/Seeding/GbtsTrackingFilter.hpp .\n it takes classes GbtsEdge and GbtsEdgeState as inputs and has no return"<<std::endl;
     if (m_globalStateCounter >= MAX_EDGE_STATE) {
       return;
     }
@@ -232,7 +232,7 @@ class GbtsTrackingFilter {
   bool update(GbtsEdge<external_spacepoint_t>* pS,
               GbtsEdgeState<external_spacepoint_t>& ts) {
 
-    cout<<"Jasper: update function called in GbtsTrackingFilter"<<std::endl;
+    std::cout<<"Jasper: update function called in Acts/Seeding/GbtsTrackingFilter.hpp .\n It takes calsses gbtsEdge and GbtsEdgeState ad inputs and returns a bool "<<std::endl;
 
     const float sigma_t = 0.0003;
     const float sigma_w = 0.00009;
@@ -386,7 +386,7 @@ class GbtsTrackingFilter {
 
   int getLayerType(int l) {
 
-    cout<<"Jasper: function getLayerType is called in GbtsTrackingFilter.hpp"<<std::endl;
+    std::cout<<"Jasper: function getLayerType is called in Acts/Seeding/GbtsTrackingFilter.hpp .\n it takes an int as input and returns an int"<<std::endl;
     
     auto iterator = find_if(m_geo.begin(), m_geo.end(), [l](auto n) {
       return n.m_subdet == l;
