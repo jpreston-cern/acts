@@ -14,6 +14,7 @@ SpacePointProxy<container_t>::SpacePointProxy(const container_t& container,
                                               std::size_t index)
     : m_container(&container), m_index(index) {}
 
+//accesses the sp memebr function of the spacepointcontainer class
 template <typename container_t>
 const typename SpacePointProxy<container_t>::ValueType&
 SpacePointProxy<container_t>::externalSpacePoint() const {

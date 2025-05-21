@@ -60,6 +60,7 @@ void SeedFinderGbts<external_spacepoint_t>::loadSpacePoints(
   m_storage->sortByPhi();
 
   m_storage->generatePhiIndexing(1.5 * m_config.m_phiSliceWidth);
+  
 }
 
 template <typename external_spacepoint_t>

@@ -38,7 +38,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
       std::cout<<"Jasper: Instance of GbtsSeedingAlgorithm created (contructor called) from Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp"<<std::endl;
   // fill config struct
-  m_cfg.layerMappingFile = m_cfg.layerMappingFile;
+  //m_cfg.layerMappingFile = m_cfg.layerMappingFile;
 
   m_cfg.seedFinderConfig =
       m_cfg.seedFinderConfig.toInternalUnits().calculateDerivedQuantities();
@@ -244,10 +244,12 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
   std::cout<<"Jasper: Calling the LayerNumbering member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n it doesnt take inputs and returns a vector of instances of Acts::Experimental::TrigInDetSiLayer classes"<<std::endl; 
   std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector;
+  std::cout<<"Jasper: input layer obj created"<<std::endl;
   std::vector<std::size_t> count_vector;
 
   m_cfg.trackingGeometry->visitSurfaces([this, &input_vector, &count_vector](
                                             const Acts::Surface *surface) {
+    
     Acts::GeometryIdentifier geoid = surface->geometryId();
     auto ACTS_vol_id = geoid.volume();
     auto ACTS_lay_id = geoid.layer();

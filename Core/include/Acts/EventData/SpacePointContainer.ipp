@@ -35,10 +35,25 @@ SpacePointContainer<container_t, holder_t>::SpacePointContainer(
 
 template <typename container_t, template <typename> class holder_t>
 void SpacePointContainer<container_t, holder_t>::initialize() {
-  m_data.resize(size(), m_config.useDetailedDoubleMeasurementInfo);
+
+  //size() accesses the m_container private variable and finds its size via .size_impl()
+  m_data.resize(size(), m_config.useDetailedDoubleMeasurementInfo); 
   m_proxies.reserve(size());
+
+  //get the container
   const auto& external_container = container();
+
+  
+
+  
+
+ 
+
+  //for every space point in container (can use just size() as that is referring to the member function of the class)
   for (std::size_t i(0); i < size(); ++i) {
+
+  //set x,y,z,rad,phi,var R and Var Z for every xAOD spacepoint using the x_impl() (and other functions) and adjust for beamspot to the m_data variable of the ACTS SpacepointContainer.
+  //(these functions are come from athena/Tracking/Acts/ActsEvent/ActsEvent/SpacePointCollector.h)
     m_data.setX(i, external_container.x_impl(i) - m_options.beamPos[0]);
     m_data.setY(i, external_container.y_impl(i) - m_options.beamPos[1]);
     m_data.setZ(i, external_container.z_impl(i));
@@ -48,6 +63,9 @@ void SpacePointContainer<container_t, holder_t>::initialize() {
     m_data.setVarianceR(i, external_container.varianceR_impl(i));
     m_data.setVarianceZ(i, external_container.varianceZ_impl(i));
 
+
+   //create a new instance of SpacePointProxy initialised with the current instance of SpacePointContainer (which has the current variables as there member variables)
+   //assigns an index i so that these variables for each spacepoint can be accessed quickly 
     m_proxies.emplace_back(*this, i);
   }
 
@@ -98,6 +116,7 @@ SpacePointContainer<container_t, holder_t>::topStripCenterPosition(
   return m_data.topStripCenterPosition(n);
 }
 
+//finds the size of collection of xAOD spacepoints 
 template <typename container_t, template <typename> class holder_t>
 std::size_t SpacePointContainer<container_t, holder_t>::size() const {
   return container().size_impl();
@@ -156,7 +175,7 @@ const typename SpacePointContainer<container_t, holder_t>::ProxyType&
 SpacePointContainer<container_t, holder_t>::at(const std::size_t n) const {
   return proxies().at(n);
 }
-
+//gets the info for the event from the spacepoint collector class which gets it from the xAOD storage of that spacepoint 
 template <typename container_t, template <typename> class holder_t>
 const typename SpacePointContainer<container_t, holder_t>::ValueType&
 SpacePointContainer<container_t, holder_t>::sp(const std::size_t n) const {
