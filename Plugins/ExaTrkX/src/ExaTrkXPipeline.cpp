@@ -37,13 +37,13 @@ ExaTrkXPipeline::ExaTrkXPipeline(
 
 std::vector<std::vector<int>> ExaTrkXPipeline::run(
     std::vector<float> &features, const std::vector<std::uint64_t> &moduleIds,
-    std::vector<int> &spacepointIDs, const ExaTrkXHook &hook,
-    ExaTrkXTiming *timing) const {
+    std::vector<int> &spacepointIDs, Acts::Device device,
+    const ExaTrkXHook &hook, ExaTrkXTiming *timing) const {
   ExecutionContext ctx;
-  ctx.device = m_graphConstructor->device();
+  ctx.device = device;
 #ifndef ACTS_EXATRKX_CPUONLY
-  if (ctx.device.type() == torch::kCUDA) {
-    ctx.stream = c10::cuda::getStreamFromPool(ctx.device.index());
+  if (ctx.device.type == Acts::Device::Type::eCUDA) {
+    ctx.stream = c10::cuda::getStreamFromPool(true, ctx.device.index);
   }
 #endif
 
@@ -92,7 +92,7 @@ std::vector<std::vector<int>> ExaTrkXPipeline::run(
 
     return res;
   } catch (Acts::NoEdgesError &) {
-    ACTS_WARNING("No egdges left in GNN pipeline, return 0 track candidates");
+    ACTS_DEBUG("No edges left in GNN pipeline, return 0 track candidates");
     if (timing != nullptr) {
       while (timing->classifierTimes.size() < m_edgeClassifiers.size()) {
         timing->classifierTimes.push_back({});

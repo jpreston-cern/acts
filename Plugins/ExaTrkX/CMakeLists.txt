@@ -2,13 +2,31 @@ add_library(ActsPluginExaTrkX SHARED src/buildEdges.cpp src/ExaTrkXPipeline.cpp)
 
 if(ACTS_EXATRKX_ENABLE_CUDA)
     target_compile_definitions(ActsPluginExaTrkX PUBLIC ACTS_EXATRKX_WITH_CUDA)
-    target_sources(ActsPluginExaTrkX PRIVATE src/CudaTrackBuilding.cu)
+    target_sources(
+        ActsPluginExaTrkX
+        PRIVATE src/CudaTrackBuilding.cu src/JunctionRemoval.cu
+    )
+endif()
+
+if(ACTS_EXATRKX_ENABLE_MODULEMAP)
+    target_compile_definitions(
+        ActsPluginExaTrkX
+        PUBLIC ACTS_EXATRKX_WITH_MODULEMAP
+    )
+
+    target_link_libraries(
+        ActsPluginExaTrkX
+        PRIVATE ModuleMapGraph::CPU ModuleMapGraph::GPU
+    )
+    target_sources(ActsPluginExaTrkX PRIVATE src/ModuleMapCuda.cu)
 endif()
 
 if(ACTS_EXATRKX_ENABLE_ONNX)
-    target_sources(
+    target_sources(ActsPluginExaTrkX PRIVATE src/OnnxEdgeClassifier.cpp)
+    target_link_libraries(ActsPluginExaTrkX PRIVATE onnxruntime::onnxruntime)
+    target_compile_definitions(
         ActsPluginExaTrkX
-        PRIVATE src/OnnxEdgeClassifier.cpp src/OnnxMetricLearning.cpp
+        PUBLIC ACTS_EXATRKX_ONNX_BACKEND
     )
 endif()
 
@@ -59,7 +77,7 @@ if(ACTS_EXATRKX_ENABLE_CUDA)
     target_compile_features(ActsPluginExaTrkX PUBLIC cuda_std_20)
     set_target_properties(
         ActsPluginExaTrkX
-        PROPERTIES CUDA_STANDARD_REQUIRED ON CUDA_SEPARABLE_COMPILATION ON
+        PROPERTIES CUDA_STANDARD_REQUIRED ON CUDA_SEPARABLE_COMPILATION OFF
     )
     target_compile_options(
         ActsPluginExaTrkX
@@ -74,15 +92,6 @@ if(ACTS_EXATRKX_ENABLE_CUDA)
     )
 else()
     target_compile_definitions(ActsPluginExaTrkX PUBLIC ACTS_EXATRKX_CPUONLY)
-endif()
-
-if(ACTS_EXATRKX_ENABLE_ONNX)
-    target_compile_definitions(
-        ActsPluginExaTrkX
-        PUBLIC ACTS_EXATRKX_ONNX_BACKEND
-    )
-
-    target_link_libraries(ActsPluginExaTrkX PRIVATE OnnxRuntime)
 endif()
 
 if(ACTS_EXATRKX_ENABLE_TORCH)
