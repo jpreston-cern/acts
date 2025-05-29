@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pathlib, acts, acts.examples, acts.examples.itk
-from acts.examples.simulation import (
+from acts.examples.simulation import (#import all the config and functions we need from reconstruction.py
     addParticleGun,
     MomentumConfig,
     EtaConfig,
@@ -12,21 +12,21 @@ from acts.examples.simulation import (
     addDigitization,
     addDigiParticleSelection,
 )
-from acts.examples.reconstruction import (
-    addSeeding,
+from acts.examples.reconstruction import (#same here 
+    addSeeding, #important function 
     SeedingAlgorithm,
     addCKFTracks,
     TrackSelectorConfig,
 )
-
+#settings we can change for whne we run 
 ttbar_pu200 = False
-u = acts.UnitConstants
-geo_dir = pathlib.Path("acts-itk")
+u = acts.UnitConstants #units used in acts 
+geo_dir = pathlib.Path("acts-itk") #itk files 
 outputDir = pathlib.Path.cwd() / "itk_output"
 # acts.examples.dump_args_calls(locals())  # show acts.examples python binding calls
 
-detector = acts.examples.itk.buildITkGeometry(geo_dir)
-trackingGeometry = detector.trackingGeometry()
+detector = acts.examples.itk.buildITkGeometry(geo_dir) #heavy itk object that holds everything
+trackingGeometry = detector.trackingGeometry()# the actual volume 
 field = acts.examples.MagneticFieldMapXyz(str(geo_dir / "bfield/ATLAS-BField-xyz.root"))
 rnd = acts.examples.RandomNumbers(seed=42)
 
@@ -92,16 +92,16 @@ addDigiParticleSelection(
 )
 
 addSeeding(
-    s,
-    trackingGeometry,
-    field,
-    seedingAlgorithm=SeedingAlgorithm.Gbts,
-    *acts.examples.itk.itkSeedingAlgConfig(
+    s, #seequencer (what actually runs everything after making algorithm choices)
+    trackingGeometry, #ACTS detector geometry
+    field, #magnetic field 
+    seedingAlgorithm=SeedingAlgorithm.Gbts, #naming the algorithm  so add seeding can choose it in its definition
+    *acts.examples.itk.itkSeedingAlgConfig(#this filled in the itk.py file and initialises and fills python config files (not in c++ yet) using a helper function
         acts.examples.itk.InputSpacePointsType.PixelSpacePoints
     ),
-    geoSelectionConfigFile=geo_dir / "itk-hgtd/geoSelection-ITk.json",
-    layerMappingConfigFile=geo_dir / "itk-hgtd/GbtsMapping.csv",
-    ConnectorInputConfigFile=geo_dir / "itk-hgtd/GbtsBinTable.txt",
+    geoSelectionConfigFile=geo_dir / "itk-hgtd/geoSelection-ITk.json", #specififes which layers are actually to be looked at (means you dont accidently load suppoet structure hits ect)
+    layerMappingConfigFile=geo_dir / "itk-hgtd/GbtsMapping.csv", #file for chaning between acts id's to athena/gbts id's
+    ConnectorInputConfigFile=geo_dir / "itk-hgtd/GbtsBinTable.txt", #connection table 
     outputDirRoot=outputDir,
 )
 

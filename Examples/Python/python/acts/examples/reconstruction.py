@@ -267,24 +267,24 @@ class VertexFinder(Enum):
     truthEstimatedSeedingAlgorithmConfigArg=TruthEstimatedSeedingAlgorithmConfigArg,
     logLevel=acts.logging.Level,
 )
-def addSeeding(
-    s: acts.examples.Sequencer,
-    trackingGeometry: acts.TrackingGeometry,
-    field: acts.MagneticFieldProvider,
-    geoSelectionConfigFile: Optional[Union[Path, str]] = None,
-    layerMappingConfigFile: Optional[Union[Path, str]] = None,
-    ConnectorInputConfigFile: Optional[Union[Path, str]] = None,
-    seedingAlgorithm: SeedingAlgorithm = SeedingAlgorithm.Default,
+def addSeeding( #only some of these variables are used for the gbts seeding algorithm via addgbtsseeding
+    s: acts.examples.Sequencer, #given input (useed in addspacepoint and gbts alg)
+    trackingGeometry: acts.TrackingGeometry, #given input (used in addspaceppoint and gbts alg)
+    field: acts.MagneticFieldProvider, #given input 
+    geoSelectionConfigFile: Optional[Union[Path, str]] = None, #given input (used in addSpacepoint and gbts seeding alg)
+    layerMappingConfigFile: Optional[Union[Path, str]] = None, #given input (used in gbts seeding alg)
+    ConnectorInputConfigFile: Optional[Union[Path, str]] = None, #given input (used in gbts seeding alg)
+    seedingAlgorithm: SeedingAlgorithm = SeedingAlgorithm.Default, #given input (used for changing the algorithm used)
     trackSmearingSigmas: TrackSmearingSigmas = TrackSmearingSigmas(),
     initialSigmas: Optional[list] = None,
     initialSigmaQoverPt: Optional[float] = None,
     initialSigmaPtRel: Optional[float] = None,
     initialVarInflation: Optional[list] = None,
-    seedFinderConfigArg: SeedFinderConfigArg = SeedFinderConfigArg(),
-    seedFinderOptionsArg: SeedFinderOptionsArg = SeedFinderOptionsArg(),
-    seedFilterConfigArg: SeedFilterConfigArg = SeedFilterConfigArg(),
-    spacePointGridConfigArg: SpacePointGridConfigArg = SpacePointGridConfigArg(),
-    seedingAlgorithmConfigArg: SeedingAlgorithmConfigArg = SeedingAlgorithmConfigArg(),
+    seedFinderConfigArg: SeedFinderConfigArg = SeedFinderConfigArg(), #passed through itkconfigarg helper (used in gbts alg)
+    seedFinderOptionsArg: SeedFinderOptionsArg = SeedFinderOptionsArg(), #passed through itkconfigarg helper (used in gbts alg)
+    seedFilterConfigArg: SeedFilterConfigArg = SeedFilterConfigArg(), #passed through itkconfigarg helper (NOT USED)
+    spacePointGridConfigArg: SpacePointGridConfigArg = SpacePointGridConfigArg(), #passed through itkconfigarg helper (NOT USED)
+    seedingAlgorithmConfigArg: SeedingAlgorithmConfigArg = SeedingAlgorithmConfigArg(), #passed through itkconfigarg helper (NOT USED)
     houghTransformConfig: acts.examples.HoughTransformSeeder.Config = acts.examples.HoughTransformSeeder.Config(),
     hashingTrainingConfigArg: Optional[
         HashingTrainingConfigArg
@@ -298,9 +298,9 @@ def addSeeding(
     ] = acts.ParticleHypothesis.pion,
     inputParticles: str = "particles",
     selectedParticles: str = "particles_selected",
-    outputDirRoot: Optional[Union[Path, str]] = None,
+    outputDirRoot: Optional[Union[Path, str]] = None, #given input 
     outputDirCsv: Optional[Union[Path, str]] = None,
-    logLevel: Optional[acts.logging.Level] = None,
+    logLevel: Optional[acts.logging.Level] = None, # used in addSpacepoint and gbts alg
     rnd: Optional[acts.examples.RandomNumbers] = None,
 ) -> None:
     """This function steers the seeding
@@ -378,7 +378,7 @@ def addSeeding(
     else:
         spacePoints = addSpacePointsMaking(
             s, trackingGeometry, geoSelectionConfigFile, logLevel
-        )
+        )#create the spacepoints which are in the acts spacepoint container in a readhandle wrapper
         # Run either: truth track finding or seeding
         if seedingAlgorithm == SeedingAlgorithm.TruthEstimated:
             logger.info("Using truth track finding from space points for seeding")
@@ -426,7 +426,7 @@ def addSeeding(
             
             seeds = addGbtsSeeding(
                 s,
-                spacePoints,
+                spacePoints, #spacepoints given with spacepoint container using proxies in  readhandle wrapper
                 seedFinderConfigArg,
                 seedFinderOptionsArg,
                 trackingGeometry,
@@ -645,7 +645,7 @@ def addSpacePointsMaking(
     For parameters description see addSeeding
     """
     logLevel = acts.examples.defaultLogging(sequence, logLevel)()
-    spAlg = acts.examples.SpacePointMaker(
+    spAlg = acts.examples.SpacePointMaker( # this gives outputs of the acts spacepoint container (with using proxies most likely as described in the Gbts2Acts in athena) using the write data handle wrapper
         level=logLevel,
         inputMeasurements="measurements",
         outputSpacePoints="spacepoints",
@@ -655,7 +655,7 @@ def addSpacePointsMaking(
         ),
     )
     sequence.addAlgorithm(spAlg)
-    return spAlg.config.outputSpacePoints
+    return spAlg.config.outputSpacePoints 
 
 
 def addStandardSeeding(
@@ -1111,29 +1111,31 @@ def addHoughTransformSeeding(
 
 def addGbtsSeeding(
     sequence: acts.examples.Sequencer,
-    spacePoints: str,
-    seedFinderConfigArg: SeedFinderConfigArg,
-    seedFinderOptionsArg: SeedFinderOptionsArg,
-    trackingGeometry: acts.TrackingGeometry,
+    spacePoints: str, #these are given via the addspacepoint function in the addseeding function (assuming these are acts seeds from the acts container? need to look into that)
+    seedFinderConfigArg: SeedFinderConfigArg, #all the different physics cuts ect
+    seedFinderOptionsArg: SeedFinderOptionsArg, # beamposition and bfield 
+    trackingGeometry: acts.TrackingGeometry, # tracking geometry in term of acts ids (i think)
     logLevel: acts.logging.Level = None,
-    layerMappingConfigFile: Union[Path, str] = None,
-    geoSelectionConfigFile: Union[Path, str] = None,
-    ConnectorInputConfigFile: Union[Path, str] = None,
+    layerMappingConfigFile: Union[Path, str] = None, #id's to allow conversion from acts map to gbts map
+    geoSelectionConfigFile: Union[Path, str] = None, # spacepoimt geometry selection (not sure what this is)
+    ConnectorInputConfigFile: Union[Path, str] = None, #connection table for creating gbts connections 
 ):
+
+    #main body of function 
     """Gbts seeding"""
     print("Jasper: calling addgbtsSeeding  in Examples/Python/python/acts/examples/reconstruction.py, \n it takes the sequemcer and config as inputs and seedingAlg.config.outputSeeds as output")
     logLevel = acts.examples.defaultLogging(sequence, logLevel)()
     layerMappingFile = str(layerMappingConfigFile)  # turn path into string
-    ConnectorInputFileStr = str(ConnectorInputConfigFile)
-    seedFinderConfig = acts.SeedFinderGbtsConfig(
-        **acts.examples.defaultKWArgs(
+    ConnectorInputFileStr = str(ConnectorInputConfigFile) #turn into string 
+    seedFinderConfig = acts.SeedFinderGbtsConfig( #fills the gbts config file (i dont remember seeing this in athena), this filling a c++ file now
+        **acts.examples.defaultKWArgs( #this uses a python bind to fill the struct hence why we can have values in the () even though there is no custom constructor 
             sigmaScattering=seedFinderConfigArg.sigmaScattering,
             minPt=seedFinderConfigArg.minPt,
             ConnectorInputFile=ConnectorInputFileStr,
             m_useClusterWidth=False,
         ),
     )
-    seedFinderOptions = acts.SeedFinderOptions(
+    seedFinderOptions = acts.SeedFinderOptions( # this is found in the ACTS seedfinderconfig fil and fills the seedfinderoptions with beamspot data and z component of mag field 
         **acts.examples.defaultKWArgs(
             beamPos=(
                 acts.Vector2(0.0, 0.0)
@@ -1146,7 +1148,7 @@ def addGbtsSeeding(
         )
     )
     
-    seedingAlg = acts.examples.GbtsSeedingAlgorithm(
+    seedingAlg = acts.examples.GbtsSeedingAlgorithm( # initialises the examples gbts seeding algorithm in the same way as the previous ways (using a python wrapper) 
         level=logLevel,
         inputSpacePoints=[spacePoints],
         outputSeeds="seeds",

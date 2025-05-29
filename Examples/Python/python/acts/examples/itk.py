@@ -586,8 +586,8 @@ def itkSeedingAlgConfig(
 
     return (
         seedingAlgorithmConfigArg,
-        seedFinderConfigArg,
-        seedFinderOptionsArg,
+        seedFinderConfigArg, #used in gbts 
+        seedFinderOptionsArg,#used in gbts 
         seedFilterConfigArg,
-        spacePointGridConfigArg,
+        spacePointGridConfigArg, 
     )

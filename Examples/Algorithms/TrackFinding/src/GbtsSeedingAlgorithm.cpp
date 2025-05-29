@@ -23,7 +23,7 @@
 #include <sstream>
 #include <vector>
 
-template class Acts::Experimental::GbtsLayer<ActsExamples::SimSpacePoint>;
+template class Acts::Experimental::GbtsLayer<ActsExamples::SimSpacePoint>; //this is done so that the teplates are initlaised onto the spacepoints during compile (saves time during running)
 template class Acts::Experimental::GbtsGeometry<ActsExamples::SimSpacePoint>;
 template class Acts::Experimental::GbtsNode<ActsExamples::SimSpacePoint>;
 template class Acts::Experimental::GbtsEtaBin<ActsExamples::SimSpacePoint>;
@@ -47,16 +47,16 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
       m_cfg.seedFinderOptions.toInternalUnits().calculateDerivedQuantities(
           m_cfg.seedFinderConfig);
 
-  for (const auto &spName : m_cfg.inputSpacePoints) {
+  for (const auto &spName : m_cfg.inputSpacePoints) {//for every collection of spacepoints
     if (spName.empty()) {
-      throw std::invalid_argument("Invalid space point input collection");
+      throw std::invalid_argument("Invalid space point input collection");// check to see if the spacepoint colletion vector is empty (this is a vector of collection not a single collection)
     }
 
-    auto &handle = m_inputSpacePoints.emplace_back(
-        std::make_unique<ReadDataHandle<SimSpacePointContainer>>(
+    auto &handle = m_inputSpacePoints.emplace_back(//add a data handle for the spacepointcontainer to the vector of data handles 
+        std::make_unique<ReadDataHandle<SimSpacePointContainer>>(//
             this,
-            "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size())));
-    handle->initialize(spName);
+            "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size()))); //define the name of the collection
+    handle->initialize(spName); //initialize it with the collection string 
   }
 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
