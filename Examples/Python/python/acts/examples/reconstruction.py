@@ -1135,7 +1135,7 @@ def addGbtsSeeding(
             m_useClusterWidth=False,
         ),
     )
-    seedFinderOptions = acts.SeedFinderOptions( # this is found in the ACTS seedfinderconfig fil and fills the seedfinderoptions with beamspot data and z component of mag field 
+    seedFinderOptions = acts.SeedFinderOptions( # this is found in the ACTS seedfinderconfig file and fills the seedfinderoptions with beamspot data and z component of mag field 
         **acts.examples.defaultKWArgs(
             beamPos=(
                 acts.Vector2(0.0, 0.0)

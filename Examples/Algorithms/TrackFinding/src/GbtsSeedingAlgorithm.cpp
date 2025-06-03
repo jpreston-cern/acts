@@ -56,12 +56,12 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
         std::make_unique<ReadDataHandle<SimSpacePointContainer>>(//
             this,
             "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size()))); //define the name of the collection
-    handle->initialize(spName); //initialize it with the collection string 
+    handle->initialize(spName); //associate the hadle with the collection string 
   }
 
-  m_outputSeeds.initialize(m_cfg.outputSeeds);
+  m_outputSeeds.initialize(m_cfg.outputSeeds); //associate the data handle with the string name for output seeds
 
-  m_inputClusters.initialize(m_cfg.inputClusters);
+  m_inputClusters.initialize(m_cfg.inputClusters); //associate the data handle with the string name for input clusters
 
   // map
   m_cfg.ActsGbtsMap = makeActsGbtsMap();
