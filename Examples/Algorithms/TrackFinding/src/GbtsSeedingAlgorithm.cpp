@@ -36,12 +36,10 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
   // fill config struct
-  m_cfg.layerMappingFile = m_cfg.layerMappingFile;
+  
 
-  m_cfg.seedFinderConfig = m_cfg.seedFinderConfig.calculateDerivedQuantities();
+  
 
-  m_cfg.seedFinderOptions = m_cfg.seedFinderOptions.calculateDerivedQuantities(
-      m_cfg.seedFinderConfig);
 
   for (const auto &spName : m_cfg.inputSpacePoints) {
     if (spName.empty()) {
