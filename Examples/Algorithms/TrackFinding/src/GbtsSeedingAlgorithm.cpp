@@ -21,6 +21,7 @@
 #include <numbers>
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 template class Acts::Experimental::GbtsLayer<ActsExamples::SimSpacePoint>;
@@ -51,6 +52,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
             this,
             "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size())));
     handle->initialize(spName);
+
   }
 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
@@ -65,12 +67,37 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.ConnectorInputFile.c_str(), std::ifstream::in);
 
-  // connector
-  std::unique_ptr<Acts::Experimental::GbtsConnector> inputConnector =
-      std::make_unique<Acts::Experimental::GbtsConnector>(input_ifstream);
+  
+  
+  if (input_ifstream.empty()) {
 
-  m_gbtsGeo = std::make_unique<Acts::Experimental::GbtsGeometry<SimSpacePoint>>(
-      m_cfg.seedFinderConfig.m_layerGeometry, inputConnector);
+    ACTS_WARNING("Cannot find layer connections file " << input_ifstream);
+    throw std::runtime_error("connection file not found") //not sure if this is the right thing to do 
+    
+  }
+
+  else {
+    
+      std::unique_ptr<GNN_FasTrackConnector> m_connector = //add this class in and set include 
+      std::make_unique<GNN_FASTRACK_CONNECTOR>(input_ifstream, m_LRTmode);
+      if (m_etaBinOverride != 0.0f) {
+
+        m_connector->m_etaBin = m_cfg.SeedFinderConfig.m_etaBinOverride;
+
+    }
+
+    
+
+  }
+
+  m_gbtsGeo = std::make_unique<TrigFTF_GNN_Geometry>(m_cfg.SeedFinderConfig.m_layerGeometry, m_connector); //add this class and then change description in the h file 
+
+  m_cfg.SeedFinderConfig.m_phiSliceWidth = 2 * std::numbers::pi / m_cfg.SeedFinderConfig.m_nMaxPhiSlice;
+  
+  ACTS_DEBUG("Property useML "<< m_cfg.SeedFinderConfig.m_useML);
+  
+  ACTS_DEBUG("Property pTmin "<<m_cfg.SeedFinderConfig.m_minPt);
+  ACTS_DEBUG("Property LRTmode "<<m_cfg.SeedFinderConfig.m_LRTmode);
 
 }  // this is not Gbts config type because it is a member of the algs config,
    // which is of type Gbts cofig
