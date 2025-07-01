@@ -44,16 +44,14 @@ struct SeedFinderGbtsConfig {
       false;  // bool for use of cluster width in loadSpacePoints function
   std::string ConnectorInputFile;  // Path to the connector configuration file
                                    // that defines the layer connections
-  std::vector<TrigInDetSiLayer> m_layerGeometry;
+  
 
   // for runGbts_TrackFinder
-  bool m_useEtaBinning =
-      true;  // bool to use eta binning from geometry structure
+  bool m_useEtaBinning = true;  // bool to use eta binning from geometry structure
   bool m_doubletFilterRZ = true;  // bool applies new Z cuts on doublets
   float m_minDeltaRadius = 2.0;   // min dr for doublet
   float m_tripletD0Max = 4.0;     // D0 cut for triplets
-  unsigned int m_maxTripletBufferLength =
-      3;                        // maximum number of space points per triplet
+  unsigned int m_maxTripletBufferLength = 3; // maximum number of space points per triplet
   int m_nMaxEdges = 2000000;       // max number of Gbts edges/doublets
   float cut_dphi_max = 0.012;   // phi cut for triplets
   float cut_dcurv_max = 0.001;  // curv cut for triplets
@@ -64,6 +62,7 @@ struct SeedFinderGbtsConfig {
   float m_tripletPtMin = m_PtMin * m_tripletPtMinFrac;  // Limit on triplet pt
   double ptCoeff =
       0.29997 * 1.9972 / 2.0;  // ~0.3*B/2 - assumes nominal field of 2*T
+
  //NEW VERAIBLES START
   
   

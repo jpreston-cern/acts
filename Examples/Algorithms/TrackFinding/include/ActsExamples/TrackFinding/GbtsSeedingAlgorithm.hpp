@@ -79,8 +79,9 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   std::unique_ptr<Acts::Experimental::GbtsGeometry<SimSpacePoint>> m_gbtsGeo;
 
-  std::vector<std::unique_ptr<ReadDataHandle<SimSpacePointContainer>>>
-      m_inputSpacePoints{};
+  std::vector<TrigInDetSiLayer> m_layerGeometry{};
+   
+  std::vector<std::unique_ptr<ReadDataHandle<SimSpacePointContainer>>> m_inputSpacePoints{};
 
   WriteDataHandle<SimSeedContainer> m_outputSeeds{this, "OutputSeeds"};
 
