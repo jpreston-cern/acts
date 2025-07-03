@@ -127,30 +127,38 @@ std::map<std::pair<int, int>, std::pair<int, int>>
 ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
 
   std::cout<<"Jasper: Calling the makeActsGbtsMap member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n no input and returns a map of two pairs of integers "<<std::endl; 
-  std::map<std::pair<int, int>, std::pair<int, int>> ActsGbts;
+  std::map<std::pair<int, int>, std::pair<int, int>> ActsGbts; //define the map object
   std::ifstream data(
-      m_cfg.layerMappingFile);  // 0 in this file refers to no Gbts ID
-  std::string line;
+      m_cfg.layerMappingFile);  // read the csv file in 0 in this file refers to no Gbts ID
+
+  std::string line; //string that will hold line of data 
+
   std::vector<std::vector<std::string>> parsedCsv;
-  while (std::getline(data, line)) {
-    std::stringstream lineStream(line);
+
+  while (std::getline(data, line)) {//whilst there are still lines to read, assign the line to the string "line"
+
+    std::stringstream lineStream(line); //reads in the string to be manipulated 
     std::string cell;
-    std::vector<std::string> parsedRow;
-    while (std::getline(lineStream, cell, ',')) {
-      parsedRow.push_back(cell);
+    std::vector<std::string> parsedRow; //the vector that holds all the parsed information of that line
+
+    while (std::getline(lineStream, cell, ',')) {//while there is still info to be parsed on that line, parse each set of info seperated by a ","
+      parsedRow.push_back(cell);//add to vector 
     }
 
-    parsedCsv.push_back(parsedRow);
+    parsedCsv.push_back(parsedRow);//add vector of all the parsed info from a line to the parsed csv. indexed on line and info in line 
   }
   // file in format ACTS_vol,ACTS_lay,ACTS_mod,Gbts_id
-  for (auto i : parsedCsv) {
+  for (auto i : parsedCsv) {//for each vector of parsed line info
+
+    //get the ACTS volume, layer and mod label as well as the gbts (or combined) ID and eta mod 
     int ACTS_vol = stoi(i[0]);
     int ACTS_lay = stoi(i[1]);
     int ACTS_mod = stoi(i[2]);
     int Gbts = stoi(i[5]);
     int eta_mod = stoi(i[6]);
+    //create combined acts id
     int ACTS_joint = ACTS_vol * 100 + ACTS_lay;
-    ActsGbts.insert({{ACTS_joint, ACTS_mod}, {Gbts, eta_mod}});
+    ActsGbts.insert({{ACTS_joint, ACTS_mod}, {Gbts, eta_mod}}); //create map of acts to gbts style combined id and mod 
   }
 
   return ActsGbts;
@@ -239,25 +247,27 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
   return gbtsSpacePoints;
 }
 
+//this is what i need to compare to the athena version
 std::vector<Acts::Experimental::TrigInDetSiLayer>
 ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
   std::cout<<"Jasper: Calling the LayerNumbering member function of class GbtsSeedingAlgorithm Examples/Algorithms/TrakFinding/src/GbtsSeedingAlgorithm.cpp,\n it doesnt take inputs and returns a vector of instances of Acts::Experimental::TrigInDetSiLayer classes"<<std::endl; 
-  std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector;
-  std::cout<<"Jasper: input layer obj created"<<std::endl;
+  std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector; //vector will be outputted 
+  
   std::vector<std::size_t> count_vector;
 
-  m_cfg.trackingGeometry->visitSurfaces([this, &input_vector, &count_vector](
-                                            const Acts::Surface *surface) {
+  m_cfg.trackingGeometry->visitSurfaces([this, &input_vector, &count_vector]( //we are visiting every surface that gives a readout in the acts version of the ITk geometry 
+                                            const Acts::Surface *surface) {//for each surface (aka each actual module)
     
-    Acts::GeometryIdentifier geoid = surface->geometryId();
+    Acts::GeometryIdentifier geoid = surface->geometryId();//get its acts geoemtryID's for each surface
     auto ACTS_vol_id = geoid.volume();
     auto ACTS_lay_id = geoid.layer();
     auto mod_id = geoid.sensitive();
+    //actual geometry of the modules (centre and bounds)
     auto bounds_vect = surface->bounds().values();
     auto center = surface->center(Acts::GeometryContext());
 
-    // make bounds global
+    // convert bounds from local to global coordinates 
     Acts::Vector3 globalFakeMom(1, 1, 1);
     Acts::Vector2 min_bound_local =
         Acts::Vector2(bounds_vect[0], bounds_vect[1]);
@@ -269,26 +279,28 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
         Acts::GeometryContext(), max_bound_local, globalFakeMom);
 
     if (min_bound_global(0) >
-        max_bound_global(0)) {  // checking that not wrong way round
+        max_bound_global(0)) {  // checking that max is not accidently min
       min_bound_global.swap(max_bound_global);
     }
 
     float rc = 0.0;
     float minBound = 100000.0;
     float maxBound = -100000.0;
-
-    // convert to Gbts ID
+    //the point of this next part is to make the trigindetsilayer 
+    // first convert to Gbts ID
     auto ACTS_joint_id = ACTS_vol_id * 100 + ACTS_lay_id;
-    auto key =
-        std::make_pair(ACTS_joint_id,
-                       0);  // here the key needs to be pair of(vol*100+lay, 0)
-    auto Find = m_cfg.ActsGbtsMap.find(key);
+
+    auto key = std::make_pair(ACTS_joint_id, 0); // 0 is because we are looking at barrel modules first which dont have a mod value
+
+    auto Find = m_cfg.ActsGbtsMap.find(key); // find the elements that corresponds to that key
+
     int Gbts_id = 0;               // initialise first to avoid FLTUND later
+
     Gbts_id = Find->second.first;  // new map, item is pair want first
-    if (Find ==
-        m_cfg.ActsGbtsMap
-            .end()) {  // if end then make new key of (vol*100+lay, modid)
-      key = std::make_pair(ACTS_joint_id, mod_id);  // mod ID
+
+    if (Find == m_cfg.ActsGbtsMap.end()) {  // if end then make new key of (vol*100+lay, modid)
+
+      key = std::make_pair(ACTS_joint_id, mod_id);  // mod ID means we have end cap pixels 
       Find = m_cfg.ActsGbtsMap.find(key);
       Gbts_id = Find->second.first;
     }
@@ -296,7 +308,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
     short barrel_ec = 0;  // a variable that says if barrrel, 0 = barrel
     int eta_mod = Find->second.second;
 
-    // assign barrel_ec depending on Gbts_layer
+    // assign barrel_ec depending on Gbts_layer ID
     if (79 < Gbts_id && Gbts_id < 85) {  // 80s, barrel
       barrel_ec = 0;
     } else if (89 < Gbts_id && Gbts_id < 99) {  // 90s positive
@@ -304,7 +316,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
     } else {  // 70s negative
       barrel_ec = -2;
     }
-
+    // if we are looking at barrel we use either r as rc and z as bounds otherise (end caps) it is otherway round 
     if (barrel_ec == 0) {
       rc = sqrt(center(0) * center(0) +
                 center(1) * center(1));  // barrel center in r
@@ -330,26 +342,31 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
       }
     }
 
-    int combined_id = Gbts_id * 1000 + eta_mod;
-    auto current_index =
-        find_if(input_vector.begin(), input_vector.end(),
-                [combined_id](auto n) { return n.m_subdet == combined_id; });
-    if (current_index != input_vector.end()) {  // not end so does exist
+    int combined_id = Gbts_id * 1000 + eta_mod; //create combined ID
+    
+    //creates an iterrator pointing to the object in the vector that has the combined ID equal to that of the current module
+    auto current_index = 
+    find_if(input_vector.begin(), input_vector.end(), 
+            [combined_id](auto n) { return n.m_subdet == combined_id; });
+
+    //if the iterrator is not the end (therefore the Trigindetsilayer exists), we add the geometry info of the module to it 
+    if (current_index != input_vector.end()) {  
       std::size_t index = std::distance(input_vector.begin(), current_index);
       input_vector[index].m_refCoord += rc;
       input_vector[index].m_minBound += minBound;
       input_vector[index].m_maxBound += maxBound;
-      count_vector[index] += 1;  // increase count at the index
+      count_vector[index] += 1;  // increase count at the index (number of modules currently added to the trigindetsilayer)
 
-    } else {  // end so doesn't exists
-      // make new if one with Gbts ID doesn't exist:
+    } else {  //if there is no trigindetsilayer that corresponds to the combined ID. make one 
+      //this is where i think ill need to add code in to get the "layer number" variable implemented 
       Acts::Experimental::TrigInDetSiLayer new_Gbts_ID(combined_id, barrel_ec,
                                                        rc, minBound, maxBound);
-      input_vector.push_back(new_Gbts_ID);
-      count_vector.push_back(
-          1);  // so the element exists and not divinding by 0
-    }
 
+      //as both are pushed back ino the vector, they both should have the same index                                                
+      input_vector.push_back(new_Gbts_ID);
+      count_vector.push_back(1);  // so the element exists and not divinding by 0
+    }
+    //just tells us the info for each of the acts ID'd detector modules 
     if (m_cfg.fill_module_csv) {
       std::fstream fout;
       fout.open("ACTS_modules.csv",
@@ -367,9 +384,10 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
     }
   });
 
-  for (std::size_t i = 0; i < input_vector.size(); i++) {
+  for (std::size_t i = 0; i < input_vector.size(); i++) {// for every trigindetsilayer within the vector
+    // take the cumulative rc cooridnate currently inputted and divide it by how many actual modules are in that logical layer (share the same combined ID)
     input_vector[i].m_refCoord = input_vector[i].m_refCoord / count_vector[i];
   }
 
-  return input_vector;
+  return input_vector; //return the completed vector of trigindetsilayers :)
 }
