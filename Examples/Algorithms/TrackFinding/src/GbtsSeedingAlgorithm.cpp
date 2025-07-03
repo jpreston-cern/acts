@@ -200,8 +200,9 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
         continue;
       }
 
-      // Search for vol, lay and module=0, if doesn't esist (end) then search
+      // Search for vol, lay and module=0, if doesn't exist (end) then search
       // for full thing vol*100+lay as first number in pair then 0 or mod id
+      //why?
       auto ACTS_joint_id = ACTS_vol_id * 100 + ACTS_lay_id;
       auto key = std::make_pair(
           ACTS_joint_id,
