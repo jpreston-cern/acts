@@ -216,19 +216,19 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
       //node variables
-      /*
-      float r = std::sqrt((spacepoint->x() * spacepoint->x()) + (spacepoint->y() * spacepoint->y()));
-      float phi = std::atan2(spacepoint->y(), spacepoint->x());
+      
+      float r = std::sqrt((spacePoint.x() * spacePoint.x()) + (spacePoint.y() * spacePoint.y()));
+      float phi = std::atan2(spacePoint.y(), spacePoint.x());
       int LogicalLayer = LayeridMap.at(combined_id);
       std::cout<<"Jasper /n"
-                <<"node x is: "<<spacepoint->x()<<"/n"
-                <<"node y is: "<<spacepoint->y()<<"/n"
-                <<"node z is: "<<spacepoint->z()<<"/n"
+                <<"node x is: "<<spacePoint.x()<<"/n"
+                <<"node y is: "<<spacePoint.y()<<"/n"
+                <<"node z is: "<<spacePoint.z()<<"/n"
                 <<"node r is: "<<r<<"/n"
                 <<"node phi is: "<<phi<<"/n"
                 <<"node node layer is: "<<LogicalLayer<<"/n"
                 <<std::endl;
-      */
+      
       float ClusterWidth = 
           0;  // false input as this is not available in examples
       // fill Gbts vector with current sapce point and ID
@@ -346,7 +346,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
       input_vector.push_back(new_Gbts_ID);
       count_vector.push_back(
           1);  // so the element exists and not divinding by 0
-
+      std::cout<<"Jasper: combined IDs: "<<combined_id <<std::endl;
       int LayerID = count_vector.size();
       LayeridMap.insert({combined_id, LayerID}); //every unique Logical Layer is given a layer ID
       GbtsIDs.push_back(combined_id);
@@ -368,7 +368,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
            << "\n";
     }
   });
-  for (int i = 0; i < LayeridMap.size(); i++){
+  for (std::size_t i = 0; i < LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
     int Gbts_id_new = GbtsIDs[i];
     std::cout<<"Jasper: /n"
