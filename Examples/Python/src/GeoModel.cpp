@@ -29,6 +29,7 @@
 #include "Acts/Surfaces/RectangleBounds.hpp"
 #include "ActsExamples/GeoModelDetector/GeoModelDetector.hpp"
 #include "ActsExamples/ITkModuleSplitting/ITkModuleSplitting.hpp"
+#include "ActsExamples/MuonSpectrometerMockupDetector/GeoMuonMockupExperiment.hpp"
 
 #include <string>
 
@@ -46,6 +47,11 @@ void addGeoModel(Context& ctx) {
   auto m = ctx.get("main");
 
   auto gm = m.def_submodule("geomodel");
+
+  py::class_<GeoModelTree::FpvConstLink>(gm, "GeoModelTree::FpvConstLink")
+      .def(py::init<>())
+      .def("get", &GeoModelTree::FpvConstLink::get,
+           py::return_value_policy::reference);
 
   py::class_<Acts::GeoModelTree>(gm, "GeoModelTree").def(py::init<>());
 
@@ -70,7 +76,7 @@ void addGeoModel(Context& ctx) {
 
     auto c = py::class_<ActsExamples::GeoModelDetector::Config>(f, "Config")
                  .def(py::init<>());
-    ACTS_PYTHON_STRUCT(c, path, logLevel);
+    ACTS_PYTHON_STRUCT(c, geoModelTree, logLevel, path);
 
     // patch the constructor
     patchKwargsConstructor(c);
@@ -125,7 +131,36 @@ void addGeoModel(Context& ctx) {
         .def("toSensitiveSurface", &Acts::GeoShiftConverter::toSensitiveSurface)
         .def("toPassiveSurface", &Acts::GeoShiftConverter::toPassiveSurface);
   }
-
+  {
+    // GeoMuonMockupExperiment
+    auto f =
+        py::class_<ActsExamples::GeoMuonMockupExperiment,
+                   std::shared_ptr<ActsExamples::GeoMuonMockupExperiment>>(
+            gm, "GeoMuonMockupExperiment")
+            .def(py::init(
+                [](const ActsExamples::GeoMuonMockupExperiment::Config& config,
+                   const std::string& name, Acts::Logging::Level level) {
+                  return std::make_shared<
+                      ActsExamples::GeoMuonMockupExperiment>(
+                      config, getDefaultLogger(name, level));
+                }))
+            .def("constructMS",
+                 &ActsExamples::GeoMuonMockupExperiment::constructMS);
+    auto c =
+        py::class_<ActsExamples::GeoMuonMockupExperiment::Config>(f, "Config")
+            .def(py::init<>());
+    ACTS_PYTHON_STRUCT(c,
+                       /// General properties
+                       dumpTree, dbName,
+                       /// Mdt properties
+                       innerTubeRadius, tubeWallThickness, nTubeLayers, nTubes,
+                       mdtFoamThickness, multiLayerSeparation,
+                       /// Rpc properties
+                       nRpcGasGaps, nRpcAlongZ, nRpcAlongPhi,
+                       /// Station properties
+                       barrelRadii, nSectors, nEtaStations, stationDistInZ,
+                       stationDistInR, endCapWheelLowR, bigWheelDistZ);
+  }
   // Volume factory
   {
     auto a =
@@ -161,7 +196,7 @@ void addGeoModel(Context& ctx) {
             &Acts::GeoModelDetectorObjectFactory::Cache::sensitiveSurfaces)
         .def_readwrite(
             "boundingBoxes",
-            &Acts::GeoModelDetectorObjectFactory::Cache::boundingBoxes);
+            &Acts::GeoModelDetectorObjectFactory::Cache::volumeBoxFPVs);
 
     py::class_<Acts::GeoModelDetectorObjectFactory::Options>(a, "Options")
         .def(py::init<>())
