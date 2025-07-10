@@ -43,17 +43,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   m_cfg.seedFinderOptions = m_cfg.seedFinderOptions.calculateDerivedQuantities(
       m_cfg.seedFinderConfig);
 
-  for (const auto &spName : m_cfg.inputSpacePoints) {
-    if (spName.empty()) {
-      throw std::invalid_argument("Invalid space point input collection");
-    }
-
-    auto &handle = m_inputSpacePoints.emplace_back(
-        std::make_unique<ReadDataHandle<SimSpacePointContainer>>(
-            this,
-            "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size())));
-    handle->initialize(spName);
-  }
+  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints);
 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
 
@@ -151,6 +141,7 @@ std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
 ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
+      
   // create space point vectors
   std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
       gbtsSpacePoints;
@@ -346,7 +337,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
       input_vector.push_back(new_Gbts_ID);
       count_vector.push_back(
           1);  // so the element exists and not divinding by 0
-      std::cout<<"Jasper: combined IDs: "<<combined_id <<std::endl;
+      
       int LayerID = count_vector.size();
       LayeridMap.insert({combined_id, LayerID}); //every unique Logical Layer is given a layer ID
       GbtsIDs.push_back(combined_id);
@@ -368,6 +359,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
            << "\n";
     }
   });
+  /*
   for (std::size_t i = 0; i < LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
     int Gbts_id_new = GbtsIDs[i];
@@ -375,6 +367,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
              <<"layer is :"<<LayeridMap.at(Gbts_id_new)<<"with Gbts ID: "<<Gbts_id_new
              <<std::endl;          
   }
+  */
   for (std::size_t i = 0; i < input_vector.size(); i++) {
     input_vector[i].m_refCoord = input_vector[i].m_refCoord / count_vector[i];
   }
