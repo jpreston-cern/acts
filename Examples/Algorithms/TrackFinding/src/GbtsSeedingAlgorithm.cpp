@@ -36,12 +36,8 @@ template class Acts::Experimental::GbtsEdge<ActsExamples::SimSpacePoint>;
 ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
-  // fill config struct
   
-
-  
-
-
+  //initialise the spacepoints from the handle 
   for (const auto &spName : m_cfg.inputSpacePoints) {
     if (spName.empty()) {
       throw std::invalid_argument("Invalid space point input collection");
@@ -59,23 +55,22 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   m_inputClusters.initialize(m_cfg.inputClusters);
 
-  // map
+  // parse the mapping file 
   m_cfg.ActsGbtsMap = makeActsGbtsMap();
-  // input trig vector
+  // create the TrigInDetSiLayers (Logical Layers)
   m_cfg.seedFinderConfig.m_layerGeometry = LayerNumbering();
 
+  //parse connection file 
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.ConnectorInputFile.c_str(), std::ifstream::in);
 
-  
-  
   if (input_ifstream.empty()) {
 
     ACTS_WARNING("Cannot find layer connections file " << input_ifstream);
     throw std::runtime_error("connection file not found") //not sure if this is the right thing to do 
     
   }
-
+  //create the connection objects
   else {
     
       std::unique_ptr<GNN_FasTrackConnector> m_connector = //add this class in and set include 
@@ -89,7 +84,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     
 
   }
-
+  // initiliase the object that holds all the geometry information needed for the algorithm
   m_gbtsGeo = std::make_unique<TrigFTF_GNN_Geometry>(m_cfg.SeedFinderConfig.m_layerGeometry, m_connector); //add this class and then change description in the h file 
 
   m_cfg.SeedFinderConfig.m_phiSliceWidth = 2 * std::numbers::pi / m_cfg.SeedFinderConfig.m_nMaxPhiSlice;
@@ -99,8 +94,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   ACTS_DEBUG("Property pTmin "<<m_cfg.SeedFinderConfig.m_minPt);
   ACTS_DEBUG("Property LRTmode "<<m_cfg.SeedFinderConfig.m_LRTmode);
 
-}  // this is not Gbts config type because it is a member of the algs config,
-   // which is of type Gbts cofig
+} 
 
 // execute:
 ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
