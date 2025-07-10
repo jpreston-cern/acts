@@ -14,6 +14,8 @@
 #include "ActsExamples/EventData/ProtoTrack.hpp"
 #include "ActsExamples/EventData/SimSeed.hpp"
 #include "ActsExamples/Framework/WhiteBoard.hpp"
+#include "Acts/EventData/SeedContainer2.hpp"
+#include "Acts/EventData/SpacePointContainer2.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -57,7 +59,8 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   // parse the mapping file 
   m_cfg.ActsGbtsMap = makeActsGbtsMap();
-  // create the TrigInDetSiLayers (Logical Layers)
+  // create the TrigInDetSiLayers (Logical Layers),
+  //as well as a map that labels there index
   m_cfg.seedFinderConfig.m_layerGeometry = LayerNumbering();
 
   //parse connection file 
@@ -74,7 +77,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   else {
     
       std::unique_ptr<GNN_FasTrackConnector> m_connector = //add this class in and set include 
-      std::make_unique<GNN_FASTRACK_CONNECTOR>(input_ifstream, m_LRTmode);
+      std::make_unique<GNN_FASTRACK_CONNECTOR>(input_ifstream, m_cfg.SeedFinderConfig.m_LRTmode);
       if (m_etaBinOverride != 0.0f) {
 
         m_connector->m_etaBin = m_cfg.SeedFinderConfig.m_etaBinOverride;
@@ -166,21 +169,32 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
+Acts::Experimental::SpacePointContainer2
 ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
-    const AlgorithmContext &ctx,
-    std::map<std::pair<int, int>, std::pair<int, int>> map) const {
-  // create space point vectors
-  std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
-      gbtsSpacePoints;
-  gbtsSpacePoints.reserve(
-      m_inputSpacePoints.size());  // not sure if this is enough
+  const AlgorithmContext &ctx,
+  std::map<std::pair<int, int>, 
+  std::pair<int, int>> map) const {
 
-  // for loop filling space
+    //initiliase new container that will be used to store all the gbts information  
+    Acts::Experimental::SpacePointContainer2 coreSpacePoints;
+    coreSpacePoints.createExtraColumns(
+      Acts::Experimental::SpacePointKnownExtraColumn::R |
+      Acts::Experimental::SpacePointKnownExtraColumn::Phi);
+      coreSpacePoints.reserve(m_inputSpacePoints.size()); //need to check this as im not sure if this is enough / if we only need one collection now 
+
+    //create extra custom coloumns needed for Layer ID's   
+    auto LayerColoumn = coreSpacePoints.createExtraColumns<int>("LayerID");
+    auto ClusterWidthColoumn = coreSpacePoints.createExtraColumns<int>("ClusterWidth");
+  // for every sapcepoint in all our collections 
   for (const auto &isp : m_inputSpacePoints) {
     for (const auto &spacePoint : (*isp)(ctx)) {
-      // Gbts space point vector
-      // loop over space points, call on map
+      
+      //get each SP geometry information (ACTS vol and layer)
+      //find what combined_id that corresponds to using the ActsGbtsMap
+      //using the combined-id, find what layer ID that corresponds to 
+      //fill each new spacepoint in the vector with x, y, z, r, phi, layer ID values 
+
+      
       const auto &sourceLink = spacePoint.sourceLinks();
       const auto &indexSourceLink = sourceLink.front().get<IndexSourceLink>();
 
@@ -190,8 +204,8 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
         ACTS_WARNING("warning source link vector is empty");
         continue;
       }
-      int ACTS_vol_id = indexSourceLink.geometryId().volume();
-      int ACTS_lay_id = indexSourceLink.geometryId().layer();
+      int ACTS_vol_id = indexSourceLink.geometryId().volume(); 
+      int ACTS_lay_id = indexSourceLink.geometryId().layer(); 
       int ACTS_mod_id = indexSourceLink.geometryId().sensitive();
 
       // dont want strips or HGTD
@@ -235,29 +249,22 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
       //node variables
-      
-      float r = std::sqrt((spacePoint.x() * spacePoint.x()) + (spacePoint.y() * spacePoint.y()));
-      float phi = std::atan2(spacePoint.y(), spacePoint.x());
-      int LogicalLayer = LayeridMap.at(combined_id);
-      std::cout<<"Jasper /n"
-                <<"node x is: "<<spacePoint.x()<<"/n"
-                <<"node y is: "<<spacePoint.y()<<"/n"
-                <<"node z is: "<<spacePoint.z()<<"/n"
-                <<"node r is: "<<r<<"/n"
-                <<"node phi is: "<<phi<<"/n"
-                <<"node node layer is: "<<LogicalLayer<<"/n"
-                <<std::endl;
-      
-      float ClusterWidth = 
-          0;  // false input as this is not available in examples
-      // fill Gbts vector with current sapce point and ID
-      gbtsSpacePoints.emplace_back(&spacePoint, Gbts_id, combined_id,
-                                   ClusterWidth);  // make new GbtsSP here !
+      auto newSp = coreSpacePoints.createSpacePoint(
+          std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)}, spacePoint.x(),
+          spacePoint.y(), spacePoint.z());
+      newSp.r() = spacePoint.r();
+      newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
+      newSp.varianceR() = spacePoint.varianceR();
+      newSp.varianceZ() = spacePoint.varianceZ();
+      //add values to custom coloumns
+      newSp.extra(LayerColoumn) = LayeridMap.at(combined_id);
+      newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
+
     }
   }
-  ACTS_VERBOSE("Space points successfully assigned Gbts ID");
+  ACTS_VERBOSE("Space point collection successfully assigned LayerID's");
 
-  return gbtsSpacePoints;
+  return coreSpacePoints;
 }
 
 std::vector<Acts::Experimental::TrigInDetSiLayer>
@@ -365,10 +372,11 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
       input_vector.push_back(new_Gbts_ID);
       count_vector.push_back(
           1);  // so the element exists and not divinding by 0
-      std::cout<<"Jasper: combined IDs: "<<combined_id <<std::endl;
+
+      //tracking the index of each TrigInDetSiLayer as there added to the vector
       int LayerID = count_vector.size();
-      LayeridMap.insert({combined_id, LayerID}); //every unique Logical Layer is given a layer ID
-      GbtsIDs.push_back(combined_id);
+      m_LayeridMap.insert({combined_id, LayerID}); 
+      m_GbtsIDs.push_back(combined_id);
     }
 
     if (m_cfg.fill_module_csv) {
