@@ -85,6 +85,8 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   mutable std::map<int, int> LayeridMap;
 
+  mutable std::map<int, int> LayeridMap;
+  mutable std::vector<int> GbtsIDs {};
   WriteDataHandle<SimSeedContainer> m_outputSeeds{this, "OutputSeeds"};
 
   ReadDataHandle<ClusterContainer> m_inputClusters{this, "InputClusters"};

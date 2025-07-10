@@ -1,0 +1,41 @@
+[  0%] Built target SympyJacobianEngine_Internal
+[  0%] Built target ParticleDataTable_Internal
+[  0%] Built target SympyCovarianceEngine_Internal
+[  2%] Built target SympyStepperMath_Internal
+[  2%] Built target ActsExamplesIoRootDict
+[ 46%] Built target ActsCore
+[ 48%] Built target ActsPluginFpeMonitoring
+[ 51%] Built target ActsFatras
+[ 55%] Built target ActsPluginJson
+[ 55%] Built target ActsPluginRoot
+[ 60%] Built target ActsExamplesFramework
+[ 60%] Built target ActsExamplesGeometry
+[ 60%] Built target ActsExamplesMagneticField
+[ 60%] Built target ActsExamplesPrinters
+[ 60%] Built target ActsExamplesPropagation
+[ 60%] Built target ActsExamplesIoHepMC3
+[ 60%] Built target ActsExamplesMaterialMapping
+[ 60%] Built target ActsExamplesDetectorsCommon
+[ 65%] Built target ActsExamplesDigitization
+[ 65%] Built target ActsExamplesTruthTracking
+[ 65%] Built target ActsExamplesAmbiguityResolution
+[ 67%] Built target ActsExampleHelloWorld
+[ 69%] Built target ActsExamplesFatras
+[ 69%] Built target ActsExamplesGenerators
+[ 69%] Built target ActsExamplesIoObj
+[ 72%] Built target ActsExamplesUtilities
+[ 72%] Built target ActsExamplesDetectorGeneric
+[ 74%] Built target ActsExamplesVertexing
+[ 74%] Built target ActsExamplesDetectorTelescope
+[ 74%] Built target ActsExamplesTrackFitting
+[ 74%] Built target ActsExamplesGeneratorsPythia8
+[ 74%] Built target ActsExamplesDetectorTGeo
+[ 74%] Building CXX object Examples/Algorithms/TrackFinding/CMakeFiles/ActsExamplesTrackFinding.dir/src/GbtsSeedingAlgorithm.cpp.o
+[ 79%] Built target ActsExamplesIoCsv
+[ 86%] Built target ActsExamplesIoRoot
+[ 86%] Linking CXX shared library ../../../lib64/libActsExamplesTrackFinding.so
+[ 88%] Built target ActsExamplesTrackFinding
+[ 88%] Linking CXX shared library ../../../lib64/libActsExamplesIoJson.so
+[ 90%] Built target ActsExamplesIoJson
+[ 90%] Linking CXX shared module ../../python/acts/ActsPythonBindings.cpython-311-x86_64-linux-gnu.so
+[100%] Built target ActsPythonBindings

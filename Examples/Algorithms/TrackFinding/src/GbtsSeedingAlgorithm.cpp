@@ -234,8 +234,21 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       // access IDs from map
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
-
-      float ClusterWidth =
+      //node variables
+      
+      float r = std::sqrt((spacePoint.x() * spacePoint.x()) + (spacePoint.y() * spacePoint.y()));
+      float phi = std::atan2(spacePoint.y(), spacePoint.x());
+      int LogicalLayer = LayeridMap.at(combined_id);
+      std::cout<<"Jasper /n"
+                <<"node x is: "<<spacePoint.x()<<"/n"
+                <<"node y is: "<<spacePoint.y()<<"/n"
+                <<"node z is: "<<spacePoint.z()<<"/n"
+                <<"node r is: "<<r<<"/n"
+                <<"node phi is: "<<phi<<"/n"
+                <<"node node layer is: "<<LogicalLayer<<"/n"
+                <<std::endl;
+      
+      float ClusterWidth = 
           0;  // false input as this is not available in examples
       // fill Gbts vector with current sapce point and ID
       gbtsSpacePoints.emplace_back(&spacePoint, Gbts_id, combined_id,
@@ -352,6 +365,10 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
       input_vector.push_back(new_Gbts_ID);
       count_vector.push_back(
           1);  // so the element exists and not divinding by 0
+      std::cout<<"Jasper: combined IDs: "<<combined_id <<std::endl;
+      int LayerID = count_vector.size();
+      LayeridMap.insert({combined_id, LayerID}); //every unique Logical Layer is given a layer ID
+      GbtsIDs.push_back(combined_id);
     }
 
     if (m_cfg.fill_module_csv) {
@@ -370,7 +387,13 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
            << "\n";
     }
   });
+  for (std::size_t i = 0; i < LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
+    int Gbts_id_new = GbtsIDs[i];
+    std::cout<<"Jasper: /n"
+             <<"layer is :"<<LayeridMap.at(Gbts_id_new)<<"with Gbts ID: "<<Gbts_id_new
+             <<std::endl;          
+  }
   for (std::size_t i = 0; i < input_vector.size(); i++) {
     input_vector[i].m_refCoord = input_vector[i].m_refCoord / count_vector[i];
   }
