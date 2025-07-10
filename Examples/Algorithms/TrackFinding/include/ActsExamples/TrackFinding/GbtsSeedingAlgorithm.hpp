@@ -83,6 +83,8 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
    
   std::vector<std::unique_ptr<ReadDataHandle<SimSpacePointContainer>>> m_inputSpacePoints{};
 
+  mutable std::map<int, int> LayeridMap;
+
   WriteDataHandle<SimSeedContainer> m_outputSeeds{this, "OutputSeeds"};
 
   ReadDataHandle<ClusterContainer> m_inputClusters{this, "InputClusters"};
