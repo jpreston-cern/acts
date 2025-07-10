@@ -156,7 +156,7 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       gbtsSpacePoints;
   gbtsSpacePoints.reserve(
       m_inputSpacePoints.size());  // not sure if this is enough
-
+      std::cout<<"Jasper: number of data handles is"<<m_inputSpacePoints.size()<<std::endl;
   // for loop filling space
   for (const auto &isp : m_inputSpacePoints) {
     for (const auto &spacePoint : (*isp)(ctx)) {
