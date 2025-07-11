@@ -40,3 +40,7 @@ codegen/src/codegen.egg-info/
 !.clang-tidy
 !.oclint
 !.devcontainer
+
+#files to ignore 
+acts-itk/
+log_log.log
