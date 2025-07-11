@@ -177,10 +177,7 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
   auto ClusterWidthColoumn = coreSpacePoints.createExtraColumn<float>("Cluster_Width");
   coreSpacePoints.reserve(spacePoints.size());
   
-  // create space point vectors
-  std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
-      gbtsSpacePoints;
-  gbtsSpacePoints.reserve(spacePoints.size());  // should be enough
+ 
       
     // for loop filling space
   
@@ -248,24 +245,9 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
 
       newSp.r() = spacePoint.r();
       newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
-      newSp.extra(LayerColoumn) = LayeridMap.at(combined_id);
-      newSp.extra(ClusterWidthColoumn) = 0;
-      float ClusterWidth = 0;  // false input as this is not available in examples
+      newSp.extra(LayerColoumn) = m_LayeridMap.at(combined_id);
+      newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
       
-      
-      /*
-      std::cout<<"Jasper /n"
-                <<"node x is: "<<spacePoint.x()<<"/n"
-                <<"node y is: "<<spacePoint.y()<<"/n"
-                <<"node z is: "<<spacePoint.z()<<"/n"
-                <<"node r is: "<<spacePoint.r()<<"/n"
-                <<"node phi is: "<<phi<<"/n"
-                <<"node node layer is: "<<LogicalLayer<<"/n"
-                <<std::endl;
-      */
-      // fill Gbts vector with current sapce point and ID
-      gbtsSpacePoints.emplace_back(&spacePoint, Gbts_id, combined_id,
-                                   ClusterWidth);  // make new GbtsSP here !
     }
 
   //test to see if container works 
