@@ -14,6 +14,8 @@
 #include "ActsExamples/EventData/ProtoTrack.hpp"
 #include "ActsExamples/EventData/SimSeed.hpp"
 #include "ActsExamples/Framework/WhiteBoard.hpp"
+#include "Acts/EventData/SeedContainer2.hpp"
+#include "Acts/EventData/SpacePointContainer2.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -42,8 +44,8 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   m_cfg.seedFinderOptions = m_cfg.seedFinderOptions.calculateDerivedQuantities(
       m_cfg.seedFinderConfig);
-
-  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints);
+  
+  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints.at(0));
 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
 
@@ -141,16 +143,27 @@ std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
 ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
-      
+  //new seeding container test
+  //initialise obtaijn spacepoints from handle and define new container 
+  const SimSpacePointContainer& spacePoints = m_inputSpacePoints(ctx);
+  Acts::Experimental::SpacePointContainer2 coreSpacePoints;
+  //define custom varibles included in container (x,y,z are added by default)
+  coreSpacePoints.createExtraColumns(
+      Acts::Experimental::SpacePointKnownExtraColumn::R |
+      Acts::Experimental::SpacePointKnownExtraColumn::Phi);
+  //add new coloumn for layer ID
+  auto LayerColoumn = coreSpacePoints.createExtraColumn<int>("LayerID");
+  auto ClusterWidthColoumn = coreSpacePoints.createExtraColumn<float>("Cluster_Width");
+  coreSpacePoints.reserve(spacePoints.size());
+  
   // create space point vectors
   std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
       gbtsSpacePoints;
-  gbtsSpacePoints.reserve(
-      m_inputSpacePoints.size());  // not sure if this is enough
-      std::cout<<"Jasper: number of data handles is"<<m_inputSpacePoints.size()<<std::endl;
-  // for loop filling space
-  for (const auto &isp : m_inputSpacePoints) {
-    for (const auto &spacePoint : (*isp)(ctx)) {
+  gbtsSpacePoints.reserve(spacePoints.size());  // should be enough
+      
+    // for loop filling space
+  
+    for (const auto &spacePoint : spacePoints) {
       // Gbts space point vector
       // loop over space points, call on map
       const auto &sourceLink = spacePoint.sourceLinks();
@@ -206,26 +219,40 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       // access IDs from map
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
-      //node variables
+
+      //add spacepoints to new container 
+      auto newSp = coreSpacePoints.createSpacePoint(
+          std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)}, 
+          spacePoint.x(), spacePoint.y(), spacePoint.z());
+
+      newSp.r() = spacePoint.r();
+      newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
+      newSp.extra(LayerColoumn) = LayeridMap.at(combined_id);
+      newSp.extra(ClusterWidthColoumn) = 0;
+      float ClusterWidth = 0;  // false input as this is not available in examples
       
-      float r = std::sqrt((spacePoint.x() * spacePoint.x()) + (spacePoint.y() * spacePoint.y()));
-      float phi = std::atan2(spacePoint.y(), spacePoint.x());
-      int LogicalLayer = LayeridMap.at(combined_id);
+      
+      /*
       std::cout<<"Jasper /n"
                 <<"node x is: "<<spacePoint.x()<<"/n"
                 <<"node y is: "<<spacePoint.y()<<"/n"
                 <<"node z is: "<<spacePoint.z()<<"/n"
-                <<"node r is: "<<r<<"/n"
+                <<"node r is: "<<spacePoint.r()<<"/n"
                 <<"node phi is: "<<phi<<"/n"
                 <<"node node layer is: "<<LogicalLayer<<"/n"
                 <<std::endl;
-      
-      float ClusterWidth = 
-          0;  // false input as this is not available in examples
+      */
       // fill Gbts vector with current sapce point and ID
       gbtsSpacePoints.emplace_back(&spacePoint, Gbts_id, combined_id,
                                    ClusterWidth);  // make new GbtsSP here !
     }
+
+  //test to see if container works 
+  for (auto sp : coreSpacePoints){
+    std::cout<<"Jasper: spacepoints x is: "<<sp.x() <<"\n"
+             <<"spacepoint phi is "<<sp.phi()<<"\n"
+             <<"spacepoint layer is: "<<sp.extra(LayerColoumn)
+             <<std::endl;
   }
   ACTS_VERBOSE("Space points successfully assigned Gbts ID");
 

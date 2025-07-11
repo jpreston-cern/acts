@@ -31,7 +31,9 @@ namespace ActsExamples {
 class GbtsSeedingAlgorithm final : public IAlgorithm {
  public:
   struct Config {
-    std::vector<std::string> inputSpacePoints;
+    
+    //need to change python binds so tit gives just a string and not a vector 
+    std::vector<std::string> inputSpacePoints; 
 
     std::string outputSeeds;
 

@@ -1,4 +1,4 @@
-15:49:45    buildITkGeom   INFO      Adding material from /opt/ppd/scratch-2022/japresto/acts/acts-itk/itk-hgtd/material-maps-ITk-HGTD.json
+10:52:13    buildITkGeom   INFO      Adding material from /opt/ppd/scratch-2022/japresto/acts/acts-itk/itk-hgtd/material-maps-ITk-HGTD.json
 Info in <TGeoManager::Import>: Reading geometry from file: acts-itk/itk-hgtd/ATLAS-ITk-HGTD.tgeo.root
 Info in <TGeoManager::CloseGeometry>: Geometry loaded from file...
 Info in <TGeoManager::SetTopVolume>: Top volume is BeamPipe__World. Master volume is BeamPipe__World
@@ -18,370 +18,614 @@ Warning in <TGeoMatrix::dtor>: Registered matrix ITkStrip__ITkStripID was remove
 Warning in <TGeoMatrix::dtor>: Registered matrix ITkStrip__ITkStripID was removed
 Warning in <TGeoMatrix::dtor>: Registered matrix HGTD__HGTDID was removed
 Warning in <TGeoMatrix::dtor>: Registered matrix HGTD__HGTDID was removed
-15:50:13    Sequencer      INFO      Create Sequencer (single-threaded)
-15:50:13    Sequencer      INFO      Add Reader 'EventGenerator'
-15:50:13    Sequencer      INFO      -> OutputEvent 'particle_gun_event':
-15:50:13    Sequencer      INFO         shared_ptr<HepMC3::GenEvent>
-15:50:13    Sequencer      INFO      Add Algorithm 'HepMC3InputConverter'
-15:50:13    Sequencer      INFO      <- InputEvent 'particle_gun_event':
-15:50:13    Sequencer      INFO         shared_ptr<HepMC3::GenEvent>
-15:50:13    Sequencer      INFO      -> OutputParticles 'particles_generated':
-15:50:13    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:13    Sequencer      INFO      -> OutputVertices 'vertices_generated':
-15:50:13    Sequencer      INFO         flat_set<SimVertex, detail::CompareVertexId, void>
-15:50:13    Sequencer      INFO      Key 'particles_generated' aliased to 'particles'
-15:50:13    Sequencer      INFO      Key 'vertices_generated' aliased to 'vertices_truth'
-15:50:13    Sequencer      INFO      Key 'particles_generated' aliased to 'particles_generated_selected'
-15:50:13    Sequencer      INFO      Add Algorithm 'FatrasSimulation'
-15:50:13    Sequencer      INFO      <- InputParticles 'particles_generated_selected':
-15:50:13    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:13    Sequencer      INFO      -> OutputSimHits 'simhits':
-15:50:13    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
-15:50:13    Sequencer      INFO      -> OutputParticles 'particles_simulated':
-15:50:13    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:13    Sequencer      INFO      Key 'particles_simulated' aliased to 'particles'
-15:50:13    Sequencer      INFO      Key 'particles_simulated' aliased to 'particles_simulated_selected'
-15:50:13    Sequencer      INFO      Add Writer 'RootParticleWriter'
-15:50:13    Sequencer      INFO      <- InputHandle 'particles_simulated':
-15:50:13    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:13    Sequencer      INFO      Add Writer 'RootSimHitWriter'
-15:50:13    Sequencer      INFO      <- InputHandle 'simhits':
-15:50:13    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
-15:50:13    Sequencer      INFO      Add Algorithm 'DigitizationAlgorithm'
-15:50:13    Sequencer      INFO      <- InputHits 'simhits':
-15:50:13    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
-15:50:13    Sequencer      INFO      -> OutputMeasurements 'measurements':
-15:50:13    Sequencer      INFO         MeasurementContainer
-15:50:13    Sequencer      INFO      -> OutputClusters 'clusters':
-15:50:13    Sequencer      INFO         vector<Cluster>
-15:50:13    Sequencer      INFO      -> OutputMeasurementParticlesMap 'measurement_particles_map':
-15:50:13    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
-15:50:13    Sequencer      INFO      -> OutputMeasurementSimHitsMap 'measurement_simhits_map':
-15:50:13    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
-15:50:13    Sequencer      INFO      -> OutputParticleMeasurementsMap 'particle_measurements_map':
-15:50:13    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
-15:50:13    Sequencer      INFO      -> OutputSimHitMeasurementsMap 'simhit_measurements_map':
-15:50:13    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      Add Writer 'RootMeasurementWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'measurements':
-15:50:14    Sequencer      INFO         MeasurementContainer
-15:50:14    Sequencer      INFO      <- InputClusters 'clusters':
-15:50:14    Sequencer      INFO         vector<Cluster>
-15:50:14    Sequencer      INFO      <- InputSimHits 'simhits':
-15:50:14    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
-15:50:14    Sequencer      INFO      <- InputMeasurementSimHitsMap 'measurement_simhits_map':
-15:50:14    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      Add Algorithm 'ParticleSelector'
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_simulated_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
-15:50:14    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
-15:50:14    Sequencer      INFO      <- InputMeasurements 'measurements':
-15:50:14    Sequencer      INFO         MeasurementContainer
-15:50:14    Sequencer      INFO      -> OutputParticles 'tmp_particles_digitized_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      Key 'tmp_particles_digitized_selected' aliased to 'particles_selected'
-15:50:14    Sequencer      INFO      Key 'tmp_particles_digitized_selected' aliased to 'particles_digitized_selected'
-15:50:14    SpacePointMa   INFO      Space point geometry selection:
-15:50:14    SpacePointMa   INFO        vol=8
-15:50:14    SpacePointMa   INFO        vol=9
-15:50:14    SpacePointMa   INFO        vol=10
-15:50:14    SpacePointMa   INFO        vol=13
-15:50:14    SpacePointMa   INFO        vol=14
-15:50:14    SpacePointMa   INFO        vol=15
-15:50:14    SpacePointMa   INFO        vol=16
-15:50:14    SpacePointMa   INFO        vol=18
-15:50:14    SpacePointMa   INFO        vol=19
-15:50:14    SpacePointMa   INFO        vol=20
-15:50:14    Sequencer      INFO      Add Algorithm 'SpacePointMaker'
-15:50:14    Sequencer      INFO      <- InputMeasurements 'measurements':
-15:50:14    Sequencer      INFO         MeasurementContainer
-15:50:14    Sequencer      INFO      -> OutputSpacePoints 'spacepoints':
-15:50:14    Sequencer      INFO         vector<SimSpacePoint>
-15:50:14    addSeeding     INFO      Using Gbts seeding
-15:50:14    Sequencer      INFO      Add Algorithm 'SeedingAlgorithm'
-15:50:14    Sequencer      INFO      <- InputClusters 'clusters':
-15:50:14    Sequencer      INFO         vector<Cluster>
-15:50:14    Sequencer      INFO      <- InputSpacePoints#0 'spacepoints':
-15:50:14    Sequencer      INFO         vector<SimSpacePoint>
-15:50:14    Sequencer      INFO      -> OutputSeeds 'seeds':
-15:50:14    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
-15:50:14    Sequencer      INFO      Add Algorithm 'TrackParamsEstimationAlgorithm'
-15:50:14    Sequencer      INFO      <- InputSeeds 'seeds':
-15:50:14    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
-15:50:14    Sequencer      INFO      -> OutputTrackParameters 'estimatedparameters':
-15:50:14    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
-15:50:14    Sequencer      INFO      -> OutputSeeds 'estimatedseeds':
-15:50:14    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
-15:50:14    Sequencer      INFO      Add Algorithm 'SeedsToPrototracks'
-15:50:14    Sequencer      INFO      <- InputSeeds 'seeds':
-15:50:14    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
-15:50:14    Sequencer      INFO      -> OutputProtoTracks 'seed-prototracks':
-15:50:14    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
-15:50:14    Sequencer      INFO      Add Algorithm 'PrototracksToTracks'
-15:50:14    Sequencer      INFO      <- InputMeasurements 'measurements':
-15:50:14    Sequencer      INFO         MeasurementContainer
-15:50:14    Sequencer      INFO      <- InputTrackParameters 'estimatedparameters':
-15:50:14    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
-15:50:14    Sequencer      INFO      <- InputProtoTracks 'seed-prototracks':
-15:50:14    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
-15:50:14    Sequencer      INFO      -> OutputTracks 'seed-tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      Add Algorithm 'TrackTruthMatcher'
-15:50:14    Sequencer      INFO      <- InputTracks 'seed-tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
-15:50:14    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      -> OutputTrackParticleMatching 'seed_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      -> OutputParticleTrackMatching 'particle_seed_matching':
-15:50:14    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
-15:50:14    Sequencer      INFO      Add Writer 'TrackFinderPerformanceWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'seed-tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputTrackParticleMatching 'seed_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      <- InputParticleTrackMatching 'particle_seed_matching':
-15:50:14    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
-15:50:14    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
-15:50:14    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
-15:50:14    Sequencer      INFO      Add Writer 'RootTrackParameterWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'estimatedparameters':
-15:50:14    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
-15:50:14    Sequencer      INFO      <- InputProtoTracks 'seed-prototracks':
-15:50:14    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputSimHits 'simhits':
-15:50:14    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
-15:50:14    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
-15:50:14    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      <- InputMeasurementSimHitsMap 'measurement_simhits_map':
-15:50:14    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      Add Algorithm 'TrackFindingAlgorithm'
-15:50:14    Sequencer      INFO      <- InputMeasurements 'measurements':
-15:50:14    Sequencer      INFO         MeasurementContainer
-15:50:14    Sequencer      INFO      <- InputInitialTrackParameters 'estimatedparameters':
-15:50:14    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
-15:50:14    Sequencer      INFO      -> OutputTracks 'ckf_tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      Key 'ckf_tracks' aliased to 'tracks'
-15:50:14    Sequencer      INFO      Add Algorithm 'TrackTruthMatcher'
-15:50:14    Sequencer      INFO      <- InputTracks 'ckf_tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
-15:50:14    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
-15:50:14    Sequencer      INFO      -> OutputTrackParticleMatching 'ckf_track_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      -> OutputParticleTrackMatching 'ckf_particle_track_matching':
-15:50:14    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
-15:50:14    Sequencer      INFO      Key 'ckf_track_particle_matching' aliased to 'track_particle_matching'
-15:50:14    Sequencer      INFO      Key 'ckf_particle_track_matching' aliased to 'particle_track_matching'
-15:50:14    Sequencer      INFO      Add Writer 'RootTrackSummaryWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'ckf_tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      Add Writer 'TrackFitterPerformanceWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'ckf_tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      Add Writer 'TrackFinderPerformanceWriter'
-15:50:14    Sequencer      INFO      <- InputHandle 'ckf_tracks':
-15:50:14    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
-15:50:14    Sequencer      INFO      <- InputParticles 'particles_selected':
-15:50:14    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
-15:50:14    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
-15:50:14    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
-15:50:14    Sequencer      INFO      <- InputParticleTrackMatching 'particle_track_matching':
-15:50:14    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
-15:50:14    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
-15:50:14    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
-15:50:14    Sequencer      INFO      Processing events [0, 5)
-15:50:14    Sequencer      INFO      Starting event loop with 1 threads
-15:50:14    Sequencer      INFO        0 context decorators
-15:50:14    Sequencer      INFO        21 sequence elements
-15:50:14    Sequencer      INFO        1 readers
-15:50:14    Sequencer      INFO        12 algorithms
-15:50:14    Sequencer      INFO        8 writers
-Jasper: number of data handles is1
-Jasper /nnode x is: -68.1961/nnode y is: -86.2521/nnode z is: -1907/nnode r is: 109.955/nnode phi is: -2.23982/nnode node layer is: 5/n
-Jasper /nnode x is: -61.501/nnode y is: -77.734/nnode z is: -1719/nnode r is: 99.1208/nnode phi is: -2.24013/nnode node layer is: 7/n
-Jasper /nnode x is: -55.4921/nnode y is: -70.1145/nnode z is: -1551/nnode r is: 89.4171/nnode phi is: -2.2403/nnode node layer is: 9/n
-Jasper /nnode x is: -50.1855/nnode y is: -63.3007/nnode z is: -1401/nnode r is: 80.781/nnode phi is: -2.24114/nnode node layer is: 11/n
-Jasper /nnode x is: -44.0915/nnode y is: -55.59/nnode z is: -1231/nnode r is: 70.9529/nnode phi is: -2.24135/nnode node layer is: 14/n
-Jasper /nnode x is: -39.5712/nnode y is: -49.8782/nnode z is: -1105/nnode r is: 63.6688/nnode phi is: -2.24147/nnode node layer is: 17/n
-Jasper /nnode x is: -39.4399/nnode y is: -49.7118/nnode z is: -1101/nnode r is: 63.4568/nnode phi is: -2.24148/nnode node layer is: 17/n
-Jasper /nnode x is: -29.9904/nnode y is: -37.7508/nnode z is: -837/nnode r is: 48.2135/nnode phi is: -2.24213/nnode node layer is: 22/n
-Jasper /nnode x is: -29.8406/nnode y is: -37.5973/nnode z is: -833/nnode r is: 48.0002/nnode phi is: -2.24168/nnode node layer is: 22/n
-Jasper /nnode x is: -26.9035/nnode y is: -33.8561/nnode z is: -751/nnode r is: 43.2439/nnode phi is: -2.24226/nnode node layer is: 24/n
-Jasper /nnode x is: -26.7727/nnode y is: -33.6877/nnode z is: -747/nnode r is: 43.0307/nnode phi is: -2.24232/nnode node layer is: 24/n
-Jasper /nnode x is: -24.246/nnode y is: -30.556/nnode z is: -677/nnode r is: 39.0069/nnode phi is: -2.24156/nnode node layer is: 26/n
-Jasper /nnode x is: -24.1164/nnode y is: -30.3662/nnode z is: -673/nnode r is: 38.7776/nnode phi is: -2.24198/nnode node layer is: 26/n
-Jasper /nnode x is: -21.7125/nnode y is: -27.3227/nnode z is: -606/nnode r is: 34.8993/nnode phi is: -2.24228/nnode node layer is: 28/n
-Jasper /nnode x is: -21.5445/nnode y is: -27.1426/nnode z is: -602/nnode r is: 34.6538/nnode phi is: -2.24172/nnode node layer is: 28/n
-Jasper /nnode x is: -19.1435/nnode y is: -28.9515/nnode z is: 324/nnode r is: 34.7082/nnode phi is: -2.15502/nnode node layer is: 52/n
-Jasper /nnode x is: -21.154/nnode y is: -32.1013/nnode z is: 359/nnode r is: 38.4446/nnode phi is: -2.15346/nnode node layer is: 54/n
-Jasper /nnode x is: -23.4349/nnode y is: -35.6671/nnode z is: 398/nnode r is: 42.6771/nnode phi is: -2.15211/nnode node layer is: 56/n
-Jasper /nnode x is: -25.7832/nnode y is: -39.3373/nnode z is: 439/nnode r is: 47.034/nnode phi is: -2.15099/nnode node layer is: 58/n
-Jasper /nnode x is: -28.6317/nnode y is: -43.7991/nnode z is: 488/nnode r is: 52.3272/nnode phi is: -2.14977/nnode node layer is: 60/n
-Jasper /nnode x is: -43.4321/nnode y is: -67.333/nnode z is: 747/nnode r is: 80.1254/nnode phi is: -2.14367/nnode node layer is: 69/n
-Jasper /nnode x is: -48.3212/nnode y is: -75.1609/nnode z is: 833/nnode r is: 89.3538/nnode phi is: -2.14217/nnode node layer is: 71/n
-Jasper /nnode x is: -53.3889/nnode y is: -83.4021/nnode z is: 923/nnode r is: 99.0267/nnode phi is: -2.14021/nnode node layer is: 73/n
-Jasper /nnode x is: -59.0367/nnode y is: -92.6882/nnode z is: 1024/nnode r is: 109.893/nnode phi is: -2.13793/nnode node layer is: 75/n
-Jasper /nnode x is: -101.378/nnode y is: -128.817/nnode z is: -2841.5/nnode r is: 163.925/nnode phi is: -2.23755/nnode node layer is: 92/n
-Jasper /nnode x is: -101.595/nnode y is: -129.07/nnode z is: -2847.5/nnode r is: 164.258/nnode phi is: -2.23764/nnode node layer is: 92/n
-Jasper /nnode x is: -85.138/nnode y is: -136.758/nnode z is: 1500.5/nnode r is: 161.093/nnode phi is: -2.12763/nnode node layer is: 155/n
-Jasper /nnode x is: -92.6764/nnode y is: -149.87/nnode z is: 1641.5/nnode r is: 176.21/nnode phi is: -2.12462/nnode node layer is: 156/n
-Jasper /nnode x is: -100.896/nnode y is: -164.465/nnode z is: 1797.5/nnode r is: 192.948/nnode phi is: -2.12107/nnode node layer is: 157/n
-Jasper /nnode x is: -120.89/nnode y is: -200.553/nnode z is: 2182.5/nnode r is: 234.171/nnode phi is: -2.11326/nnode node layer is: 176/n
-Jasper /nnode x is: -155.495/nnode y is: -263.585/nnode z is: 2852.5/nnode r is: 306.032/nnode phi is: -2.10377/nnode node layer is: 196/n
-15:50:14    Sequencer      INFO      finished event 0
-Jasper: number of data handles is1
-Jasper /nnode x is: 92.2097/nnode y is: 61.2654/nnode z is: -927/nnode r is: 110.707/nnode phi is: 0.586442/nnode node layer is: 21/n
-Jasper /nnode x is: 83.248/nnode y is: 55.4003/nnode z is: -837/nnode r is: 99.9971/nnode phi is: 0.587184/nnode node layer is: 23/n
-Jasper /nnode x is: 74.634/nnode y is: 49.7964/nnode z is: -751/nnode r is: 89.7213/nnode phi is: 0.588378/nnode node layer is: 25/n
-Jasper /nnode x is: 67.2265/nnode y is: 44.9372/nnode z is: -677/nnode r is: 80.8626/nnode phi is: 0.589232/nnode node layer is: 27/n
-Jasper /nnode x is: 43.5319/nnode y is: 29.245/nnode z is: -439/nnode r is: 52.4433/nnode phi is: 0.591551/nnode node layer is: 34/n
-Jasper /nnode x is: 39.4514/nnode y is: 26.5175/nnode z is: -398/nnode r is: 47.5352/nnode phi is: 0.591794/nnode node layer is: 36/n
-Jasper /nnode x is: 35.605/nnode y is: 23.9517/nnode z is: -359/nnode r is: 42.9115/nnode phi is: 0.592173/nnode node layer is: 38/n
-Jasper /nnode x is: 32.1054/nnode y is: 21.6047/nnode z is: -324/nnode r is: 38.6978/nnode phi is: 0.592325/nnode node layer is: 40/n
-Jasper /nnode x is: 31.725/nnode y is: 21.3561/nnode z is: -320/nnode r is: 38.2434/nnode phi is: 0.592486/nnode node layer is: 40/n
-Jasper /nnode x is: 29.0465/nnode y is: 19.5435/nnode z is: -293/nnode r is: 35.0093/nnode phi is: 0.592262/nnode node layer is: 42/n
-Jasper /nnode x is: 28.6709/nnode y is: 19.2918/nnode z is: -289/nnode r is: 34.5571/nnode phi is: 0.592285/nnode node layer is: 42/n
-Jasper /nnode x is: -22.8217/nnode y is: 27.7756/nnode z is: 12.0604/nnode r is: 35.9487/nnode phi is: 2.2586/nnode node layer is: 46/n
-Jasper /nnode x is: -64.1263/nnode y is: 77.6946/nnode z is: 33.7724/nnode r is: 100.74/nnode phi is: 2.26081/nnode node layer is: 47/n
-Jasper /nnode x is: 149.597/nnode y is: 98.1711/nnode z is: -1500.5/nnode r is: 178.932/nnode phi is: 0.580749/nnode node layer is: 99/n
-Jasper /nnode x is: 136.893/nnode y is: 90.0888/nnode z is: -1373.5/nnode r is: 163.877/nnode phi is: 0.582046/nnode node layer is: 100/n
-Jasper /nnode x is: 191.491/nnode y is: 124.724/nnode z is: -1918.5/nnode r is: 228.528/nnode phi is: 0.57731/nnode node layer is: 112/n
-Jasper /nnode x is: 253.56/nnode y is: 163.687/nnode z is: -2535.5/nnode r is: 301.805/nnode phi is: 0.573246/nnode node layer is: 127/n
-Jasper /nnode x is: -100.24/nnode y is: 120.887/nnode z is: 52.5934/nnode r is: 157.04/nnode phi is: 2.26309/nnode node layer is: 145/n
-Jasper /nnode x is: -105.471/nnode y is: 127.083/nnode z is: 55.3235/nnode r is: 165.149/nnode phi is: 2.26353/nnode node layer is: 145/n
-Jasper /nnode x is: -145.393/nnode y is: 174.298/nnode z is: 75.9655/nnode r is: 226.978/nnode phi is: 2.26602/nnode node layer is: 125/n
-Jasper /nnode x is: -188.197/nnode y is: 224.422/nnode z is: 97.9662/nnode r is: 292.887/nnode phi is: 2.26863/nnode node layer is: 144/n
-15:50:14    Sequencer      INFO      finished event 1
-Jasper: number of data handles is1
-Jasper /nnode x is: 27.7672/nnode y is: 22.851/nnode z is: -28.5446/nnode r is: 35.9608/nnode phi is: 0.688578/nnode node layer is: 46/n
-Jasper /nnode x is: -29.5473/nnode y is: 16.8939/nnode z is: 42.7854/nnode r is: 34.036/nnode phi is: 2.6222/nnode node layer is: 46/n
-Jasper /nnode x is: 77.5651/nnode y is: 64.4468/nnode z is: -79.9851/nnode r is: 100.845/nnode phi is: 0.693285/nnode node layer is: 47/n
-Jasper /nnode x is: -89.5293/nnode y is: 50.2726/nnode z is: 129.252/nnode r is: 102.678/nnode phi is: 2.62995/nnode node layer is: 47/n
-Jasper /nnode x is: -83.8078/nnode y is: 47.1509/nnode z is: 121.03/nnode r is: 96.1611/nnode phi is: 2.62912/nnode node layer is: 47/n
-Jasper /nnode x is: 120.509/nnode y is: 100.868/nnode z is: -124.57/nnode r is: 157.152/nnode phi is: 0.69691/nnode node layer is: 145/n
-Jasper /nnode x is: 126.799/nnode y is: 106.259/nnode z is: -131.151/nnode r is: 165.436/nnode phi is: 0.697493/nnode node layer is: 145/n
-Jasper /nnode x is: -136.971/nnode y is: 75.8917/nnode z is: 197.147/nnode r is: 156.591/nnode phi is: 2.63563/nnode node layer is: 145/n
-Jasper /nnode x is: -143.504/nnode y is: 79.3825/nnode z is: 206.501/nnode r is: 163.996/nnode phi is: 2.63632/nnode node layer is: 145/n
-Jasper /nnode x is: 173.626/nnode y is: 146.717/nnode z is: -180.183/nnode r is: 227.315/nnode phi is: 0.701596/nnode node layer is: 125/n
-Jasper /nnode x is: -204.623/nnode y is: 111.199/nnode z is: 293.167/nnode r is: 232.886/nnode phi is: 2.6438/nnode node layer is: 125/n
-Jasper /nnode x is: -197.283/nnode y is: 107.408/nnode z is: 282.797/nnode r is: 224.626/nnode phi is: 2.64303/nnode node layer is: 125/n
-Jasper /nnode x is: 223.413/nnode y is: 190.403/nnode z is: -232.72/nnode r is: 293.541/nnode phi is: 0.705797/nnode node layer is: 144/n
-Jasper /nnode x is: -253.927/nnode y is: 136.198/nnode z is: 362.729/nnode r is: 288.147/nnode phi is: 2.64928/nnode node layer is: 144/n
-Jasper /nnode x is: -275.049/nnode y is: 146.739/nnode z is: 392.387/nnode r is: 311.744/nnode phi is: 2.65151/nnode node layer is: 179/n
-15:50:14    Sequencer      INFO      finished event 2
-15:50:14    Digitization   WARNING   6 skipped in Digitization. Enable DEBUG mode to see more details.
-Jasper: number of data handles is1
-Jasper /nnode x is: 112.536/nnode y is: -16.6458/nnode z is: -837/nnode r is: 113.76/nnode phi is: -0.146851/nnode node layer is: 23/n
-Jasper /nnode x is: 112.003/nnode y is: -16.5862/nnode z is: -833/nnode r is: 113.224/nnode phi is: -0.147019/nnode node layer is: 23/n
-Jasper /nnode x is: 100.909/nnode y is: -15.1387/nnode z is: -751/nnode r is: 102.038/nnode phi is: -0.148912/nnode node layer is: 25/n
-Jasper /nnode x is: 100.386/nnode y is: -15.0643/nnode z is: -747/nnode r is: 101.51/nnode phi is: -0.148952/nnode node layer is: 25/n
-Jasper /nnode x is: 90.9653/nnode y is: -13.7907/nnode z is: -677/nnode r is: 92.0047/nnode phi is: -0.150458/nnode node layer is: 27/n
-Jasper /nnode x is: 90.406/nnode y is: -13.7383/nnode z is: -673/nnode r is: 91.4439/nnode phi is: -0.150809/nnode node layer is: 27/n
-Jasper /nnode x is: 81.3783/nnode y is: -12.4949/nnode z is: -606/nnode r is: 82.332/nnode phi is: -0.152351/nnode node layer is: 29/n
-Jasper /nnode x is: 80.8424/nnode y is: -12.4181/nnode z is: -602/nnode r is: 81.7906/nnode phi is: -0.152417/nnode node layer is: 29/n
-Jasper /nnode x is: 48.167/nnode y is: -7.76811/nnode z is: -359/nnode r is: 48.7894/nnode phi is: -0.159898/nnode node layer is: 38/n
-Jasper /nnode x is: 47.6468/nnode y is: -7.65863/nnode z is: -355/nnode r is: 48.2584/nnode phi is: -0.159374/nnode node layer is: 38/n
-Jasper /nnode x is: 43.4717/nnode y is: -7.04164/nnode z is: -324/nnode r is: 44.0383/nnode phi is: -0.160587/nnode node layer is: 40/n
-Jasper /nnode x is: 42.9237/nnode y is: -6.93419/nnode z is: -320/nnode r is: 43.4801/nnode phi is: -0.160163/nnode node layer is: 40/n
-Jasper /nnode x is: 39.2833/nnode y is: -6.41395/nnode z is: -293/nnode r is: 39.8035/nnode phi is: -0.161846/nnode node layer is: 42/n
-Jasper /nnode x is: 38.8058/nnode y is: -6.33927/nnode z is: -289/nnode r is: 39.3202/nnode phi is: -0.161928/nnode node layer is: 42/n
-Jasper /nnode x is: 35.5624/nnode y is: -5.82098/nnode z is: -265/nnode r is: 36.0357/nnode phi is: -0.162245/nnode node layer is: 44/n
-Jasper /nnode x is: 35.012/nnode y is: -5.76624/nnode z is: -261/nnode r is: 35.4836/nnode phi is: -0.163228/nnode node layer is: 44/n
-Jasper /nnode x is: -30.9405/nnode y is: -11.784/nnode z is: -67.7792/nnode r is: 33.1086/nnode phi is: -2.77769/nnode node layer is: 46/n
-Jasper /nnode x is: -93.7492/nnode y is: -36.3898/nnode z is: -205.897/nnode r is: 100.564/nnode phi is: -2.77133/nnode node layer is: 47/n
-Jasper /nnode x is: 185.234/nnode y is: -24.7837/nnode z is: -1373.5/nnode r is: 186.885/nnode phi is: -0.133006/nnode node layer is: 100/n
-Jasper /nnode x is: 169.477/nnode y is: -23.2265/nnode z is: -1257.5/nnode r is: 171.061/nnode phi is: -0.1362/nnode node layer is: 101/n
-Jasper /nnode x is: 155.417/nnode y is: -21.6934/nnode z is: -1154/nnode r is: 156.923/nnode phi is: -0.138686/nnode node layer is: 102/n
-Jasper /nnode x is: 226.763/nnode y is: -28.5811/nnode z is: -1678.5/nnode r is: 228.557/nnode phi is: -0.125379/nnode node layer is: 113/n
-Jasper /nnode x is: -231.595/nnode y is: -94.0887/nnode z is: -511.265/nnode r is: 249.978/nnode phi is: -2.7557/nnode node layer is: 122/n
-Jasper /nnode x is: -208.67/nnode y is: -84.1248/nnode z is: -460.282/nnode r is: 224.99/nnode phi is: -2.75838/nnode node layer is: 123/n
-Jasper /nnode x is: 305.444/nnode y is: -34.6227/nnode z is: -2255.5/nnode r is: 307.4/nnode phi is: -0.11287/nnode node layer is: 128/n
-Jasper /nnode x is: -289.971/nnode y is: -119.992/nnode z is: -641.299/nnode r is: 313.817/nnode phi is: -2.74924/nnode node layer is: 139/n
-Jasper /nnode x is: -286.68/nnode y is: -118.506/nnode z is: -634.044/nnode r is: 310.209/nnode phi is: -2.74961/nnode node layer is: 139/n
-Jasper /nnode x is: -265.555/nnode y is: -109.045/nnode z is: -586.928/nnode r is: 287.072/nnode phi is: -2.75196/nnode node layer is: 140/n
-Jasper /nnode x is: -262.271/nnode y is: -107.616/nnode z is: -579.595/nnode r is: 283.492/nnode phi is: -2.75222/nnode node layer is: 140/n
-Jasper /nnode x is: -148.214/nnode y is: -58.598/nnode z is: -326.185/nnode r is: 159.377/nnode phi is: -2.76509/nnode node layer is: 145/n
-15:50:14    Sequencer      INFO      finished event 3
-Jasper: number of data handles is1
-Jasper /nnode x is: 107.566/nnode y is: -31.9389/nnode z is: -1551/nnode r is: 112.208/nnode phi is: -0.288631/nnode node layer is: 9/n
-Jasper /nnode x is: 97.1629/nnode y is: -28.8211/nnode z is: -1401/nnode r is: 101.347/nnode phi is: -0.288359/nnode node layer is: 11/n
-Jasper /nnode x is: 88.0955/nnode y is: -26.0534/nnode z is: -1270/nnode r is: 91.8673/nnode phi is: -0.287544/nnode node layer is: 13/n
-Jasper /nnode x is: 79.0613/nnode y is: -23.3748/nnode z is: -1140/nnode r is: 82.4444/nnode phi is: -0.287464/nnode node layer is: 16/n
-Jasper /nnode x is: 46.7315/nnode y is: -13.6888/nnode z is: -673/nnode r is: 48.6951/nnode phi is: -0.284954/nnode node layer is: 26/n
-Jasper /nnode x is: 41.7944/nnode y is: -12.2399/nnode z is: -602/nnode r is: 43.5498/nnode phi is: -0.284893/nnode node layer is: 28/n
-Jasper /nnode x is: 37.5453/nnode y is: -10.9881/nnode z is: -541/nnode r is: 39.1202/nnode phi is: -0.284711/nnode node layer is: 30/n
-Jasper /nnode x is: 33.8911/nnode y is: -9.91413/nnode z is: -488/nnode r is: 35.3115/nnode phi is: -0.284588/nnode node layer is: 32/n
-Jasper /nnode x is: 33.6045/nnode y is: -9.83381/nnode z is: -484/nnode r is: 35.0138/nnode phi is: -0.284685/nnode node layer is: 32/n
-Jasper /nnode x is: 8.93391/nnode y is: -35.7309/nnode z is: 488/nnode r is: 36.8309/nnode phi is: -1.32579/nnode node layer is: 60/n
-Jasper /nnode x is: 9.95201/nnode y is: -39.8756/nnode z is: 545/nnode r is: 41.0988/nnode phi is: -1.32622/nnode node layer is: 62/n
-Jasper /nnode x is: 11.0641/nnode y is: -44.3655/nnode z is: 606/nnode r is: 45.7243/nnode phi is: -1.3264/nnode node layer is: 64/n
-Jasper /nnode x is: 12.3274/nnode y is: -49.5882/nnode z is: 677/nnode r is: 51.0975/nnode phi is: -1.32714/nnode node layer is: 66/n
-Jasper /nnode x is: 20.4385/nnode y is: -84.0059/nnode z is: 1144/nnode r is: 86.4565/nnode phi is: -1.33213/nnode node layer is: 78/n
-Jasper /nnode x is: 22.6082/nnode y is: -93.5973/nnode z is: 1274/nnode r is: 96.2891/nnode phi is: -1.33379/nnode node layer is: 80/n
-Jasper /nnode x is: 24.7894/nnode y is: -103.241/nnode z is: 1405/nnode r is: 106.175/nnode phi is: -1.33514/nnode node layer is: 82/n
-Jasper /nnode x is: 27.2465/nnode y is: -114.31/nnode z is: 1555/nnode r is: 117.513/nnode phi is: -1.33681/nnode node layer is: 84/n
-Jasper /nnode x is: 180.478/nnode y is: -54.2115/nnode z is: -2601.5/nnode r is: 188.444/nnode phi is: -0.291803/nnode node layer is: 93/n
-Jasper /nnode x is: 180.04/nnode y is: -54.0757/nnode z is: -2595.5/nnode r is: 187.985/nnode phi is: -0.291782/nnode node layer is: 93/n
-Jasper /nnode x is: 164.363/nnode y is: -49.2717/nnode z is: -2369.5/nnode r is: 171.59/nnode phi is: -0.291248/nnode node layer is: 94/n
-Jasper /nnode x is: 163.933/nnode y is: -49.1482/nnode z is: -2363.5/nnode r is: 171.142/nnode phi is: -0.29128/nnode node layer is: 94/n
-Jasper /nnode x is: 149.757/nnode y is: -44.8094/nnode z is: -2159.5/nnode r is: 156.317/nnode phi is: -0.290736/nnode node layer is: 95/n
-Jasper /nnode x is: 149.357/nnode y is: -44.669/nnode z is: -2153.5/nnode r is: 155.893/nnode phi is: -0.290609/nnode node layer is: 95/n
-Jasper /nnode x is: 36.4583/nnode y is: -157.488/nnode z is: 2142.5/nnode r is: 161.653/nnode phi is: -1.34331/nnode node layer is: 159/n
-Jasper /nnode x is: 39.7147/nnode y is: -172.941/nnode z is: 2352.5/nnode r is: 177.442/nnode phi is: -1.34507/nnode node layer is: 160/n
-Jasper /nnode x is: 43.2283/nnode y is: -189.995/nnode z is: 2584.5/nnode r is: 194.851/nnode phi is: -1.34708/nnode node layer is: 161/n
-Jasper /nnode x is: 47.2135/nnode y is: -209.366/nnode z is: 2847.5/nnode r is: 214.623/nnode phi is: -1.349/nnode node layer is: 178/n
-15:50:14    Sequencer      INFO      finished event 4
-15:50:14    RootParticle   INFO      Wrote particles to tree 'particles' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/particles_simulation.root'
-15:50:14    TrackFinderP   INFO      Efficiency with tracks (nMatchedTracks/ nAllTracks) = 1
-15:50:14    TrackFinderP   INFO      Fake ratio with tracks (nFakeTracks/nAllTracks) = 0
-15:50:14    TrackFinderP   INFO      Duplicate ratio with tracks (nDuplicateTracks/nAllTracks) = 0.814815
-15:50:14    TrackFinderP   INFO      Efficiency with particles (nMatchedParticles/nTrueParticles) = 1
-15:50:14    TrackFinderP   INFO      Fake ratio with particles (nFakeParticles/nTrueParticles) = 0
-15:50:14    TrackFinderP   INFO      Duplicate ratio with particles (nDuplicateParticles/nTrueParticles) = 1
-15:50:14    TrackFinderP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_seeding.root:/'
-15:50:14    RootTrackPar   INFO      Wrote estimated parameters from seed to tree 'estimatedparams' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/estimatedparams.root'
-15:50:14    TrackFinding   INFO      TrackFindingAlgorithm statistics:
-15:50:14    TrackFinding   INFO      - total seeds: 54
-15:50:14    TrackFinding   INFO      - deduplicated seeds: 0
-15:50:14    TrackFinding   INFO      - failed seeds: 0
-15:50:14    TrackFinding   INFO      - failed smoothing: 0
-15:50:14    TrackFinding   INFO      - failed extrapolation: 0
-15:50:14    TrackFinding   INFO      - failure ratio seeds: 0
-15:50:14    TrackFinding   INFO      - found tracks: 54
-15:50:14    TrackFinding   INFO      - selected tracks: 54
-15:50:14    TrackFinding   INFO      - stopped branches: 0
-15:50:14    TrackFinding   INFO      - skipped second pass: 0
-15:50:14    RootTrackSum   INFO      Wrote parameters of tracks to tree 'tracksummary' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/tracksummary_ckf.root'
-15:50:14    TrackFitterP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_fitting_ckf.root:/'
-15:50:14    TrackFinderP   INFO      Efficiency with tracks (nMatchedTracks/ nAllTracks) = 0.981481
-15:50:14    TrackFinderP   INFO      Fake ratio with tracks (nFakeTracks/nAllTracks) = 0.0185185
-15:50:14    TrackFinderP   INFO      Duplicate ratio with tracks (nDuplicateTracks/nAllTracks) = 0.796296
-15:50:14    TrackFinderP   INFO      Efficiency with particles (nMatchedParticles/nTrueParticles) = 1
-15:50:14    TrackFinderP   INFO      Fake ratio with particles (nFakeParticles/nTrueParticles) = 0.1
-15:50:14    TrackFinderP   INFO      Duplicate ratio with particles (nDuplicateParticles/nTrueParticles) = 1
-15:50:14    TrackFinderP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_finding_ckf.root:/'
-15:50:14    Sequencer      INFO      No unmasked FPEs encountered
-15:50:14    Sequencer      INFO      Processed 5 events in 450.311932 ms (wall clock)
-15:50:14    Sequencer      INFO      Average time per event: 12.963310 ms/event
+10:52:40    Sequencer      INFO      Create Sequencer (single-threaded)
+10:52:40    Sequencer      INFO      Add Reader 'EventGenerator'
+10:52:40    Sequencer      INFO      -> OutputEvent 'particle_gun_event':
+10:52:40    Sequencer      INFO         shared_ptr<HepMC3::GenEvent>
+10:52:40    Sequencer      INFO      Add Algorithm 'HepMC3InputConverter'
+10:52:40    Sequencer      INFO      <- InputEvent 'particle_gun_event':
+10:52:40    Sequencer      INFO         shared_ptr<HepMC3::GenEvent>
+10:52:40    Sequencer      INFO      -> OutputParticles 'particles_generated':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      -> OutputVertices 'vertices_generated':
+10:52:40    Sequencer      INFO         flat_set<SimVertex, detail::CompareVertexId, void>
+10:52:40    Sequencer      INFO      Key 'particles_generated' aliased to 'particles'
+10:52:40    Sequencer      INFO      Key 'vertices_generated' aliased to 'vertices_truth'
+10:52:40    Sequencer      INFO      Key 'particles_generated' aliased to 'particles_generated_selected'
+10:52:40    Sequencer      INFO      Add Algorithm 'FatrasSimulation'
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_generated_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      -> OutputSimHits 'simhits':
+10:52:40    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
+10:52:40    Sequencer      INFO      -> OutputParticles 'particles_simulated':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      Key 'particles_simulated' aliased to 'particles'
+10:52:40    Sequencer      INFO      Key 'particles_simulated' aliased to 'particles_simulated_selected'
+10:52:40    Sequencer      INFO      Add Writer 'RootParticleWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'particles_simulated':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      Add Writer 'RootSimHitWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'simhits':
+10:52:40    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
+10:52:40    Sequencer      INFO      Add Algorithm 'DigitizationAlgorithm'
+10:52:40    Sequencer      INFO      <- InputHits 'simhits':
+10:52:40    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
+10:52:40    Sequencer      INFO      -> OutputMeasurements 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      -> OutputClusters 'clusters':
+10:52:40    Sequencer      INFO         vector<Cluster>
+10:52:40    Sequencer      INFO      -> OutputMeasurementParticlesMap 'measurement_particles_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      -> OutputMeasurementSimHitsMap 'measurement_simhits_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      -> OutputParticleMeasurementsMap 'particle_measurements_map':
+10:52:40    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
+10:52:40    Sequencer      INFO      -> OutputSimHitMeasurementsMap 'simhit_measurements_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      Add Writer 'RootMeasurementWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      <- InputClusters 'clusters':
+10:52:40    Sequencer      INFO         vector<Cluster>
+10:52:40    Sequencer      INFO      <- InputSimHits 'simhits':
+10:52:40    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
+10:52:40    Sequencer      INFO      <- InputMeasurementSimHitsMap 'measurement_simhits_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      Add Algorithm 'ParticleSelector'
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_simulated_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
+10:52:40    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
+10:52:40    Sequencer      INFO      <- InputMeasurements 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      -> OutputParticles 'tmp_particles_digitized_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      Key 'tmp_particles_digitized_selected' aliased to 'particles_selected'
+10:52:40    Sequencer      INFO      Key 'tmp_particles_digitized_selected' aliased to 'particles_digitized_selected'
+10:52:40    SpacePointMa   INFO      Space point geometry selection:
+10:52:40    SpacePointMa   INFO        vol=8
+10:52:40    SpacePointMa   INFO        vol=9
+10:52:40    SpacePointMa   INFO        vol=10
+10:52:40    SpacePointMa   INFO        vol=13
+10:52:40    SpacePointMa   INFO        vol=14
+10:52:40    SpacePointMa   INFO        vol=15
+10:52:40    SpacePointMa   INFO        vol=16
+10:52:40    SpacePointMa   INFO        vol=18
+10:52:40    SpacePointMa   INFO        vol=19
+10:52:40    SpacePointMa   INFO        vol=20
+10:52:40    Sequencer      INFO      Add Algorithm 'SpacePointMaker'
+10:52:40    Sequencer      INFO      <- InputMeasurements 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      -> OutputSpacePoints 'spacepoints':
+10:52:40    Sequencer      INFO         vector<SimSpacePoint>
+10:52:40    addSeeding     INFO      Using Gbts seeding
+Jasper: number of collections are :1
+10:52:40    Sequencer      INFO      Add Algorithm 'SeedingAlgorithm'
+10:52:40    Sequencer      INFO      <- InputSpacePoints 'spacepoints':
+10:52:40    Sequencer      INFO         vector<SimSpacePoint>
+10:52:40    Sequencer      INFO      <- InputClusters 'clusters':
+10:52:40    Sequencer      INFO         vector<Cluster>
+10:52:40    Sequencer      INFO      -> OutputSeeds 'seeds':
+10:52:40    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
+10:52:40    Sequencer      INFO      Add Algorithm 'TrackParamsEstimationAlgorithm'
+10:52:40    Sequencer      INFO      <- InputSeeds 'seeds':
+10:52:40    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
+10:52:40    Sequencer      INFO      -> OutputTrackParameters 'estimatedparameters':
+10:52:40    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
+10:52:40    Sequencer      INFO      -> OutputSeeds 'estimatedseeds':
+10:52:40    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
+10:52:40    Sequencer      INFO      Add Algorithm 'SeedsToPrototracks'
+10:52:40    Sequencer      INFO      <- InputSeeds 'seeds':
+10:52:40    Sequencer      INFO         vector<Seed<SimSpacePoint, 3ul>>
+10:52:40    Sequencer      INFO      -> OutputProtoTracks 'seed-prototracks':
+10:52:40    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
+10:52:40    Sequencer      INFO      Add Algorithm 'PrototracksToTracks'
+10:52:40    Sequencer      INFO      <- InputMeasurements 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      <- InputTrackParameters 'estimatedparameters':
+10:52:40    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
+10:52:40    Sequencer      INFO      <- InputProtoTracks 'seed-prototracks':
+10:52:40    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
+10:52:40    Sequencer      INFO      -> OutputTracks 'seed-tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      Add Algorithm 'TrackTruthMatcher'
+10:52:40    Sequencer      INFO      <- InputTracks 'seed-tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      -> OutputTrackParticleMatching 'seed_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      -> OutputParticleTrackMatching 'particle_seed_matching':
+10:52:40    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
+10:52:40    Sequencer      INFO      Add Writer 'TrackFinderPerformanceWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'seed-tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputTrackParticleMatching 'seed_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      <- InputParticleTrackMatching 'particle_seed_matching':
+10:52:40    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
+10:52:40    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
+10:52:40    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
+10:52:40    Sequencer      INFO      Add Writer 'RootTrackParameterWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'estimatedparameters':
+10:52:40    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
+10:52:40    Sequencer      INFO      <- InputProtoTracks 'seed-prototracks':
+10:52:40    Sequencer      INFO         vector<small_vector<unsigned int, 3ul, void, void>>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputSimHits 'simhits':
+10:52:40    Sequencer      INFO         flat_multiset<Hit, detail::CompareGeometryId, void>
+10:52:40    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      <- InputMeasurementSimHitsMap 'measurement_simhits_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, unsigned int, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      Add Algorithm 'TrackFindingAlgorithm'
+10:52:40    Sequencer      INFO      <- InputMeasurements 'measurements':
+10:52:40    Sequencer      INFO         MeasurementContainer
+10:52:40    Sequencer      INFO      <- InputInitialTrackParameters 'estimatedparameters':
+10:52:40    Sequencer      INFO         vector<GenericBoundTrackParameters<ParticleHypothesis>>
+10:52:40    Sequencer      INFO      -> OutputTracks 'ckf_tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      Key 'ckf_tracks' aliased to 'tracks'
+10:52:40    Sequencer      INFO      Add Algorithm 'TrackTruthMatcher'
+10:52:40    Sequencer      INFO      <- InputTracks 'ckf_tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputMeasurementParticlesMap 'measurement_particles_map':
+10:52:40    Sequencer      INFO         flat_multimap<unsigned int, Barcode, less<unsigned int>, void>
+10:52:40    Sequencer      INFO      -> OutputTrackParticleMatching 'ckf_track_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      -> OutputParticleTrackMatching 'ckf_particle_track_matching':
+10:52:40    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
+10:52:40    Sequencer      INFO      Key 'ckf_track_particle_matching' aliased to 'track_particle_matching'
+10:52:40    Sequencer      INFO      Key 'ckf_particle_track_matching' aliased to 'particle_track_matching'
+10:52:40    Sequencer      INFO      Add Writer 'RootTrackSummaryWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'ckf_tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      Add Writer 'TrackFitterPerformanceWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'ckf_tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      Add Writer 'TrackFinderPerformanceWriter'
+10:52:40    Sequencer      INFO      <- InputHandle 'ckf_tracks':
+10:52:40    Sequencer      INFO            TrackContainer<ConstVectorTrackContainer, ConstVectorMultiTrajectory, shared_ptr>
+10:52:40    Sequencer      INFO      <- InputParticles 'particles_selected':
+10:52:40    Sequencer      INFO         flat_set<SimParticle, detail::CompareParticleId, void>
+10:52:40    Sequencer      INFO      <- InputTrackParticleMatching 'track_particle_matching':
+10:52:40    Sequencer      INFO            map<unsigned int, TrackMatchEntry, less<unsigned int>, allocator<pair<unsigned int const, TrackMatchEntry> > >
+10:52:40    Sequencer      INFO      <- InputParticleTrackMatching 'particle_track_matching':
+10:52:40    Sequencer      INFO            map<Barcode, ParticleMatchEntry, less<Barcode>, allocator<pair<Barcode const, ParticleMatchEntry> > >
+10:52:40    Sequencer      INFO      <- InputParticleMeasurementsMap 'particle_measurements_map':
+10:52:40    Sequencer      INFO         flat_multimap<Barcode, unsigned int, less<Barcode>, void>
+10:52:40    Sequencer      INFO      Processing events [0, 5)
+10:52:40    Sequencer      INFO      Starting event loop with 1 threads
+10:52:40    Sequencer      INFO        0 context decorators
+10:52:40    Sequencer      INFO        21 sequence elements
+10:52:40    Sequencer      INFO        1 readers
+10:52:40    Sequencer      INFO        12 algorithms
+10:52:40    Sequencer      INFO        8 writers
+Jasper: spacepoints x is: -68.1961
+spacepoint phi is -2.23982
+spacepoint layer is: 5
+Jasper: spacepoints x is: -61.501
+spacepoint phi is -2.24013
+spacepoint layer is: 7
+Jasper: spacepoints x is: -55.4921
+spacepoint phi is -2.2403
+spacepoint layer is: 9
+Jasper: spacepoints x is: -50.1855
+spacepoint phi is -2.24114
+spacepoint layer is: 11
+Jasper: spacepoints x is: -44.0915
+spacepoint phi is -2.24135
+spacepoint layer is: 14
+Jasper: spacepoints x is: -39.5712
+spacepoint phi is -2.24147
+spacepoint layer is: 17
+Jasper: spacepoints x is: -39.4399
+spacepoint phi is -2.24148
+spacepoint layer is: 17
+Jasper: spacepoints x is: -29.9904
+spacepoint phi is -2.24213
+spacepoint layer is: 22
+Jasper: spacepoints x is: -29.8406
+spacepoint phi is -2.24168
+spacepoint layer is: 22
+Jasper: spacepoints x is: -26.9035
+spacepoint phi is -2.24226
+spacepoint layer is: 24
+Jasper: spacepoints x is: -26.7727
+spacepoint phi is -2.24232
+spacepoint layer is: 24
+Jasper: spacepoints x is: -24.246
+spacepoint phi is -2.24156
+spacepoint layer is: 26
+Jasper: spacepoints x is: -24.1164
+spacepoint phi is -2.24198
+spacepoint layer is: 26
+Jasper: spacepoints x is: -21.7125
+spacepoint phi is -2.24228
+spacepoint layer is: 28
+Jasper: spacepoints x is: -21.5445
+spacepoint phi is -2.24172
+spacepoint layer is: 28
+Jasper: spacepoints x is: -19.1435
+spacepoint phi is -2.15502
+spacepoint layer is: 52
+Jasper: spacepoints x is: -21.154
+spacepoint phi is -2.15346
+spacepoint layer is: 54
+Jasper: spacepoints x is: -23.4349
+spacepoint phi is -2.15211
+spacepoint layer is: 56
+Jasper: spacepoints x is: -25.7832
+spacepoint phi is -2.15099
+spacepoint layer is: 58
+Jasper: spacepoints x is: -28.6317
+spacepoint phi is -2.14977
+spacepoint layer is: 60
+Jasper: spacepoints x is: -43.4321
+spacepoint phi is -2.14367
+spacepoint layer is: 69
+Jasper: spacepoints x is: -48.3212
+spacepoint phi is -2.14217
+spacepoint layer is: 71
+Jasper: spacepoints x is: -53.3889
+spacepoint phi is -2.14021
+spacepoint layer is: 73
+Jasper: spacepoints x is: -59.0367
+spacepoint phi is -2.13793
+spacepoint layer is: 75
+Jasper: spacepoints x is: -101.378
+spacepoint phi is -2.23755
+spacepoint layer is: 92
+Jasper: spacepoints x is: -101.595
+spacepoint phi is -2.23764
+spacepoint layer is: 92
+Jasper: spacepoints x is: -85.138
+spacepoint phi is -2.12763
+spacepoint layer is: 155
+Jasper: spacepoints x is: -92.6764
+spacepoint phi is -2.12462
+spacepoint layer is: 156
+Jasper: spacepoints x is: -100.896
+spacepoint phi is -2.12107
+spacepoint layer is: 157
+Jasper: spacepoints x is: -120.89
+spacepoint phi is -2.11326
+spacepoint layer is: 176
+Jasper: spacepoints x is: -155.495
+spacepoint phi is -2.10377
+spacepoint layer is: 196
+10:52:40    Sequencer      INFO      finished event 0
+Jasper: spacepoints x is: 92.2097
+spacepoint phi is 0.586442
+spacepoint layer is: 21
+Jasper: spacepoints x is: 83.248
+spacepoint phi is 0.587184
+spacepoint layer is: 23
+Jasper: spacepoints x is: 74.634
+spacepoint phi is 0.588378
+spacepoint layer is: 25
+Jasper: spacepoints x is: 67.2265
+spacepoint phi is 0.589232
+spacepoint layer is: 27
+Jasper: spacepoints x is: 43.5319
+spacepoint phi is 0.591551
+spacepoint layer is: 34
+Jasper: spacepoints x is: 39.4514
+spacepoint phi is 0.591794
+spacepoint layer is: 36
+Jasper: spacepoints x is: 35.605
+spacepoint phi is 0.592173
+spacepoint layer is: 38
+Jasper: spacepoints x is: 32.1054
+spacepoint phi is 0.592325
+spacepoint layer is: 40
+Jasper: spacepoints x is: 31.725
+spacepoint phi is 0.592486
+spacepoint layer is: 40
+Jasper: spacepoints x is: 29.0465
+spacepoint phi is 0.592262
+spacepoint layer is: 42
+Jasper: spacepoints x is: 28.6709
+spacepoint phi is 0.592285
+spacepoint layer is: 42
+Jasper: spacepoints x is: -22.8217
+spacepoint phi is 2.2586
+spacepoint layer is: 46
+Jasper: spacepoints x is: -64.1263
+spacepoint phi is 2.26081
+spacepoint layer is: 47
+Jasper: spacepoints x is: 149.597
+spacepoint phi is 0.580749
+spacepoint layer is: 99
+Jasper: spacepoints x is: 136.893
+spacepoint phi is 0.582046
+spacepoint layer is: 100
+Jasper: spacepoints x is: 191.491
+spacepoint phi is 0.57731
+spacepoint layer is: 112
+Jasper: spacepoints x is: 253.56
+spacepoint phi is 0.573246
+spacepoint layer is: 127
+Jasper: spacepoints x is: -100.24
+spacepoint phi is 2.26309
+spacepoint layer is: 145
+Jasper: spacepoints x is: -105.471
+spacepoint phi is 2.26353
+spacepoint layer is: 145
+Jasper: spacepoints x is: -145.393
+spacepoint phi is 2.26602
+spacepoint layer is: 125
+Jasper: spacepoints x is: -188.197
+spacepoint phi is 2.26863
+spacepoint layer is: 144
+10:52:40    Sequencer      INFO      finished event 1
+Jasper: spacepoints x is: 27.7672
+spacepoint phi is 0.688578
+spacepoint layer is: 46
+Jasper: spacepoints x is: -29.5473
+spacepoint phi is 2.6222
+spacepoint layer is: 46
+Jasper: spacepoints x is: 77.5651
+spacepoint phi is 0.693285
+spacepoint layer is: 47
+Jasper: spacepoints x is: -89.5293
+spacepoint phi is 2.62995
+spacepoint layer is: 47
+Jasper: spacepoints x is: -83.8078
+spacepoint phi is 2.62912
+spacepoint layer is: 47
+Jasper: spacepoints x is: 120.509
+spacepoint phi is 0.69691
+spacepoint layer is: 145
+Jasper: spacepoints x is: 126.799
+spacepoint phi is 0.697493
+spacepoint layer is: 145
+Jasper: spacepoints x is: -136.971
+spacepoint phi is 2.63563
+spacepoint layer is: 145
+Jasper: spacepoints x is: -143.504
+spacepoint phi is 2.63632
+spacepoint layer is: 145
+Jasper: spacepoints x is: 173.626
+spacepoint phi is 0.701596
+spacepoint layer is: 125
+Jasper: spacepoints x is: -204.623
+spacepoint phi is 2.6438
+spacepoint layer is: 125
+Jasper: spacepoints x is: -197.283
+spacepoint phi is 2.64303
+spacepoint layer is: 125
+Jasper: spacepoints x is: 223.413
+spacepoint phi is 0.705797
+spacepoint layer is: 144
+Jasper: spacepoints x is: -253.927
+spacepoint phi is 2.64928
+spacepoint layer is: 144
+Jasper: spacepoints x is: -275.049
+spacepoint phi is 2.65151
+spacepoint layer is: 179
+10:52:40    Sequencer      INFO      finished event 2
+10:52:40    Digitization   WARNING   6 skipped in Digitization. Enable DEBUG mode to see more details.
+Jasper: spacepoints x is: 112.536
+spacepoint phi is -0.146851
+spacepoint layer is: 23
+Jasper: spacepoints x is: 112.003
+spacepoint phi is -0.147019
+spacepoint layer is: 23
+Jasper: spacepoints x is: 100.909
+spacepoint phi is -0.148912
+spacepoint layer is: 25
+Jasper: spacepoints x is: 100.386
+spacepoint phi is -0.148952
+spacepoint layer is: 25
+Jasper: spacepoints x is: 90.9653
+spacepoint phi is -0.150458
+spacepoint layer is: 27
+Jasper: spacepoints x is: 90.406
+spacepoint phi is -0.150809
+spacepoint layer is: 27
+Jasper: spacepoints x is: 81.3783
+spacepoint phi is -0.152351
+spacepoint layer is: 29
+Jasper: spacepoints x is: 80.8424
+spacepoint phi is -0.152417
+spacepoint layer is: 29
+Jasper: spacepoints x is: 48.167
+spacepoint phi is -0.159898
+spacepoint layer is: 38
+Jasper: spacepoints x is: 47.6468
+spacepoint phi is -0.159374
+spacepoint layer is: 38
+Jasper: spacepoints x is: 43.4717
+spacepoint phi is -0.160587
+spacepoint layer is: 40
+Jasper: spacepoints x is: 42.9237
+spacepoint phi is -0.160163
+spacepoint layer is: 40
+Jasper: spacepoints x is: 39.2833
+spacepoint phi is -0.161846
+spacepoint layer is: 42
+Jasper: spacepoints x is: 38.8058
+spacepoint phi is -0.161928
+spacepoint layer is: 42
+Jasper: spacepoints x is: 35.5624
+spacepoint phi is -0.162245
+spacepoint layer is: 44
+Jasper: spacepoints x is: 35.012
+spacepoint phi is -0.163228
+spacepoint layer is: 44
+Jasper: spacepoints x is: -30.9405
+spacepoint phi is -2.77769
+spacepoint layer is: 46
+Jasper: spacepoints x is: -93.7492
+spacepoint phi is -2.77133
+spacepoint layer is: 47
+Jasper: spacepoints x is: 185.234
+spacepoint phi is -0.133006
+spacepoint layer is: 100
+Jasper: spacepoints x is: 169.477
+spacepoint phi is -0.1362
+spacepoint layer is: 101
+Jasper: spacepoints x is: 155.417
+spacepoint phi is -0.138686
+spacepoint layer is: 102
+Jasper: spacepoints x is: 226.763
+spacepoint phi is -0.125379
+spacepoint layer is: 113
+Jasper: spacepoints x is: -231.595
+spacepoint phi is -2.7557
+spacepoint layer is: 122
+Jasper: spacepoints x is: -208.67
+spacepoint phi is -2.75838
+spacepoint layer is: 123
+Jasper: spacepoints x is: 305.444
+spacepoint phi is -0.11287
+spacepoint layer is: 128
+Jasper: spacepoints x is: -289.971
+spacepoint phi is -2.74924
+spacepoint layer is: 139
+Jasper: spacepoints x is: -286.68
+spacepoint phi is -2.74961
+spacepoint layer is: 139
+Jasper: spacepoints x is: -265.555
+spacepoint phi is -2.75196
+spacepoint layer is: 140
+Jasper: spacepoints x is: -262.271
+spacepoint phi is -2.75222
+spacepoint layer is: 140
+Jasper: spacepoints x is: -148.214
+spacepoint phi is -2.76509
+spacepoint layer is: 145
+10:52:40    Sequencer      INFO      finished event 3
+Jasper: spacepoints x is: 107.566
+spacepoint phi is -0.288631
+spacepoint layer is: 9
+Jasper: spacepoints x is: 97.1629
+spacepoint phi is -0.288359
+spacepoint layer is: 11
+Jasper: spacepoints x is: 88.0955
+spacepoint phi is -0.287544
+spacepoint layer is: 13
+Jasper: spacepoints x is: 79.0613
+spacepoint phi is -0.287464
+spacepoint layer is: 16
+Jasper: spacepoints x is: 46.7315
+spacepoint phi is -0.284954
+spacepoint layer is: 26
+Jasper: spacepoints x is: 41.7944
+spacepoint phi is -0.284893
+spacepoint layer is: 28
+Jasper: spacepoints x is: 37.5453
+spacepoint phi is -0.284711
+spacepoint layer is: 30
+Jasper: spacepoints x is: 33.8911
+spacepoint phi is -0.284588
+spacepoint layer is: 32
+Jasper: spacepoints x is: 33.6045
+spacepoint phi is -0.284685
+spacepoint layer is: 32
+Jasper: spacepoints x is: 8.93391
+spacepoint phi is -1.32579
+spacepoint layer is: 60
+Jasper: spacepoints x is: 9.95201
+spacepoint phi is -1.32622
+spacepoint layer is: 62
+Jasper: spacepoints x is: 11.0641
+spacepoint phi is -1.3264
+spacepoint layer is: 64
+Jasper: spacepoints x is: 12.3274
+spacepoint phi is -1.32714
+spacepoint layer is: 66
+Jasper: spacepoints x is: 20.4385
+spacepoint phi is -1.33213
+spacepoint layer is: 78
+Jasper: spacepoints x is: 22.6082
+spacepoint phi is -1.33379
+spacepoint layer is: 80
+Jasper: spacepoints x is: 24.7894
+spacepoint phi is -1.33514
+spacepoint layer is: 82
+Jasper: spacepoints x is: 27.2465
+spacepoint phi is -1.33681
+spacepoint layer is: 84
+Jasper: spacepoints x is: 180.478
+spacepoint phi is -0.291803
+spacepoint layer is: 93
+Jasper: spacepoints x is: 180.04
+spacepoint phi is -0.291782
+spacepoint layer is: 93
+Jasper: spacepoints x is: 164.363
+spacepoint phi is -0.291248
+spacepoint layer is: 94
+Jasper: spacepoints x is: 163.933
+spacepoint phi is -0.29128
+spacepoint layer is: 94
+Jasper: spacepoints x is: 149.757
+spacepoint phi is -0.290736
+spacepoint layer is: 95
+Jasper: spacepoints x is: 149.357
+spacepoint phi is -0.290609
+spacepoint layer is: 95
+Jasper: spacepoints x is: 36.4583
+spacepoint phi is -1.34331
+spacepoint layer is: 159
+Jasper: spacepoints x is: 39.7147
+spacepoint phi is -1.34507
+spacepoint layer is: 160
+Jasper: spacepoints x is: 43.2283
+spacepoint phi is -1.34708
+spacepoint layer is: 161
+Jasper: spacepoints x is: 47.2135
+spacepoint phi is -1.349
+spacepoint layer is: 178
+10:52:40    Sequencer      INFO      finished event 4
+10:52:40    RootParticle   INFO      Wrote particles to tree 'particles' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/particles_simulation.root'
+10:52:40    TrackFinderP   INFO      Efficiency with tracks (nMatchedTracks/ nAllTracks) = 1
+10:52:40    TrackFinderP   INFO      Fake ratio with tracks (nFakeTracks/nAllTracks) = 0
+10:52:40    TrackFinderP   INFO      Duplicate ratio with tracks (nDuplicateTracks/nAllTracks) = 0.814815
+10:52:40    TrackFinderP   INFO      Efficiency with particles (nMatchedParticles/nTrueParticles) = 1
+10:52:40    TrackFinderP   INFO      Fake ratio with particles (nFakeParticles/nTrueParticles) = 0
+10:52:40    TrackFinderP   INFO      Duplicate ratio with particles (nDuplicateParticles/nTrueParticles) = 1
+10:52:40    TrackFinderP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_seeding.root:/'
+10:52:40    RootTrackPar   INFO      Wrote estimated parameters from seed to tree 'estimatedparams' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/estimatedparams.root'
+10:52:40    TrackFinding   INFO      TrackFindingAlgorithm statistics:
+10:52:40    TrackFinding   INFO      - total seeds: 54
+10:52:40    TrackFinding   INFO      - deduplicated seeds: 0
+10:52:40    TrackFinding   INFO      - failed seeds: 0
+10:52:40    TrackFinding   INFO      - failed smoothing: 0
+10:52:40    TrackFinding   INFO      - failed extrapolation: 0
+10:52:40    TrackFinding   INFO      - failure ratio seeds: 0
+10:52:40    TrackFinding   INFO      - found tracks: 54
+10:52:40    TrackFinding   INFO      - selected tracks: 54
+10:52:40    TrackFinding   INFO      - stopped branches: 0
+10:52:40    TrackFinding   INFO      - skipped second pass: 0
+10:52:40    RootTrackSum   INFO      Wrote parameters of tracks to tree 'tracksummary' in '/opt/ppd/scratch-2022/japresto/acts/itk_output/tracksummary_ckf.root'
+10:52:41    TrackFitterP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_fitting_ckf.root:/'
+10:52:41    TrackFinderP   INFO      Efficiency with tracks (nMatchedTracks/ nAllTracks) = 0.981481
+10:52:41    TrackFinderP   INFO      Fake ratio with tracks (nFakeTracks/nAllTracks) = 0.0185185
+10:52:41    TrackFinderP   INFO      Duplicate ratio with tracks (nDuplicateTracks/nAllTracks) = 0.796296
+10:52:41    TrackFinderP   INFO      Efficiency with particles (nMatchedParticles/nTrueParticles) = 1
+10:52:41    TrackFinderP   INFO      Fake ratio with particles (nFakeParticles/nTrueParticles) = 0.1
+10:52:41    TrackFinderP   INFO      Duplicate ratio with particles (nDuplicateParticles/nTrueParticles) = 1
+10:52:41    TrackFinderP   INFO      Wrote performance plots to '/opt/ppd/scratch-2022/japresto/acts/itk_output/performance_finding_ckf.root:/'
+10:52:41    Sequencer      INFO      No unmasked FPEs encountered
+10:52:41    Sequencer      INFO      Processed 5 events in 417.396856 ms (wall clock)
+10:52:41    Sequencer      INFO      Average time per event: 12.303194 ms/event
 FPE masks:
 - Core/src/Vertexing/AdaptiveMultiVertexFinder.cpp:474: FLTUND: 1
 - Core/include/Acts/TrackFitting/detail/GsfComponentMerging.hpp:88: FLTUND: 1
