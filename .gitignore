@@ -39,6 +39,8 @@ codegen/src/codegen.egg-info/
 !.gitlab-ci.yml
 !.clang-tidy
 !.oclint
+!.devcontainer
 
-#inbedded files 
+#files to ignore 
 acts-itk/
+log_log.log

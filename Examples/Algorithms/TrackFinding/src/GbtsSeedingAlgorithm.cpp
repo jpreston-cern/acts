@@ -16,6 +16,8 @@
 #include "ActsExamples/Framework/WhiteBoard.hpp"
 #include "Acts/EventData/SeedContainer2.hpp"
 #include "Acts/EventData/SpacePointContainer2.hpp"
+#include "Acts/EventData/SeedContainer2.hpp"
+#include "Acts/EventData/SpacePointContainer2.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -40,18 +42,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
   
   //initialise the spacepoints from the handle 
-  for (const auto &spName : m_cfg.inputSpacePoints) {
-    if (spName.empty()) {
-      throw std::invalid_argument("Invalid space point input collection");
-    }
-
-    auto &handle = m_inputSpacePoints.emplace_back(
-        std::make_unique<ReadDataHandle<SimSpacePointContainer>>(
-            this,
-            "InputSpacePoints#" + std::to_string(m_inputSpacePoints.size())));
-    handle->initialize(spName);
-
-  }
+  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints.at(0));
 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
 
@@ -171,30 +162,31 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
 
 Acts::Experimental::SpacePointContainer2
 ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
-  const AlgorithmContext &ctx,
-  std::map<std::pair<int, int>, 
-  std::pair<int, int>> map) const {
-
-    //initiliase new container that will be used to store all the gbts information  
-    Acts::Experimental::SpacePointContainer2 coreSpacePoints;
-    coreSpacePoints.createExtraColumns(
+    const AlgorithmContext &ctx,
+    std::map<std::pair<int, int>, std::pair<int, int>> map) const {
+  //new seeding container test
+  //initialise obtaijn spacepoints from handle and define new container 
+  const SimSpacePointContainer& spacePoints = m_inputSpacePoints(ctx);
+  Acts::Experimental::SpacePointContainer2 coreSpacePoints;
+  //define custom varibles included in container (x,y,z are added by default)
+  coreSpacePoints.createExtraColumns(
       Acts::Experimental::SpacePointKnownExtraColumn::R |
       Acts::Experimental::SpacePointKnownExtraColumn::Phi);
-      coreSpacePoints.reserve(m_inputSpacePoints.size()); //need to check this as im not sure if this is enough / if we only need one collection now 
-
-    //create extra custom coloumns needed for Layer ID's   
-    auto LayerColoumn = coreSpacePoints.createExtraColumns<int>("LayerID");
-    auto ClusterWidthColoumn = coreSpacePoints.createExtraColumns<int>("ClusterWidth");
-  // for every sapcepoint in all our collections 
-  for (const auto &isp : m_inputSpacePoints) {
-    for (const auto &spacePoint : (*isp)(ctx)) {
+  //add new coloumn for layer ID
+  auto LayerColoumn = coreSpacePoints.createExtraColumn<int>("LayerID");
+  auto ClusterWidthColoumn = coreSpacePoints.createExtraColumn<float>("Cluster_Width");
+  coreSpacePoints.reserve(spacePoints.size());
+  
+  // create space point vectors
+  std::vector<Acts::Experimental::GbtsSP<ActsExamples::SimSpacePoint>>
+      gbtsSpacePoints;
+  gbtsSpacePoints.reserve(spacePoints.size());  // should be enough
       
-      //get each SP geometry information (ACTS vol and layer)
-      //find what combined_id that corresponds to using the ActsGbtsMap
-      //using the combined-id, find what layer ID that corresponds to 
-      //fill each new spacepoint in the vector with x, y, z, r, phi, layer ID values 
-
-      
+    // for loop filling space
+  
+    for (const auto &spacePoint : spacePoints) {
+      // Gbts space point vector
+      // loop over space points, call on map
       const auto &sourceLink = spacePoint.sourceLinks();
       const auto &indexSourceLink = sourceLink.front().get<IndexSourceLink>();
 
@@ -248,19 +240,40 @@ ActsExamples::GbtsSeedingAlgorithm::MakeGbtsSpacePoints(
       // access IDs from map
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
-      //node variables
+
+      //add spacepoints to new container 
       auto newSp = coreSpacePoints.createSpacePoint(
-          std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)}, spacePoint.x(),
-          spacePoint.y(), spacePoint.z());
+          std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)}, 
+          spacePoint.x(), spacePoint.y(), spacePoint.z());
+
       newSp.r() = spacePoint.r();
       newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
-      newSp.varianceR() = spacePoint.varianceR();
-      newSp.varianceZ() = spacePoint.varianceZ();
-      //add values to custom coloumns
       newSp.extra(LayerColoumn) = LayeridMap.at(combined_id);
-      newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
-
+      newSp.extra(ClusterWidthColoumn) = 0;
+      float ClusterWidth = 0;  // false input as this is not available in examples
+      
+      
+      /*
+      std::cout<<"Jasper /n"
+                <<"node x is: "<<spacePoint.x()<<"/n"
+                <<"node y is: "<<spacePoint.y()<<"/n"
+                <<"node z is: "<<spacePoint.z()<<"/n"
+                <<"node r is: "<<spacePoint.r()<<"/n"
+                <<"node phi is: "<<phi<<"/n"
+                <<"node node layer is: "<<LogicalLayer<<"/n"
+                <<std::endl;
+      */
+      // fill Gbts vector with current sapce point and ID
+      gbtsSpacePoints.emplace_back(&spacePoint, Gbts_id, combined_id,
+                                   ClusterWidth);  // make new GbtsSP here !
     }
+
+  //test to see if container works 
+  for (auto sp : coreSpacePoints){
+    std::cout<<"Jasper: spacepoints x is: "<<sp.x() <<"\n"
+             <<"spacepoint phi is "<<sp.phi()<<"\n"
+             <<"spacepoint layer is: "<<sp.extra(LayerColoumn)
+             <<std::endl;
   }
   ACTS_VERBOSE("Space point collection successfully assigned LayerID's");
 
@@ -395,6 +408,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
            << "\n";
     }
   });
+  /*
   for (std::size_t i = 0; i < LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
     int Gbts_id_new = GbtsIDs[i];
@@ -402,6 +416,7 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
              <<"layer is :"<<LayeridMap.at(Gbts_id_new)<<"with Gbts ID: "<<Gbts_id_new
              <<std::endl;          
   }
+  */
   for (std::size_t i = 0; i < input_vector.size(); i++) {
     input_vector[i].m_refCoord = input_vector[i].m_refCoord / count_vector[i];
   }
