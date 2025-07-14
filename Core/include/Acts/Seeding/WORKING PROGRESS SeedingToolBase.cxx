@@ -16,6 +16,36 @@
 #include "SeedingToolBase.h"
 
 
+
+std::vector<std::vector<Acts::Experimental::GNN_Node>> 
+  CreateNodes(Acts::Experimental::SpacePointContainer2& container, int MaxLayers){
+	std::vector<std::vector<Acts::Experimental::GNN_Node>> node_storage;
+	//reserve for better efficiency 
+	node_storage.resize(MaxLayers);
+	for(auto& v : node_storage) v.reserve(100000);
+
+	for(auto sp : container){
+
+		//for every sp in container,
+		//add its variables to nodes storage organised by layer 
+		int layer = sp.extra(LayerColoumn)
+
+		//add node to storage 
+		Acts::Experimental::GNN_Node node = node_storage[layer].emplace_back(layer);
+
+		//fill the node with spacepoint variables
+		node.m_x = sp.x();
+		node.m_y = sp.y();
+		node.m_z = sp.z();
+		node.m_r = sp.r();
+		node.m_phi = sp.phi();
+		node.m_idx = sp.index();
+		node.m_pcw = sp.extra(ClusterWidthColoumn);
+	}
+	return node_storage;
+
+  }
+
 std::pair<int, int> SeedingToolBase::buildTheGraph(const IRoiDescriptor& roi, const std::unique_ptr<TrigFTF_GNN_DataStorage>& storage, std::vector<TrigFTF_GNN_Edge>& edgeStorage) const {
 
   const float M_2PI = 2.0*M_PI;

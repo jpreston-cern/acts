@@ -63,6 +63,10 @@ struct SeedFinderGbtsConfig {
   double ptCoeff =
       0.29997 * 1.9972 / 2.0;  // ~0.3*B/2 - assumes nominal field of 2*T
 
+ //for GbtsSeedingAlgorithm
+ bool BeamSpotCorrection = false
+
+
  //NEW VERAIBLES START
   
   
