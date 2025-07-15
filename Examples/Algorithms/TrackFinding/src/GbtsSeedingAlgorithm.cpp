@@ -139,7 +139,8 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
                                          *coreSpacePoints.at(sps[2])
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>());
-    seedContainerForStorage.back().setVertexZ(seed.vertexZ());
+    //not sure if these have set values in v2
+    seedContainerForStorage.back().setVertexZ(seed.vertexZ()); 
     seedContainerForStorage.back().setQuality(seed.quality());
   }
 
