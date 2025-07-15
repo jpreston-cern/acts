@@ -96,12 +96,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
     const AlgorithmContext &ctx) const {
   Acts::Experimental::SpacePointContainer2 SpacePointContainer =
       MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
-      for (auto sp : coreSpacePoints){
-    std::cout<<"Jasper: spacepoints x is: "<<sp.x() <<"\n"
-             <<"spacepoint phi is "<<sp.phi()<<"\n"
-             <<"spacepoint layer is: "<<sp.extra(LayerColoumn)
-             <<std::endl;
-  }
+      
 
   for (auto sp : SpacePointContainer) {
     
@@ -112,24 +107,24 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
     }
   }
   // this is now calling on a core algorithm
-  Acts::Experimental::SeedFinderGbts<SimSpacePoint> finder(
+  Acts::Experimental::SeedFinderGbts finder(
       m_cfg.seedFinderConfig, *m_gbtsGeo,
       logger().cloneWithSuffix("GbtdFinder"));
 
-  // output of function needed for seed
 
-  finder.loadSpacePoints(GbtsSpacePoints);
-
-  // trigGbts file :
-  Acts::Experimental::RoiDescriptor internalRoi(
-      0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
+  int max_layers = m_LayeridMap.size()
   // ROI file:
   //  Acts::Experimental::RoiDescriptor internalRoi(0, -5, 5, 0,
   //  -std::numbers::pi, std::numbers::pi, 0, -225., 225.);
-
-  // new version returns seeds
-  SimSeedContainer seeds = finder.createSeeds(internalRoi, *m_gbtsGeo);
-
+  Acts::Experimental::RoiDescriptor internalRoi(
+      0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
+ 
+  
+  // create the seeds
+  
+  SeedContainer2 seeds = finder.createSeeds(internalRoi, SpacePointContainer, max_layers);
+  //convert to simseedcontainer
+  
   m_outputSeeds(ctx, std::move(seeds));
 
   return ActsExamples::ProcessCode::SUCCESS;
@@ -248,7 +243,9 @@ ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
       int combined_id = Gbts_id * 1000 + eta_mod;
       //apply beamspot corrections if needed
       if(m_cfg.SeedFinderConfig.BeamSpotCorrection){
+
         //not implemented here as no beamspot corrections available in examples
+        
       }else{
         //add spacepoints to new container 
         auto newSp = coreSpacePoints.createSpacePoint(
@@ -257,7 +254,9 @@ ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
 
         newSp.r() = spacePoint.r();
         newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
+
       }
+
       newSp.extra(LayerColoumn) = m_LayeridMap.at(combined_id);
       newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
       
