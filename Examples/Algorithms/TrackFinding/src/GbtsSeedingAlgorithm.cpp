@@ -124,7 +124,9 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   
   SeedContainer2 seeds = finder.createSeeds(internalRoi, SpacePointContainer, max_layers);
   //convert to simseedcontainer
-  
+  //take out each seed in the seeding container
+  //convert to a simseed
+  //add to simseed cotainer (just a vector)
   m_outputSeeds(ctx, std::move(seeds));
 
   return ActsExamples::ProcessCode::SUCCESS;
