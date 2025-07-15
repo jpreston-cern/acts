@@ -27,12 +27,13 @@ SeedingToolBase::SeedingToolBase(
 
 //the big boy 
 //unsure on what the output will look like for now
-SeedingToolBase::CreateSeeds(
+
+SpacePointContainer2 SeedingToolBase::CreateSeeds(
 	const RoiDescriptor& roi, const Acts::Experimental::SpacePointContainer2& SPcontainer, 
 	int max_layers, ){
 
 	Acts::Experimental::SeedContainer2& SeedContainer;
-	
+
 	std::vector<std::vector<Acts::Experimental::GNN_Node>> node_storage =
 	 CreateNodes(Acts::Experimental::SpacePointContainer2& SPcontainer, int max_layers);
 

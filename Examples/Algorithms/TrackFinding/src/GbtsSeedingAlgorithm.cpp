@@ -123,10 +123,27 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   // create the seeds
   
   SeedContainer2 seeds = finder.createSeeds(internalRoi, SpacePointContainer, max_layers);
-  //convert to simseedcontainer
-  //take out each seed in the seeding container
-  //convert to a simseed
-  //add to simseed cotainer (just a vector)
+
+  // move seeds to simseedcontainer to be used down stream 
+  // currently as simseeds need to be hard types we can only have 3 SP in them, but in future we should be able to have any length seed
+  SimSeedContainer seedContainerForStorage;
+  seedContainerForStorage.reserve(seeds.size());
+  for (const auto& seed : seeds) {
+    auto sps = seed.spacePointIndices();
+    seedContainerForStorage.emplace_back(*coreSpacePoints.at(sps[0])
+                                              .sourceLinks()[0]
+                                              .get<const SimSpacePoint*>(),
+                                         *coreSpacePoints.at(sps[1])
+                                              .sourceLinks()[0]
+                                              .get<const SimSpacePoint*>(),
+                                         *coreSpacePoints.at(sps[2])
+                                              .sourceLinks()[0]
+                                              .get<const SimSpacePoint*>());
+    seedContainerForStorage.back().setVertexZ(seed.vertexZ());
+    seedContainerForStorage.back().setQuality(seed.quality());
+  }
+
+  
   m_outputSeeds(ctx, std::move(seeds));
 
   return ActsExamples::ProcessCode::SUCCESS;

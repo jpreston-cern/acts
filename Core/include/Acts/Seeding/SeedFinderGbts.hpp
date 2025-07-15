@@ -9,9 +9,14 @@
 #pragma once
 
 #include "Acts/EventData/Seed.hpp"
+#include "Acts/EventData/SeedContainer2.hpp"
 #include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
 #include "Acts/TrackFinding/RoiDescriptor.hpp"
 #include "Acts/Utilities/Logger.hpp"
+
+#include "Acts/Trackfinding/GbtsConnector.h"
+#include "Acts/Seeding/GbtsGeometry.h"
+#include "Acts/Seeding/GBtsDataStorage.h"
 
 #include <memory>
 #include <string>
@@ -19,70 +24,35 @@
 
 namespace Acts::Experimental {
 
-template <typename external_spacepoint_t>
-struct GbtsTrigTracklet {
+class SeedingToolBase{
  public:
-  GbtsTrigTracklet(std::vector<const GbtsSP<external_spacepoint_t> *> &vSP,
-                   std::vector<TrigInDetTriplet<external_spacepoint_t>> &tbuf)
-      : m_track(vSP), m_seeds(tbuf) {}
 
-  std::vector<const GbtsSP<external_spacepoint_t> *> m_track;
-  std::vector<TrigInDetTriplet<external_spacepoint_t>> m_seeds;
-};
+  SeedingToolBase(SeedFinderGbtsConfig);
+  
+  typedef TrigFTF_GNN_Node GNN_Node;
+  typedef TrigFTF_GNN_DataStorage GNN_DataStorage;
+  typedef TrigFTF_GNN_Edge GNN_Edge;
 
-template <typename external_spacepoint_t>
-class SeedFinderGbts {
- public:
-  static constexpr std::size_t NDims = 3;
+  SeedContainer2 createSeeds(
+    const RoiDescriptor& roi, const Acts::Experimental::SpacePointContainer2& SPcontainer, 
+	  int max_layers, Acts::Experimental::SeedContainer2& SeedContainer);
+  
+  
+  std::vector<std::vector<Acts::Experimental::GNN_Node>> 
+    CreateNodes(const Acts::Experimental::SpacePointContainer2& SPcontainer, int MaxLayers);
 
-  using seed_t = Seed<external_spacepoint_t>;
+  std::pair<int, int> buildTheGraph(const IRoiDescriptor&, const std::unique_ptr<GNN_DataStorage>&, std::vector<GNN_Edge>&) const;
 
-  // constructors
-  SeedFinderGbts(const SeedFinderGbtsConfig<external_spacepoint_t> &config,
-                 const GbtsGeometry<external_spacepoint_t> &gbtsgeo,
-                 std::unique_ptr<const Acts::Logger> logger =
-                     Acts::getDefaultLogger("Finder",
-                                            Acts::Logging::Level::INFO));
+  int runCCA(int, std::vector<GNN_Edge>&) const;
 
-  ~SeedFinderGbts() = default;
-  SeedFinderGbts() = default;
-  SeedFinderGbts(const SeedFinderGbts<external_spacepoint_t> &) = delete;
-  SeedFinderGbts<external_spacepoint_t> &operator=(
-      const SeedFinderGbts<external_spacepoint_t> &) = delete;
+ private: 
+  
+  SeedFinderGbtsConfig m_config;
 
-  void loadSpacePoints(
-      const std::vector<GbtsSP<external_spacepoint_t>> &gbtsSPvect);
-
-  // inner
-  template <typename output_container_t>
-  void createSeeds(const RoiDescriptor & /*roi*/,
-                   const GbtsGeometry<external_spacepoint_t> & /*gbtsgeo*/,
-                   output_container_t & /*out_cont*/);
-  // outer
-  std::vector<seed_t> createSeeds(
-      const RoiDescriptor & /*roi*/,
-      const GbtsGeometry<external_spacepoint_t> & /*gbtsgeo*/);
-
- private:
-  enum Dim { DimPhi = 0, DimR = 1, DimZ = 2 };
-
-  // config object
-  SeedFinderGbtsConfig<external_spacepoint_t> m_config;
-
-  void runGbts_TrackFinder(
-      std::vector<GbtsTrigTracklet<external_spacepoint_t>> &vTracks,
-      const RoiDescriptor &roi,
-      const GbtsGeometry<external_spacepoint_t> &gbtsgeo);
-
-  // needs to be member of class so can accessed by all member functions
   std::unique_ptr<GbtsDataStorage<external_spacepoint_t>> m_storage{nullptr};
 
-  // for create seeds:
-  std::vector<TrigInDetTriplet<external_spacepoint_t>> m_triplets;
+  std::vector<TrigInDetSiLayer> m_layerGeometry;
 
-  const Acts::Logger &logger() const { return *m_logger; }
-  std::unique_ptr<const Acts::Logger> m_logger =
-      Acts::getDefaultLogger("Finder", Acts::Logging::Level::INFO);
 };
 
 }  // namespace Acts::Experimental
