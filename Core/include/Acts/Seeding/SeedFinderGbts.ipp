@@ -64,7 +64,7 @@ SpacePointContainer2 SeedingToolBase::CreateSeeds(
 	m_config.m_phiSliceWidth = 2*std::numbers::pi/m_config.m_nMaxPhiSlice;
     storage->generatePhiIndexing(1.5*m_config.m_phiSliceWidth);
 
-	std::vector<GNN_Edge> edgeStorage; //this is in storage NEED TO PUT STORAGE FILE IN 
+	std::vector<GNN_Edge> edgeStorage; 
 
     std::pair<int, int> graphStats = buildTheGraph(roi, storage, edgeStorage);
 
