@@ -30,14 +30,12 @@ SeedingToolBase::SeedingToolBase(
 	  m_layerGeometry(layerGeometry),
 	  m_logger(std::move(logger)) {}
 
-//the big boy 
-//unsure on what the output will look like for now
 
 SpacePointContainer2 SeedingToolBase::CreateSeeds(
 	const RoiDescriptor& roi, const Acts::Experimental::SpacePointContainer2& SPcontainer, 
 	int max_layers, ){
 
-	Acts::Experimental::SeedContainer2& SeedContainer;
+	Acts::Experimental::SeedContainer2 SeedContainer;
 
 	std::vector<std::vector<Acts::Experimental::GNN_Node>> node_storage =
 	 CreateNodes(Acts::Experimental::SpacePointContainer2& SPcontainer, int max_layers);
@@ -128,17 +126,15 @@ SpacePointContainer2 SeedingToolBase::CreateSeeds(
 	    
         }
 
-        if(vN.size()<3) continue; //would this get rid of seeds losing effeicency ?
+        if(vN.size()<3) continue; 
 	
        
 		//add to seed container:
-		//get the index of the spacepoints from the nodes 
-		//create a seed and add to the seed container
-		std::array<SpacePointIndex2, vN.size()> Indexes{};
-		
-		for(unsigned int i = 0; i < vN.size(); i++){
+		std::array<SpacePointIndex2, vN.size()> Sp_Indexes{};
+		int index = 0;
+		for(const auto* vNptr : vN){
 
-			Indexes[i](vNptr->m_idx);
+			Sp_Indexes[i](vNptr->sp_idx());
 
 		}
 		
@@ -186,9 +182,9 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 
   const float M_2PI = 2.0*M_PI;
   
-  const float cut_dphi_max      = m_LRTmode ? 0.07 : 0.012;
-  const float cut_dcurv_max     = m_LRTmode ? 0.015 : 0.001;
-  const float cut_tau_ratio_max = m_LRTmode ? 0.015 : 0.007;
+  const float cut_dphi_max      = m_LRTmode ? 0.07f : 0.012f;
+  const float cut_dcurv_max     = m_LRTmode ? 0.015f : 0.001f;
+  const float cut_tau_ratio_max = m_LRTmode ? 0.015f : static_cast<float>(m_config.m_tau_ratio_cut);
   const float min_z0            = m_LRTmode ? -600.0 : roi.zedMinus();
   const float max_z0            = m_LRTmode ? 600.0 : roi.zedPlus();
   const float min_deltaPhi      = m_LRTmode ? 0.01f : 0.001f;
@@ -424,6 +420,9 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
     } //loop over bins in Layer 2
   } //loop over bin groups
 
+  if(nEdges >= m_nMaxEdges) {
+    ACTS_WARNING("Maximum number of graph edges exceeded - possible efficiency loss "<< nEdges);
+  }
   return std::make_pair(nEdges, nConnections);
 }
 

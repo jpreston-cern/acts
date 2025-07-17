@@ -84,6 +84,8 @@ struct SeedFinderGbtsConfig {
   
   bool m_useOldTunings = false;
 
+  bool m_tau_ratio_cut = 0.007
+
   //NEW VARIABLES END 
   
 

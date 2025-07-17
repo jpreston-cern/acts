@@ -32,25 +32,32 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
  public:
   struct Config {
     
-    //need to change python binds so tit gives just a string and not a vector 
+    //TO DO: need to change python binds so it gives just a string and not a vector 
+    // this is used to initiliase the handle that points to the container of spacepoints 
     std::vector<std::string> inputSpacePoints; 
 
+    // this is used to initiliase the handle that points to the container of seeds
     std::string outputSeeds;
 
+    //contains all the options used to steer the algorithm 
+    //includes both user options avilable to cahnge in the python script and those seen just be the algorithm
     Acts::Experimental::SeedFinderGbtsConfig<SimSpacePoint> seedFinderConfig;
     
-
+    // the connection table (parsed from csv file) used to make geoemetry cuts be GBTS
     std::string layerMappingFile;
 
-    std::vector<Acts::GeometryIdentifier> geometrySelection;
-
+    //Holds detector information, used to make the geometry objects used by GBTS
+    
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
 
+    //conversion between ACTS labelling of volume, layer and modules to that used by GBTS
     std::map<std::pair<int, int>, std::pair<int, int>> ActsGbtsMap;
 
     bool fill_module_csv = false;
 
-    std::string inputClusters;
+    // this is used to initiliase the handle that points to the container of clusters 
+    // which each SpacePoint is constructed from
+    std::string inputClusters; //TO DO: add the cluster width
   };
 
   // constructor:
@@ -63,35 +70,51 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   /// @return a process code indication success or failure
   ProcessCode execute(const AlgorithmContext &ctx) const override;
 
-  // access to config
-  const Config &config() const { return m_cfg; }
-
   // own class functions
-  // make the map
+  // make the map between ACTS labelling (ID's) and GBTS labelling (ID's)
   std::map<std::pair<int, int>, std::pair<int, int>> makeActsGbtsMap() const;
-  // make the vector of space points with FTF Info
-  std::vector<Acts::Experimental::GbtsSP<SimSpacePoint>> MakeGbtsSpacePoints(
+
+  // make the container that holds the spacepoints that have been given 
+  // all the veriables needed for GBTS
+  Acts::Experimental::SpacePointContainer2
+    ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::pair<int, int>> map) const;
-  // layer numbering
+
+  // makes the geometry objects used by GBTS that correspond to the objects in the connection table
+  // for easy these are sometimes called "logical layers"
   std::vector<Acts::Experimental::TrigInDetSiLayer> LayerNumbering() const;
 
- private:
-  Config m_cfg;
+  private:
+  
+  Config m_cfg{};
+  
+  // object that processes and holds connection table information 
+  std::optional<Acts::Experimental::GNN_FasTrackConnector> m_connector;
 
-  std::unique_ptr<Acts::Experimental::GbtsGeometry<SimSpacePoint>> m_gbtsGeo;
+  // object that holds all geometry information after:
+  // connection table has been processed 
+  // vector of logical layers that have been created
+  std::optional<Acts::Experimental::GbtsGeometry> m_gbtsGeo;
 
-  ReadDataHandle<SimSpacePointContainer> m_inputSpacePoints{this, "InputSpacePoints"};
-    
-std::vector<TrigInDetSiLayer> m_layerGeometry{};
-
-  mutable std::map<int, int> m_LayeridMap;
-
+  //collection of geometry objects used by GBTS
+  std::vector<TrigInDetSiLayer> m_layerGeometry{};
+  
+  // map of GBTS ID's to the index of the vector holding logical layers
+  mutable std::map<int, int> m_LayeridMap{};
+  
+  //will get rid of this in final version (useful for debuggin at the moment)
   mutable std::vector<int> m_GbtsIDs {};
   
-  WriteDataHandle<SimSeedContainer> m_outputSeeds{this, "OutputSeeds"};
+  //handle that points to the container of input spacepoints 
+  ReadDataHandle<SimSpacePointContainer> m_inputSpacePoints{this, "InputSpacePoints"};
 
+  //handle that points to container of output seeds
+  WriteDataHandle<SimSeedContainer> m_outputSeeds{this, "OutputSeeds"};
+  
+  //handle that points to clusters used by spacepoints
   ReadDataHandle<ClusterContainer> m_inputClusters{this, "InputClusters"};
+
 };
 
 }  // namespace ActsExamples
