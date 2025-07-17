@@ -44,3 +44,4 @@ codegen/src/codegen.egg-info/
 #files to ignore 
 acts-itk/
 log_log.log
+compile.log

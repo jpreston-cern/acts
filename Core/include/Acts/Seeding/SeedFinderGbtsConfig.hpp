@@ -12,7 +12,6 @@
 
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/Definitions/Units.hpp"
-#include "Acts/Seeding/GbtsBase.hpp"  //definition of Trigsispacepoint base and trigtriplets
 #include "Acts/Seeding/SeedConfirmationRangeConfig.hpp"
 
 #include <memory>
@@ -20,7 +19,6 @@
 // core algorithm so in acts namespace
 namespace Acts::Experimental {
 
-template <typename SpacePoint>
 struct SeedFinderGbtsConfig {
   // // how many sigmas of scattering angle should be considered?
   float sigmaScattering = 5;
@@ -59,12 +57,12 @@ struct SeedFinderGbtsConfig {
   float maxOuterRadius = 550.0;     // used to calculate Z cut on doublets
   float m_minPt = 1000.0;
   float m_tripletPtMinFrac = 0.3;
-  float m_tripletPtMin = m_PtMin * m_tripletPtMinFrac;  // Limit on triplet pt
+  float m_tripletPtMin = m_minPt * m_tripletPtMinFrac;  // Limit on triplet pt
   double ptCoeff =
       0.29997 * 1.9972 / 2.0;  // ~0.3*B/2 - assumes nominal field of 2*T
 
  //for GbtsSeedingAlgorithm
- bool BeamSpotCorrection = false
+ bool BeamSpotCorrection = false;
 
 
  //NEW VERAIBLES START
@@ -84,7 +82,7 @@ struct SeedFinderGbtsConfig {
   
   bool m_useOldTunings = false;
 
-  bool m_tau_ratio_cut = 0.007
+  bool m_tau_ratio_cut = 0.007;
 
   //NEW VARIABLES END 
   
@@ -117,7 +115,7 @@ struct SeedFinderGbtsConfig {
     // divides inputs by 1mm, all ones input
     // changes member inInInternalUnits to true
     return config;
-  }
+  };
 
 };  // end of config struct
 

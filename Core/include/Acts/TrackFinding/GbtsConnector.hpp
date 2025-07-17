@@ -49,7 +49,7 @@ namespace Acts::Experimental {
     float m_etaBin;
 
     std::map<int, std::vector<struct LayerGroup> > m_layerGroups;
-    std::map<int, std::vector<GGNN_FasTrackConnection*> > m_connMap;
+    std::map<int, std::vector<GNN_FasTrackConnection*> > m_connMap;
 
   };
 

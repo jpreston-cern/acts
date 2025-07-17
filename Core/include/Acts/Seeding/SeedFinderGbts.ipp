@@ -21,24 +21,27 @@ namespace Acts::Experimental {
 
 
 SeedingToolBase::SeedingToolBase(
-	const SeedFinderGbtsConfig<external_spacepoint_t>& config,
-    const GbtsGeometry<external_spacepoint_t>& gbtsGeo,
+	const SeedFinderGbtsConfig& config,
+    const TrigFTF_GNN_Geometry* gbtsGeo,
 	const std::vector<TrigInDetSiLayer>& layerGeometry,
     std::unique_ptr<const Acts::Logger> logger)
     : m_config(config),
-      m_storage(std::make_unique<GbtsDataStorage<external_spacepoint_t>>(gbtsGeo)),
+      m_storage(std::make_unique<GNN_DataStorage>(gbtsGeo)),
 	  m_layerGeometry(layerGeometry),
 	  m_logger(std::move(logger)) {}
 
 
-SpacePointContainer2 SeedingToolBase::CreateSeeds(
-	const RoiDescriptor& roi, const Acts::Experimental::SpacePointContainer2& SPcontainer, 
-	int max_layers, ){
+SeedContainer2 SeedingToolBase::CreateSeeds(
+	const RoiDescriptor& roi, const auto& SpContainerComponents, 
+	int max_layers){
 
-	Acts::Experimental::SeedContainer2 SeedContainer;
+	SeedContainer2 SeedContainer;
 
-	std::vector<std::vector<Acts::Experimental::GNN_Node>> node_storage =
-	 CreateNodes(Acts::Experimental::SpacePointContainer2& SPcontainer, int max_layers);
+	std::vector<std::vector<GNN_Node>> node_storage =
+	 CreateNodes(SpContainerComponents, max_layers);
+	
+	unsigned int nPixelLoaded = 0;
+    unsigned int nStripLoaded = 0;
 
 	//load the nodes into storage
 	for(size_t l = 0; l < node_storage.size(); l++) {
@@ -46,25 +49,26 @@ SpacePointContainer2 SeedingToolBase::CreateSeeds(
       const std::vector<GNN_Node>& nodes = node_storage[l];
 
       if(nodes.size() == 0) continue;
-	
-      if(/*add condition for if they are strip or pixel*/) 
-		nPixelLoaded += storage->loadPixelGraphNodes(l, nodes, m_config.m_useML);
+
+	  bool is_pixel = true;
+      if(is_pixel) //placeholder for now until strip hits are added in
+		nPixelLoaded += m_storage->loadPixelGraphNodes(l, nodes, m_config.m_useML);
       else
-		nStripLoaded += storage->loadStripGraphNodes(l, nodes);
+		nStripLoaded += m_storage->loadStripGraphNodes(l, nodes);
     }
 
 	ACTS_DEBUG("Loaded "<<nPixelLoaded<<" pixel spacepoints and "<<nStripLoaded<<" strip spacepoints");
 
-    storage->sortByPhi();
+    m_storage->sortByPhi();
 
-    storage->initializeNodes(m_config.m_useML);
+    m_storage->initializeNodes(m_config.m_useML);
 
 	m_config.m_phiSliceWidth = 2*std::numbers::pi/m_config.m_nMaxPhiSlice;
-    storage->generatePhiIndexing(1.5*m_config.m_phiSliceWidth);
+    m_storage->generatePhiIndexing(1.5*m_config.m_phiSliceWidth);
 
 	std::vector<GNN_Edge> edgeStorage; 
 
-    std::pair<int, int> graphStats = buildTheGraph(roi, storage, edgeStorage);
+    std::pair<int, int> graphStats = buildTheGraph(roi, m_storage, edgeStorage);
 
     ACTS_DEBUG("Created graph with "<<graphStats.first<<" edges and "<<graphStats.second<< " edge links");
 
@@ -74,7 +78,7 @@ SpacePointContainer2 SeedingToolBase::CreateSeeds(
 
     int minLevel = 3;//a triplet + 2 confirmation
 
-    if(m_LRTmode) {
+    if(m_config.m_LRTmode) {
         minLevel = 2;//a triplet + 1 confirmation
     }
 
@@ -130,39 +134,39 @@ SpacePointContainer2 SeedingToolBase::CreateSeeds(
 	
        
 		//add to seed container:
-		std::array<SpacePointIndex2, vN.size()> Sp_Indexes{};
+		std::array<SpacePointIndex2, 3> Sp_Indexes{};
 		int index = 0;
 		for(const auto* vNptr : vN){
 
-			Sp_Indexes[i](vNptr->sp_idx());
-
+			Sp_Indexes[index] = vNptr->sp_idx();
+			index ++;
 		}
 		
-		SeedContainer.createSeed(Indexes);
+		SeedContainer.createSeed(Sp_Indexes);
     }
 
     ACTS_DEBUG("GBTS created "<<SeedContainer.size()<<" seeds");
 
-    return SeedContainer
+    return SeedContainer;
 		
 }
 
-std::vector<std::vector<Acts::Experimental::GNN_Node>> 
-  SeedingToolBase::CreateNodes(Acts::Experimental::SpacePointContainer2& container, int MaxLayers){
+std::vector<std::vector<SeedingToolBase::GNN_Node>> 
+  SeedingToolBase::CreateNodes(const auto& container, int MaxLayers){
 
-	std::vector<std::vector<Acts::Experimental::GNN_Node>> node_storage;
+	std::vector<std::vector<SeedingToolBase::GNN_Node>> node_storage;
 	//reserve for better efficiency 
 	node_storage.resize(MaxLayers);
 	for(auto& v : node_storage) v.reserve(100000);
 
-		for(auto sp : container){
+		for(auto sp : std::get<0>(container)){
 
 			//for every sp in container,
 			//add its variables to node_storage organised by layer 
-			int layer = sp.extra(LayerColoumn)
+			int layer = sp.extra(std::get<1>(container));
 
 			//add node to storage 
-			Acts::Experimental::GNN_Node node = node_storage[layer].emplace_back(layer);
+			SeedingToolBase::GNN_Node node = node_storage[layer].emplace_back(layer);
 
 			//fill the node with spacepoint variables
 			node.m_x = sp.x();
@@ -171,7 +175,7 @@ std::vector<std::vector<Acts::Experimental::GNN_Node>>
 			node.m_r = sp.r();
 			node.m_phi = sp.phi();
 			node.m_idx = sp.index();//change node so that is uses SpacePointIndex2 (doesnt affect code but i guess it looks cleaner)
-			node.m_pcw = sp.extra(ClusterWidthColoumn);
+			node.m_pcw = sp.extra(std::get<2>(container));
 		}
 
 	return node_storage;

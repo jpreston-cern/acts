@@ -14,9 +14,9 @@
 #include "Acts/TrackFinding/RoiDescriptor.hpp"
 #include "Acts/Utilities/Logger.hpp"
 
-#include "Acts/Trackfinding/GbtsConnector.h"
-#include "Acts/Seeding/GbtsGeometry.h"
-#include "Acts/Seeding/GBtsDataStorage.h"
+#include "Acts/TrackFinding/GbtsConnector.hpp"
+#include "Acts/Seeding/GbtsGeometry.hpp"
+#include "Acts/Seeding/GbtsDataStorage.hpp"
 
 #include <memory>
 #include <string>
@@ -27,21 +27,24 @@ namespace Acts::Experimental {
 class SeedingToolBase{
  public:
 
-  SeedingToolBase(SeedFinderGbtsConfig);
-  
+  SeedingToolBase(const SeedFinderGbtsConfig& config,
+                  const TrigFTF_GNN_Geometry* gbtsGeo,
+	                const std::vector<TrigInDetSiLayer>& layerGeometry,
+                  std::unique_ptr<const Acts::Logger> logger);
+
   typedef TrigFTF_GNN_Node GNN_Node;
   typedef TrigFTF_GNN_DataStorage GNN_DataStorage;
   typedef TrigFTF_GNN_Edge GNN_Edge;
 
-  SeedContainer2 createSeeds(
-    const RoiDescriptor& roi, const Acts::Experimental::SpacePointContainer2& SPcontainer, 
-	  int max_layers, Acts::Experimental::SeedContainer2& SeedContainer);
+  SeedContainer2 CreateSeeds(
+	const RoiDescriptor& roi, const auto& SpContainerComponents, 
+	int max_layers);
   
   
-  std::vector<std::vector<Acts::Experimental::GNN_Node>> 
-    CreateNodes(const Acts::Experimental::SpacePointContainer2& SPcontainer, int MaxLayers);
+  std::vector<std::vector<SeedingToolBase::GNN_Node>> 
+    CreateNodes(const auto& container, int MaxLayers);
 
-  std::pair<int, int> buildTheGraph(const IRoiDescriptor&, const std::unique_ptr<GNN_DataStorage>&, std::vector<GNN_Edge>&) const;
+  std::pair<int, int> buildTheGraph(const RoiDescriptor&, const std::unique_ptr<GNN_DataStorage>&, std::vector<GNN_Edge>&) const;
 
   int runCCA(int, std::vector<GNN_Edge>&) const;
 
@@ -49,9 +52,14 @@ class SeedingToolBase{
   
   SeedFinderGbtsConfig m_config;
 
-  std::unique_ptr<GbtsDataStorage<external_spacepoint_t>> m_storage{nullptr};
+  std::unique_ptr<GNN_DataStorage> m_storage = nullptr;
 
   std::vector<TrigInDetSiLayer> m_layerGeometry;
+
+  std::unique_ptr<const Acts::Logger> m_logger =
+      Acts::getDefaultLogger("Finder", Acts::Logging::Level::INFO);
+
+  const Acts::Logger &logger() const { return *m_logger; }
 
 };
 

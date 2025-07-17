@@ -76,8 +76,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   // make the container that holds the spacepoints that have been given 
   // all the veriables needed for GBTS
-  Acts::Experimental::SpacePointContainer2
-    ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
+  auto ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::pair<int, int>> map) const;
 
@@ -89,13 +88,14 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   
   Config m_cfg{};
   
+  struct Spacepoint_info{
   // object that processes and holds connection table information 
-  std::optional<Acts::Experimental::GNN_FasTrackConnector> m_connector;
+  std::unique_ptr<Acts::Experimental::GNN_FasTrackConnector> m_connector = nullptr;
 
   // object that holds all geometry information after:
   // connection table has been processed 
   // vector of logical layers that have been created
-  std::optional<Acts::Experimental::GbtsGeometry> m_gbtsGeo;
+  std::unique_ptr<Acts::Experimental::GbtsGeometry> m_gbtsGeo = nullptr;
 
   //collection of geometry objects used by GBTS
   std::vector<TrigInDetSiLayer> m_layerGeometry{};

@@ -58,9 +58,9 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   
   //create the connection objects
   else {
-    
-     m_connector.emplace(input_ifstream, m_cfg.SeedFinderConfig.m_LRTmode);
 
+     m_connector = std::make_unique<GNN_FASTRACK_CONNECTOR>(input_ifstream, m_cfg.SeedFinderConfig.m_LRTmode);
+  
     // option that allows for adding custom eta binning (default is at 0.2)
     if (m_etaBinOverride != 0.0f) {
 
@@ -70,7 +70,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   }
 
   // initiliase the object that holds all the geometry information needed for the algorithm
-  m_gbtsGeo.emplace(m_layerGeometry, m_connector); 
+  m_gbtsGeo = std::make_unique<TrigFTF_GNN_Geometry>(m_layerGeometry, m_connector); 
 
   ACTS_DEBUG("Property useML "<< m_cfg.SeedFinderConfig.m_useML);
   ACTS_DEBUG("Property pTmin "<<m_cfg.SeedFinderConfig.m_minPt);
@@ -83,10 +83,12 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   const AlgorithmContext &ctx) const {
 
   //take spacepoints, add veriables needed for GBTS and add them to new container 
-  Acts::Experimental::SpacePointContainer2 SpacePointContainer =
+  //due to how spacepoint container works, we need to keep the container and the external coloumns we added alive 
+  //this is done by using a tuple of the core container and the two extra coloumns
+  auto SpContainerComponents =
     MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
       
-  for (auto sp : SpacePointContainer) {
+  for (auto sp : std::get<0>(SpContainerComponents)) {
     
     if (!links.empty()) {
       ACTS_DEBUG("space points:  Layer_id: "
@@ -109,7 +111,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
       0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
  
   // create the seeds
-  SeedContainer2 seeds = finder.createSeeds(internalRoi, SpacePointContainer, max_layers);
+  SeedContainer2 seeds = finder.createSeeds(internalRoi, SpCointContainerComponents, max_layers);
 
   // move seeds to simseedcontainer to be used down stream 
   // currently as simseeds need to be hard types we can only have 3 SP in them, 
@@ -173,8 +175,7 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-Acts::Experimental::SpacePointContainer2
- ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
+auto ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
 
@@ -283,7 +284,7 @@ Acts::Experimental::SpacePointContainer2
     
   ACTS_VERBOSE("Space point collection successfully assigned LayerID's");
 
-  return coreSpacePoints;
+  return std::make_tuple(coreSpacePoints, LayerColoumn, ClusterWidthColoumn);
 }
 
 std::vector<Acts::Experimental::TrigInDetSiLayer>
