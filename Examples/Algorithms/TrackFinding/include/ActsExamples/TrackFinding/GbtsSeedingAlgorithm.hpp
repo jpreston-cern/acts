@@ -41,7 +41,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
     //contains all the options used to steer the algorithm 
     //includes both user options avilable to cahnge in the python script and those seen just be the algorithm
-    Acts::Experimental::SeedFinderGbtsConfig<SimSpacePoint> seedFinderConfig;
+    Acts::Experimental::SeedFinderGbtsConfig seedFinderConfig;
     
     // the connection table (parsed from csv file) used to make geoemetry cuts be GBTS
     std::string layerMappingFile;
@@ -76,7 +76,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   // make the container that holds the spacepoints that have been given 
   // all the veriables needed for GBTS
-  auto ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
+  std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumns, Acts::Experimental::SpacePointColumns> MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::pair<int, int>> map) const;
 
@@ -88,17 +88,16 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   
   Config m_cfg{};
   
-  struct Spacepoint_info{
   // object that processes and holds connection table information 
   std::unique_ptr<Acts::Experimental::GNN_FasTrackConnector> m_connector = nullptr;
 
   // object that holds all geometry information after:
   // connection table has been processed 
   // vector of logical layers that have been created
-  std::unique_ptr<Acts::Experimental::GbtsGeometry> m_gbtsGeo = nullptr;
+  std::unique_ptr<Acts::Experimental::TrigFTF_GNN_Geometry> m_gbtsGeo = nullptr;
 
   //collection of geometry objects used by GBTS
-  std::vector<TrigInDetSiLayer> m_layerGeometry{};
+  std::vector<Acts::Experimental::TrigInDetSiLayer> m_layerGeometry{};
   
   // map of GBTS ID's to the index of the vector holding logical layers
   mutable std::map<int, int> m_LayeridMap{};

@@ -28,7 +28,7 @@ class SeedingToolBase{
  public:
 
   SeedingToolBase(const SeedFinderGbtsConfig& config,
-                  const TrigFTF_GNN_Geometry* gbtsGeo,
+                  std::unique_ptr<TrigFTF_GNN_Geometry> gbtsGeo,
 	                const std::vector<TrigInDetSiLayer>& layerGeometry,
                   std::unique_ptr<const Acts::Logger> logger);
 
@@ -51,6 +51,8 @@ class SeedingToolBase{
  private: 
   
   SeedFinderGbtsConfig m_config;
+
+  std::unique_ptr<const TrigFTF_GNN_Geometry> m_geo;
 
   std::unique_ptr<GNN_DataStorage> m_storage = nullptr;
 

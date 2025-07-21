@@ -43,38 +43,38 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   // create the TrigInDetSiLayers (Logical Layers),
   //as well as a map that tracks there index in m_layerGeometry
-  m_cfg.seedFinderConfig.m_layerGeometry = LayerNumbering();
+  m_layerGeometry = LayerNumbering();
 
   //parse connection file 
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.ConnectorInputFile.c_str(), std::ifstream::in);
+  
+  if (input_ifstream.peek() == std::ifstream::traits_type::eof()) {
 
-  if (input_ifstream.empty()) {
-
-    ACTS_WARNING("Cannot find layer connections file " << input_ifstream);
-    throw std::runtime_error("connection file not found") //not sure if this is the right thing to do 
+    ACTS_WARNING("Cannot find layer connections file ");
+    throw std::runtime_error("connection file not found"); //not sure if this is the right thing to do 
     
   }
   
   //create the connection objects
   else {
 
-     m_connector = std::make_unique<GNN_FASTRACK_CONNECTOR>(input_ifstream, m_cfg.SeedFinderConfig.m_LRTmode);
+     m_connector = std::make_unique<Acts::Experimental::GNN_FasTrackConnector>(input_ifstream, m_cfg.seedFinderConfig.m_LRTmode);
   
     // option that allows for adding custom eta binning (default is at 0.2)
-    if (m_etaBinOverride != 0.0f) {
+    if (m_cfg.seedFinderConfig.m_etaBinOverride != 0.0f) {
 
-      m_connector->m_etaBin = m_cfg.SeedFinderConfig.m_etaBinOverride;
+      m_connector->m_etaBin = m_cfg.seedFinderConfig.m_etaBinOverride;
 
     }
   }
 
   // initiliase the object that holds all the geometry information needed for the algorithm
-  m_gbtsGeo = std::make_unique<TrigFTF_GNN_Geometry>(m_layerGeometry, m_connector); 
+  m_gbtsGeo = std::make_unique<Acts::Experimental::TrigFTF_GNN_Geometry>(m_layerGeometry, m_connector); 
 
-  ACTS_DEBUG("Property useML "<< m_cfg.SeedFinderConfig.m_useML);
-  ACTS_DEBUG("Property pTmin "<<m_cfg.SeedFinderConfig.m_minPt);
-  ACTS_DEBUG("Property LRTmode "<<m_cfg.SeedFinderConfig.m_LRTmode);
+  ACTS_DEBUG("Property useML "<< m_cfg.seedFinderConfig.m_useML);
+  ACTS_DEBUG("Property pTmin "<<m_cfg.seedFinderConfig.m_minPt);
+  ACTS_DEBUG("Property LRTmode "<<m_cfg.seedFinderConfig.m_LRTmode);
 
 } 
 
@@ -85,7 +85,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   //take spacepoints, add veriables needed for GBTS and add them to new container 
   //due to how spacepoint container works, we need to keep the container and the external coloumns we added alive 
   //this is done by using a tuple of the core container and the two extra coloumns
-  auto SpContainerComponents =
+  std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumns, Acts::Experimental::SpacePointColumns> SpContainerComponents =
     MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
       
   for (auto sp : std::get<0>(SpContainerComponents)) {
@@ -175,7 +175,8 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-auto ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
+std::tuple<SpacePointContainer, SpacePointColumns, SpacePointColumns> 
+  ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
 
@@ -258,7 +259,7 @@ auto ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
       //apply beamspot corrections if needed
-      if(m_cfg.SeedFinderConfig.BeamSpotCorrection){
+      if(m_cfg.seedFinderConfig.BeamSpotCorrection){
 
         //not implemented here as no beamspot corrections available in examples
         

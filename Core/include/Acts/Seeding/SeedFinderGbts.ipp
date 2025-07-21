@@ -22,11 +22,12 @@ namespace Acts::Experimental {
 
 SeedingToolBase::SeedingToolBase(
 	const SeedFinderGbtsConfig& config,
-    const TrigFTF_GNN_Geometry* gbtsGeo,
+    std::unique_ptr<TrigFTF_GNN_Geometry> gbtsGeo,
 	const std::vector<TrigInDetSiLayer>& layerGeometry,
     std::unique_ptr<const Acts::Logger> logger)
     : m_config(config),
-      m_storage(std::make_unique<GNN_DataStorage>(gbtsGeo)),
+	  m_geo(std::move(gbtsGeo)),
+      m_storage(std::make_unique<GNN_DataStorage>(m_geo.get())),
 	  m_layerGeometry(layerGeometry),
 	  m_logger(std::move(logger)) {}
 
@@ -186,42 +187,42 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 
   const float M_2PI = 2.0*M_PI;
   
-  const float cut_dphi_max      = m_LRTmode ? 0.07f : 0.012f;
-  const float cut_dcurv_max     = m_LRTmode ? 0.015f : 0.001f;
-  const float cut_tau_ratio_max = m_LRTmode ? 0.015f : static_cast<float>(m_config.m_tau_ratio_cut);
-  const float min_z0            = m_LRTmode ? -600.0 : roi.zedMinus();
-  const float max_z0            = m_LRTmode ? 600.0 : roi.zedPlus();
-  const float min_deltaPhi      = m_LRTmode ? 0.01f : 0.001f;
+  const float cut_dphi_max      = m_config.m_LRTmode ? 0.07f : 0.012f;
+  const float cut_dcurv_max     = m_config.m_LRTmode ? 0.015f : 0.001f;
+  const float cut_tau_ratio_max = m_config.m_LRTmode ? 0.015f : static_cast<float>(m_config.m_tau_ratio_cut);
+  const float min_z0            = m_config.m_LRTmode ? -600.0 : roi.zedMinus();
+  const float max_z0            = m_config.m_LRTmode ? 600.0 : roi.zedPlus();
+  const float min_deltaPhi      = m_config.m_LRTmode ? 0.01f : 0.001f;
   
-  const float maxOuterRadius    = m_LRTmode ? 1050.0 : 550.0;
+  const float maxOuterRadius    = m_config.m_LRTmode ? 1050.0 : 550.0;
 
   const float cut_zMinU = min_z0 + maxOuterRadius*roi.dzdrMinus();
   const float cut_zMaxU = max_z0 + maxOuterRadius*roi.dzdrPlus();
 
   const float ptCoeff = 0.29997*1.9972/2.0;// ~0.3*B/2 - assuming nominal field of 2*T
 
-  float tripletPtMin = 0.8*m_minPt;//correction due to limited pT resolution
-  const float pt_scale     = 900.0/m_minPt;//to re-scale original tunings done for the 900 MeV pT cut
+  float tripletPtMin = 0.8*m_config.m_minPt;//correction due to limited pT resolution
+  const float pt_scale     = 900.0/m_config.m_minPt;//to re-scale original tunings done for the 900 MeV pT cut
 
   float maxCurv = ptCoeff/tripletPtMin;
  
-  float maxKappa_high_eta          = m_LRTmode ? 1.0*maxCurv : std::sqrt(0.8)*maxCurv;
-  float maxKappa_low_eta           = m_LRTmode ? 1.0*maxCurv : std::sqrt(0.6)*maxCurv;
+  float maxKappa_high_eta          = m_config.m_LRTmode ? 1.0*maxCurv : std::sqrt(0.8)*maxCurv;
+  float maxKappa_low_eta           = m_config.m_LRTmode ? 1.0*maxCurv : std::sqrt(0.6)*maxCurv;
 
-  if(!m_useOldTunings && !m_LRTmode) {//new settings for curvature cuts
+  if(!m_config.m_useOldTunings && !m_config.m_LRTmode) {//new settings for curvature cuts
     maxKappa_high_eta          = 4.75e-4f*pt_scale;
     maxKappa_low_eta           = 3.75e-4f*pt_scale;
   }
 
-  const float dphi_coeff                 = m_LRTmode ? 1.0*maxCurv : 0.68*maxCurv;
+  const float dphi_coeff                 = m_config.m_LRTmode ? 1.0*maxCurv : 0.68*maxCurv;
   
   const float minDeltaRadius = 2.0;
     
-  float deltaPhi = 0.5f*m_phiSliceWidth;//the default sliding window along phi
+  float deltaPhi = 0.5f*m_config.m_phiSliceWidth;//the default sliding window along phi
  
   unsigned int nConnections = 0;
   
-  edgeStorage.reserve(m_nMaxEdges);
+  edgeStorage.reserve(m_config.m_nMaxEdges);
   
   int nEdges = 0;
 
@@ -241,9 +242,9 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
       
       float rb2 = B2.getMaxBinRadius();
     
-      if(m_useEtaBinning) {
+      if(m_config.m_useEtaBinning) {
 		float abs_dr = std::fabs(rb2-rb1);
-		if (m_useOldTunings) {
+		if (m_config.m_useOldTunings) {
 	  		deltaPhi = min_deltaPhi + dphi_coeff*abs_dr;
 		}
 		else {
@@ -317,7 +318,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 	  if(ftau < n2pars[0]) continue;
 	  if(ftau > n2pars[1]) continue;
 		
-	  if (m_doubletFilterRZ) {
+	  if (m_config.m_doubletFilterRZ) {
 		  
 	    float z0 = z1 - r1*tau;
 	  
@@ -344,7 +345,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 
 	  float exp_eta = std::sqrt(1+tau*tau)-tau;
 	  
-	  if (m_matchBeforeCreate) {//match edge candidate against edges incoming to n2
+	  if (m_config.m_matchBeforeCreate) {//match edge candidate against edges incoming to n2
 
 	    bool isGood = v2In.size() <= 2;//we must have enough incoming edges to decide
 
@@ -373,7 +374,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 	  float dPhi2 = curv*r2;
 	  float dPhi1 = curv*r1;
 	
-	  if(nEdges < m_nMaxEdges) {
+	  if(nEdges < m_config.m_nMaxEdges) {
 	  
 	    edgeStorage.emplace_back(B1.m_vn[n1Idx], B2.m_vn[n2Idx], exp_eta, curv, phi1 + dPhi1);
 	    
@@ -424,7 +425,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
     } //loop over bins in Layer 2
   } //loop over bin groups
 
-  if(nEdges >= m_nMaxEdges) {
+  if(nEdges >= m_config.m_nMaxEdges) {
     ACTS_WARNING("Maximum number of graph edges exceeded - possible efficiency loss "<< nEdges);
   }
   return std::make_pair(nEdges, nConnections);
