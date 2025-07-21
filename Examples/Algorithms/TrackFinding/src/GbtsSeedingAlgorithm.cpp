@@ -88,17 +88,10 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumns, Acts::Experimental::SpacePointColumns> SpContainerComponents =
     MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
       
-  for (auto sp : std::get<0>(SpContainerComponents)) {
-    
-    if (!links.empty()) {
-      ACTS_DEBUG("space points:  Layer_id: "
-                 << sp.extra(LayerColoumn) 
-                 << " z: " << sp.z() << " r: " << sp.r());
-    }
-  }
+  //TO DO: HAVE A RINT OUT OF ALL SPACEPOINTS AFTER MAKING
 
   // this is now calling on a core algorithm
-  Acts::Experimental::SeedFinderGbts finder(m_cfg.seedFinderConfig, m_gbtsGeo, m_layerGeometry,
+  Acts::Experimental::SeedingToolBase finder(m_cfg.seedFinderConfig, m_gbtsGeo, m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
 
   //used to reserve size of nodes 2D vector in core
