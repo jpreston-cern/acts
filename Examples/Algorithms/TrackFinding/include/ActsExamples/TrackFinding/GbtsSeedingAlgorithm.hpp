@@ -76,7 +76,8 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   // make the container that holds the spacepoints that have been given 
   // all the veriables needed for GBTS
-  std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumns, Acts::Experimental::SpacePointColumns> MakeSpContainer(
+  std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumnProxy<int, false>, Acts::Experimental::SpacePointColumnProxy<float, false>> 
+    MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::pair<int, int>> map) const;
 

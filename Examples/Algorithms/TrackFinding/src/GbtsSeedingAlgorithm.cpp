@@ -85,17 +85,16 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   //take spacepoints, add veriables needed for GBTS and add them to new container 
   //due to how spacepoint container works, we need to keep the container and the external coloumns we added alive 
   //this is done by using a tuple of the core container and the two extra coloumns
-  std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumns, Acts::Experimental::SpacePointColumns> SpContainerComponents =
-    MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
+  auto SpContainerComponents = MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
       
   //TO DO: HAVE A RINT OUT OF ALL SPACEPOINTS AFTER MAKING
 
   // this is now calling on a core algorithm
-  Acts::Experimental::SeedingToolBase finder(m_cfg.seedFinderConfig, m_gbtsGeo, m_layerGeometry,
+  Acts::Experimental::SeedingToolBase finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
 
   //used to reserve size of nodes 2D vector in core
-  int max_layers = m_LayeridMap.size()
+  int max_layers = m_LayeridMap.size();
 
   // ROI file:Defines what region in detector we are interested in, currntly set to entire detector
   //  Acts::Experimental::RoiDescriptor internalRoi(0, -5, 5, 0,
@@ -104,7 +103,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
       0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
  
   // create the seeds
-  SeedContainer2 seeds = finder.createSeeds(internalRoi, SpCointContainerComponents, max_layers);
+  Acts::Experimental::SeedContainer2 seeds = finder.CreateSeeds(internalRoi, SpContainerComponents, max_layers);
 
   // move seeds to simseedcontainer to be used down stream 
   // currently as simseeds need to be hard types we can only have 3 SP in them, 
@@ -113,13 +112,13 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   seedContainerForStorage.reserve(seeds.size());
   for (const auto& seed : seeds) {
     auto sps = seed.spacePointIndices();
-    seedContainerForStorage.emplace_back(*coreSpacePoints.at(sps[0])
+    seedContainerForStorage.emplace_back(*std::get<0>(SpContainerComponents).at(sps[0])
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>(),
-                                         *coreSpacePoints.at(sps[1])
+                                         *std::get<0>(SpContainerComponents).at(sps[1])
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>(),
-                                         *coreSpacePoints.at(sps[2])
+                                         *std::get<0>(SpContainerComponents).at(sps[2])
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>());
 
@@ -129,7 +128,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   }
 
   
-  m_outputSeeds(ctx, std::move(seeds));
+  m_outputSeeds(ctx, std::move(seedContainerForStorage));
 
   return ActsExamples::ProcessCode::SUCCESS;
 }
@@ -168,7 +167,7 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-std::tuple<SpacePointContainer, SpacePointColumns, SpacePointColumns> 
+std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumnProxy<int, false>, Acts::Experimental::SpacePointColumnProxy<float, false>> 
   ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
@@ -251,6 +250,8 @@ std::tuple<SpacePointContainer, SpacePointColumns, SpacePointColumns>
       // access IDs from map
       int eta_mod = Find->second.second;
       int combined_id = Gbts_id * 1000 + eta_mod;
+      
+      auto newSp = coreSpacePoints.createSpacePoint();
       //apply beamspot corrections if needed
       if(m_cfg.seedFinderConfig.BeamSpotCorrection){
 
@@ -258,7 +259,7 @@ std::tuple<SpacePointContainer, SpacePointColumns, SpacePointColumns>
         
       }else{
         //add spacepoints to new container 
-        auto newSp = coreSpacePoints.createSpacePoint();
+        
         newSp.assignSourceLinks(
           std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)});
         newSp.y() = spacePoint.x();

@@ -10,7 +10,7 @@
 
 #include "Acts/Seeding/SeedFinderGbts.hpp"
 #include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
-#include "Acts/Seeding/GbtsTrackingFilter.hpp" //need to bring this over
+#include "Acts/Seeding/GbtsTrackingFilter.hpp" 
 
 #include <algorithm>
 #include <cmath>
@@ -21,13 +21,13 @@ namespace Acts::Experimental {
 
 
 SeedingToolBase::SeedingToolBase(
-	const SeedFinderGbtsConfig& config,
-    std::unique_ptr<TrigFTF_GNN_Geometry> gbtsGeo,
-	const std::vector<TrigInDetSiLayer>& layerGeometry,
-    std::unique_ptr<const Acts::Logger> logger)
+	SeedFinderGbtsConfig config,
+    const TrigFTF_GNN_Geometry* gbtsGeo,
+	const std::vector<TrigInDetSiLayer>* layerGeometry,
+    std::unique_ptr<const Acts::Logger> logger) 
     : m_config(config),
-	  m_geo(std::move(gbtsGeo)),
-      m_storage(std::make_unique<GNN_DataStorage>(m_geo.get())),
+	  m_geo(gbtsGeo),
+      m_storage(std::make_unique<GNN_DataStorage>(*m_geo)),
 	  m_layerGeometry(layerGeometry),
 	  m_logger(std::move(logger)) {}
 
@@ -103,7 +103,7 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 
     //backtracking
 
-    TrigFTF_GNN_TrackingFilter tFilter(m_layerGeometry, edgeStorage); //add this file in
+    TrigFTF_GNN_TrackingFilter tFilter(*m_layerGeometry, edgeStorage); //add this file in
 	
 	for(auto pS : vSeeds) {
         if(pS->m_level == -1) continue;

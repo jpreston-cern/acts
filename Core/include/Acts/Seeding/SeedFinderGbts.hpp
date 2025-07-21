@@ -27,10 +27,10 @@ namespace Acts::Experimental {
 class SeedingToolBase{
  public:
 
-  SeedingToolBase(const SeedFinderGbtsConfig& config,
-                  std::unique_ptr<TrigFTF_GNN_Geometry> gbtsGeo,
-	                const std::vector<TrigInDetSiLayer>& layerGeometry,
-                  std::unique_ptr<const Acts::Logger> logger);
+  SeedingToolBase( const SeedFinderGbtsConfig config,
+                   const TrigFTF_GNN_Geometry* gbtsGeo,
+	                 const std::vector<TrigInDetSiLayer>* layerGeometry,
+                   std::unique_ptr<const Acts::Logger> logger);
 
   typedef TrigFTF_GNN_Node GNN_Node;
   typedef TrigFTF_GNN_DataStorage GNN_DataStorage;
@@ -52,11 +52,11 @@ class SeedingToolBase{
   
   SeedFinderGbtsConfig m_config;
 
-  std::unique_ptr<const TrigFTF_GNN_Geometry> m_geo;
+  const TrigFTF_GNN_Geometry* m_geo;
 
   std::unique_ptr<GNN_DataStorage> m_storage = nullptr;
 
-  std::vector<TrigInDetSiLayer> m_layerGeometry;
+  const std::vector<TrigInDetSiLayer>* m_layerGeometry;
 
   std::unique_ptr<const Acts::Logger> m_logger =
       Acts::getDefaultLogger("Finder", Acts::Logging::Level::INFO);
