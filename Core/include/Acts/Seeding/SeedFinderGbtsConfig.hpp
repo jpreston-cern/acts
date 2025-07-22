@@ -13,7 +13,6 @@
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/Definitions/Units.hpp"
 #include "Acts/Seeding/SeedConfirmationRangeConfig.hpp"
-
 #include <memory>
 
 // core algorithm so in acts namespace

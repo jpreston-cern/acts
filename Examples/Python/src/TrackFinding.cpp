@@ -115,7 +115,7 @@ void addTrackFinding(Context& ctx) {
     auto c = py::class_<Config>(m, "SeedFinderGbtsConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(c, minPt, sigmaScattering, highland, maxScatteringAngle2,
                        ConnectorInputFile, m_phiSliceWidth, m_nMaxPhiSlice,
-                       m_useClusterWidth, m_layerGeometry);
+                       m_useClusterWidth);
     patchKwargsConstructor(c);
   }
 
