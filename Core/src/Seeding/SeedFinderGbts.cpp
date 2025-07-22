@@ -6,7 +6,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#pragma once
 
 #include "Acts/Seeding/SeedFinderGbts.hpp"
 #include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
@@ -33,7 +32,7 @@ SeedingToolBase::SeedingToolBase(
 
 
 SeedContainer2 SeedingToolBase::CreateSeeds(
-	const RoiDescriptor& roi, const auto& SpContainerComponents, 
+	const RoiDescriptor& roi, const SPContainerComponentsType& SpContainerComponents, 
 	int max_layers){
 
 	SeedContainer2 SeedContainer;

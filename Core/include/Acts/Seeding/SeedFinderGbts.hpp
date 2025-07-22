@@ -23,6 +23,12 @@
 #include <vector>
 
 namespace Acts::Experimental {
+  
+//defined the tuple template used to carry the spacepoint components
+using SPContainerComponentsType = std::tuple<
+                                             SpacePointContainer2,
+                                             SpacePointColumnProxy<int, true>,
+                                             SpacePointColumnProxy<float, true>>;
 
 class SeedingToolBase{
  public:
@@ -37,8 +43,9 @@ class SeedingToolBase{
   typedef TrigFTF_GNN_Edge GNN_Edge;
 
   SeedContainer2 CreateSeeds(
-	const RoiDescriptor& roi, const auto& SpContainerComponents, 
-	int max_layers);
+	  const RoiDescriptor& roi, 
+    const SPContainerComponentsType& SpContainerComponents, 
+	  int max_layers);
   
   
   std::vector<std::vector<SeedingToolBase::GNN_Node>> 
@@ -67,4 +74,4 @@ class SeedingToolBase{
 
 }  // namespace Acts::Experimental
 
-#include "Acts/Seeding/SeedFinderGbts.ipp"
+

@@ -39,6 +39,7 @@ namespace Acts::Experimental {
       unsigned int m_dst;//the target layer of the group
 
       std::vector<const GNN_FasTrackConnection*> m_sources;//the source layers of the group
+
     };
 
   public:

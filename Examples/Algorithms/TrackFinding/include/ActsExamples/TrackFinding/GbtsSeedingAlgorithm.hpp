@@ -60,6 +60,10 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     std::string inputClusters; //TO DO: add the cluster width
   };
 
+  // access to config
+  //allows bindings to work 
+  const Config &config() const { return m_cfg; }
+
   // constructor:
   /// @param cfg is the algorithm configuration
   /// @param lvl is the logging level
@@ -76,10 +80,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   // make the container that holds the spacepoints that have been given 
   // all the veriables needed for GBTS
-  std::tuple<Acts::Experimental::SpacePointContainer2, 
-           Acts::Experimental::SpacePointColumnProxy<int, true>,
-           Acts::Experimental::SpacePointColumnProxy<float, true>>
-    MakeSpContainer(
+  Acts::Experimental::SPContainerComponentsType MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::pair<int, int>> map) const;
 

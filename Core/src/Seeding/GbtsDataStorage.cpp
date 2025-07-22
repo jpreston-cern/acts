@@ -2,7 +2,7 @@
   Copyright (C) 2002-2025 CERN for the benefit of the ATLAS collaboration
 */
 
-#include "GNN_DataStorage.h"
+#include "Acts/Seeding/GbtsDataStorage.hpp"
 
 #include<cmath>
 #include<cstring>

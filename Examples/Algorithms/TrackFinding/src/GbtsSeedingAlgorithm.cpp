@@ -167,9 +167,7 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-std::tuple<Acts::Experimental::SpacePointContainer2, 
-           Acts::Experimental::SpacePointColumnProxy<int, true>,
-           Acts::Experimental::SpacePointColumnProxy<float, true>> 
+Acts::Experimental::SPContainerComponentsType 
   ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {

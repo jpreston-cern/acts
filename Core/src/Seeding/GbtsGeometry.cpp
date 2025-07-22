@@ -231,11 +231,11 @@ namespace Acts::Experimental {
 
     int lastBin1 = -1;
     
-    for(std::map<int, std::vector<GNN_FASTRACK_CONNECTION*> >::const_iterator it = conn->m_connMap.begin();it!=conn->m_connMap.end();++it) {
+    for(std::map<int, std::vector<GNN_FasTrackConnection*> >::const_iterator it = conn->m_connMap.begin();it!=conn->m_connMap.end();++it) {
 
-        const std::vector<GNN_FASTRACK_CONNECTION*>& vConn = (*it).second;
+        const std::vector<GNN_FasTrackConnection*>& vConn = (*it).second;
 
-        for(std::vector<GNN_FASTRACK_CONNECTION*>::const_iterator cIt=vConn.begin();cIt!=vConn.end();++cIt) {
+        for(std::vector<GNN_FasTrackConnection*>::const_iterator cIt=vConn.begin();cIt!=vConn.end();++cIt) {
         
         unsigned int src = (*cIt)->m_src;//n2 : the new connectors
         unsigned int dst = (*cIt)->m_dst;//n1
