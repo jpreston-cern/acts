@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/opt/ppd/scratch-2022/japresto/acts/Examples/Scripts/Python/full_chain_itk_Gbts.py", line 2, in <module>
+    import pathlib, acts, acts.examples, acts.examples.itk
+  File "/home/ppd/jasper/QT/acts/build/python/acts/__init__.py", line 7, in <module>
+    from .ActsPythonBindings import *
+ImportError: /home/ppd/jasper/QT/acts/build/lib64/libActsExamplesTrackFinding.so: undefined symbol: _ZN4Acts12Experimental23TrigFTF_GNN_DataStorage19generatePhiIndexingEf
