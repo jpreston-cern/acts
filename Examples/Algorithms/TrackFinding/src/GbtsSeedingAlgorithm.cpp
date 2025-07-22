@@ -167,7 +167,9 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   return ActsGbts;
 }
 
-std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePointColumnProxy<int, false>, Acts::Experimental::SpacePointColumnProxy<float, false>> 
+std::tuple<Acts::Experimental::SpacePointContainer2, 
+           Acts::Experimental::SpacePointColumnProxy<int, false>, 
+           Acts::Experimental::SpacePointColumnProxy<float, false>> 
   ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
@@ -265,11 +267,9 @@ std::tuple<Acts::Experimental::SpacePointContainer2, Acts::Experimental::SpacePo
         newSp.y() = spacePoint.x();
         newSp.y() = spacePoint.y();
         newSp.z() = spacePoint.z();
-        newSp.r() = spacePoint.r();
-        newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
-
       }
-
+      newSp.r() = spacePoint.r();
+      newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
       newSp.extra(LayerColoumn) = m_LayeridMap.at(combined_id);
       newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
       
