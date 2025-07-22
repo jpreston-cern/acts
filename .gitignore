@@ -45,3 +45,5 @@ codegen/src/codegen.egg-info/
 acts-itk/
 log_log.log
 compile.log
+run_script.sh
+runtime.log
