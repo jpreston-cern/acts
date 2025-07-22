@@ -168,8 +168,8 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
 }
 
 std::tuple<Acts::Experimental::SpacePointContainer2, 
-           Acts::Experimental::SpacePointColumnProxy<int, false>, 
-           Acts::Experimental::SpacePointColumnProxy<float, false>> 
+           Acts::Experimental::SpacePointColumnProxy<int, true>,
+           Acts::Experimental::SpacePointColumnProxy<float, true>> 
   ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
     std::map<std::pair<int, int>, std::pair<int, int>> map) const {
@@ -279,7 +279,7 @@ std::tuple<Acts::Experimental::SpacePointContainer2,
     
   ACTS_VERBOSE("Space point collection successfully assigned LayerID's");
 
-  return std::make_tuple(coreSpacePoints, LayerColoumn, ClusterWidthColoumn);
+  return std::make_tuple(std::move(coreSpacePoints), LayerColoumn.asConst(), ClusterWidthColoumn.asConst());
 }
 
 std::vector<Acts::Experimental::TrigInDetSiLayer>

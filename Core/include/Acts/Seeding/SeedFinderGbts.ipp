@@ -167,7 +167,7 @@ std::vector<std::vector<SeedingToolBase::GNN_Node>>
 			int layer = sp.extra(std::get<1>(container));
 
 			//add node to storage 
-			SeedingToolBase::GNN_Node node = node_storage[layer].emplace_back(layer);
+			SeedingToolBase::GNN_Node& node = node_storage[layer].emplace_back(layer);
 
 			//fill the node with spacepoint variables
 			node.m_x = sp.x();
