@@ -1216,6 +1216,7 @@ def addGbtsSeeding(
     sequence: acts.examples.Sequencer,
     spacePoints: str,
     seedFinderConfigArg: SeedFinderConfigArg,
+    seedFinderOptionsArg: SeedFinderOptionsArg,
     trackingGeometry: acts.TrackingGeometry,
     logLevel: acts.logging.Level = None,
     layerMappingConfigFile: Union[Path, str] = None,
