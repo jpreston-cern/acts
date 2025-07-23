@@ -111,11 +111,11 @@ void addTrackFinding(Context& ctx) {
   }
 
   {
-    using Config = Acts::Experimental::SeedFinderGbtsConfig;
+    using Config = Acts::Experimental::SeedFinderGbtsConfig<SimSpacePoint>;
     auto c = py::class_<Config>(m, "SeedFinderGbtsConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(c, minPt, sigmaScattering, highland, maxScatteringAngle2,
                        ConnectorInputFile, m_phiSliceWidth, m_nMaxPhiSlice,
-                       m_useClusterWidth);
+                       m_useClusterWidth, m_layerGeometry);
     patchKwargsConstructor(c);
   }
 
@@ -176,8 +176,8 @@ void addTrackFinding(Context& ctx) {
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
       ActsExamples::GbtsSeedingAlgorithm, mex, "GbtsSeedingAlgorithm",
-      inputSpacePoints, outputSeeds, seedFinderConfig,
-      layerMappingFile, trackingGeometry, ActsGbtsMap,
+      inputSpacePoints, outputSeeds, seedFinderConfig, seedFinderOptions,
+      layerMappingFile, geometrySelection, trackingGeometry, ActsGbtsMap,
       fill_module_csv, inputClusters);
 
   ACTS_PYTHON_DECLARE_ALGORITHM(

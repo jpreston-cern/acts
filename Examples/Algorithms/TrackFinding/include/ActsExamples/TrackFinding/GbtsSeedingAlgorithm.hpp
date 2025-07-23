@@ -42,12 +42,13 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     //contains all the options used to steer the algorithm 
     //includes both user options avilable to cahnge in the python script and those seen just be the algorithm
     Acts::Experimental::SeedFinderGbtsConfig seedFinderConfig;
-    
+    Acts::SeedFinderOptions seedFinderOptions;
     // the connection table (parsed from csv file) used to make geoemetry cuts be GBTS
     std::string layerMappingFile;
 
+    std::vector<Acts::GeometryIdentifier> geometrySelection;
+
     //Holds detector information, used to make the geometry objects used by GBTS
-    
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
 
     //conversion between ACTS labelling of volume, layer and modules to that used by GBTS
