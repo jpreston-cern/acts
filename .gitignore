@@ -47,3 +47,5 @@ log_log.log
 compile.log
 run_script.sh
 runtime.log
+heap_memory.log
+heap_profile.massif

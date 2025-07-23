@@ -16,5 +16,7 @@ echo "source python binds"
 source build/python/setup.sh
 
 echo "run gbtsv2 seeding"
-code runtime.log
-Examples/Scripts/Python/full_chain_itk_Gbts.py &> runtime.log
+code heap_memory.log
+valgrind --tool=massif --stacks=yes \
+         --massif-out-file=heap_profile.massif \
+         python Examples/Scripts/Python/full_chain_itk_Gbts.py 2>&1 | tee heap_memory.log

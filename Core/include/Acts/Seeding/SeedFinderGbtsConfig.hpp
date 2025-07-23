@@ -13,6 +13,7 @@
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/Definitions/Units.hpp"
 #include "Acts/Seeding/SeedConfirmationRangeConfig.hpp"
+#include "Acts/Seeding/GbtsGeometry.hpp"
 #include <memory>
 
 // core algorithm so in acts namespace
@@ -63,7 +64,7 @@ struct SeedFinderGbtsConfig {
  //for GbtsSeedingAlgorithm
  bool BeamSpotCorrection = false;
 
-
+ std::vector<TrigInDetSiLayer> m_layerGeometry;
  //NEW VERAIBLES START
   
   
