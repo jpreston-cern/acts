@@ -32,7 +32,8 @@
 ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
-  
+
+  std::cout<<"Jasper: constructor start"<<std::endl;
   //initialise the spacepoint, seed and cluster handles 
   m_inputSpacePoints.initialize(m_cfg.inputSpacePoints.at(0)); //TO DO: change bindings so it only gives a string instead of a vector 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
@@ -75,24 +76,26 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   ACTS_DEBUG("Property useML "<< m_cfg.seedFinderConfig.m_useML);
   ACTS_DEBUG("Property pTmin "<<m_cfg.seedFinderConfig.m_minPt);
   ACTS_DEBUG("Property LRTmode "<<m_cfg.seedFinderConfig.m_LRTmode);
-
+  std::cout<<"Jasper: constructor end"<<std::endl;
 } 
 
 // execute:
 ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   const AlgorithmContext &ctx) const {
 
+  std::cout<<"Jasper: execute start"<<std::endl;
   //take spacepoints, add veriables needed for GBTS and add them to new container 
   //due to how spacepoint container works, we need to keep the container and the external coloumns we added alive 
   //this is done by using a tuple of the core container and the two extra coloumns
   auto SpContainerComponents = MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
-      
+  std::cout<<"Jasper: MAkeSpContainer() completed"<<std::endl;
   //TO DO: HAVE A RINT OUT OF ALL SPACEPOINTS AFTER MAKING
 
   // this is now calling on a core algorithm
+  std::cout<<"Jasper: finder initialised"<<std::endl;
   Acts::Experimental::SeedingToolBase finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
-
+  std::cout<<"Jasper: finder completed"<<std::endl;
   //used to reserve size of nodes 2D vector in core
   int max_layers = m_LayeridMap.size();
 
@@ -103,8 +106,9 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
       0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
  
   // create the seeds
+  std::cout<<"Jasper: create seeds called"<<std::endl;
   Acts::Experimental::SeedContainer2 seeds = finder.CreateSeeds(internalRoi, SpContainerComponents, max_layers);
-
+  std::cout<<"Jasper: creat seeds finished"<<std::endl;
   // move seeds to simseedcontainer to be used down stream 
   // currently as simseeds need to be hard types we can only have 3 SP in them, 
   // but in future we should be able to have any length seed
@@ -193,12 +197,11 @@ Acts::Experimental::SPContainerComponentsType
  
       
     // for loop filling space
-  
+    int counter = 0;
     for (const auto &spacePoint : spacePoints) {
       // Gbts space point vector
       // loop over space points, call on map
       const auto &sourceLink = spacePoint.sourceLinks();
-      const auto &indexSourceLink = sourceLink.front().get<IndexSourceLink>();
 
       // warning if source link empty
       if (sourceLink.empty()) {
@@ -206,6 +209,11 @@ Acts::Experimental::SPContainerComponentsType
         ACTS_WARNING("warning source link vector is empty");
         continue;
       }
+      
+      const auto &indexSourceLink = sourceLink.front().get<IndexSourceLink>();
+
+      
+      
       int ACTS_vol_id = indexSourceLink.geometryId().volume(); 
       int ACTS_lay_id = indexSourceLink.geometryId().layer(); 
       int ACTS_mod_id = indexSourceLink.geometryId().sensitive();
@@ -252,6 +260,7 @@ Acts::Experimental::SPContainerComponentsType
       int combined_id = Gbts_id * 1000 + eta_mod;
       
       auto newSp = coreSpacePoints.createSpacePoint();
+      
       //apply beamspot corrections if needed
       if(m_cfg.seedFinderConfig.BeamSpotCorrection){
 
@@ -262,17 +271,19 @@ Acts::Experimental::SPContainerComponentsType
         
         newSp.assignSourceLinks(
           std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)});
-        newSp.y() = spacePoint.x();
+        newSp.x() = spacePoint.x();
         newSp.y() = spacePoint.y();
         newSp.z() = spacePoint.z();
+        
       }
       newSp.r() = spacePoint.r();
       newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
       newSp.extra(LayerColoumn) = m_LayeridMap.at(combined_id);
       newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
       
+      counter++;
+      std::cout<<"Jasper: spacepoint converted to new container :"<<counter<<std::endl;
     }
-
     
     
   ACTS_VERBOSE("Space point collection successfully assigned LayerID's");
@@ -366,8 +377,9 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
         maxBound = max;
       }
     }
-
+    
     int combined_id = Gbts_id * 1000 + eta_mod;
+    
     auto current_index =
         find_if(input_vector.begin(), input_vector.end(),
                 [combined_id](auto n) { return n.m_subdet == combined_id; });
@@ -388,6 +400,8 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
       //tracking the index of each TrigInDetSiLayer as there added to the vector
       int LayerID = count_vector.size();
+      std::cout<<"Jasper: Gbts_Id is "<<""<<Gbts_id<<""<<"eta_mod is "<<""<<eta_mod<<std::endl;
+      std::cout<<"Jasper: combined ID "<<""<<combined_id<<""<<"Layer ID"<<""<<LayerID<<std::endl;
       m_LayeridMap.insert({combined_id, LayerID}); 
       m_GbtsIDs.push_back(combined_id);
     }
@@ -409,11 +423,11 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
     }
   });
   /*
-  for (std::size_t i = 0; i < LayeridMap.size(); i++){ //check to see if layer ID map is filled 
+  for (std::size_t i = 0; i < m_LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
-    int Gbts_id_new = GbtsIDs[i];
+    int Gbts_id_new = m_GbtsIDs[i];
     std::cout<<"Jasper: /n"
-             <<"layer is :"<<LayeridMap.at(Gbts_id_new)<<"with Gbts ID: "<<Gbts_id_new
+             <<"layer is :"<<m_LayeridMap.at(Gbts_id_new)<<"with Gbts ID: "<<Gbts_id_new
              <<std::endl;          
   }
   */
