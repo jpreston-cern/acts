@@ -51,10 +51,12 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
       if(nodes.size() == 0) continue;
 
 	  bool is_pixel = true;
-      if(is_pixel) //placeholder for now until strip hits are added in
+      if(is_pixel){ //placeholder for now until strip hits are added in
 		nPixelLoaded += m_storage->loadPixelGraphNodes(l, nodes, m_config.m_useML);
-      else
+		std::cout<<"Jasper: node loaded"<<std::endl;
+	  }else{
 		nStripLoaded += m_storage->loadStripGraphNodes(l, nodes);
+	  }
     }
 	
 	ACTS_DEBUG("Loaded "<<nPixelLoaded<<" pixel spacepoints and "<<nStripLoaded<<" strip spacepoints");
@@ -166,7 +168,7 @@ std::vector<std::vector<SeedingToolBase::GNN_Node>>
 			//for every sp in container,
 			//add its variables to node_storage organised by layer 
 			int layer = sp.extra(std::get<1>(container));
-			std::cout<<"Jasper: layer is: "<<layer<<std::endl;
+			//std::cout<<"Jasper: layer is: "<<layer<<std::endl;
 			//add node to storage 
 			SeedingToolBase::GNN_Node& node = node_storage[layer].emplace_back(layer); // this is the issue
 			

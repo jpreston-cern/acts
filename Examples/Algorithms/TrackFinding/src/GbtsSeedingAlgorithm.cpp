@@ -400,8 +400,6 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
       //tracking the index of each TrigInDetSiLayer as there added to the vector
       int LayerID = count_vector.size();
-      std::cout<<"Jasper: Gbts_Id is "<<""<<Gbts_id<<""<<"eta_mod is "<<""<<eta_mod<<std::endl;
-      std::cout<<"Jasper: combined ID "<<""<<combined_id<<""<<"Layer ID"<<""<<LayerID<<std::endl;
       m_LayeridMap.insert({combined_id, LayerID}); 
       m_GbtsIDs.push_back(combined_id);
     }
