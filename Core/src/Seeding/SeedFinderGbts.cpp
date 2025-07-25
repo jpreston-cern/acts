@@ -28,7 +28,7 @@ SeedingToolBase::SeedingToolBase(
 	  m_geo(gbtsGeo),
       m_storage(std::make_unique<GNN_DataStorage>(*m_geo)),
 	  m_layerGeometry(layerGeometry),
-	  m_logger(std::move(logger)) {std::cout<<"SeedFinderGbts constructor initialised"<<std::endl;}
+	  m_logger(std::move(logger)) {}
 
 
 SeedContainer2 SeedingToolBase::CreateSeeds(
@@ -36,38 +36,40 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 	int max_layers){
 	
 	SeedContainer2 SeedContainer;
-	std::cout<<"Jasper: create seeds start"<<std::endl;
+	//std::cout<<"Jasper: create seeds start"<<std::endl;
 	std::vector<std::vector<GNN_Node>> node_storage =
 	 CreateNodes(SpContainerComponents, max_layers);
-	
+	//std::cout<<"Jasper: Node storage size is"<<""<<node_storage.size()<<std::endl;
 	unsigned int nPixelLoaded = 0;
     unsigned int nStripLoaded = 0;
 
 	//load the nodes into storage
-	for(size_t l = 1; l <= node_storage.size(); l++) {
+	for(size_t l = 0; l < node_storage.size(); l++) {
 	
       const std::vector<GNN_Node>& nodes = node_storage[l];
-	  //std::cout<<"Jasper: Looking at Layer "<<l<<"in node storage with "<<node_storage[l].size()<<"SP"<<std::endl;
+	  
       if(nodes.size() == 0) continue;
 
 	  bool is_pixel = true;
       if(is_pixel){ //placeholder for now until strip hits are added in
+		
 		nPixelLoaded += m_storage->loadPixelGraphNodes(l, nodes, m_config.m_useML);
-		std::cout<<"Jasper: node loaded"<<std::endl;
+		
 	  }else{
 		nStripLoaded += m_storage->loadStripGraphNodes(l, nodes);
 	  }
+	  
     }
-	
+	//std::cout<<"Jasper: nodes loaded successfully"<<std::endl;
 	ACTS_DEBUG("Loaded "<<nPixelLoaded<<" pixel spacepoints and "<<nStripLoaded<<" strip spacepoints");
-
+	
     m_storage->sortByPhi();
 
     m_storage->initializeNodes(m_config.m_useML);
 
 	m_config.m_phiSliceWidth = 2*std::numbers::pi/m_config.m_nMaxPhiSlice;
     m_storage->generatePhiIndexing(1.5*m_config.m_phiSliceWidth);
-
+	
 	std::vector<GNN_Edge> edgeStorage; 
 
     std::pair<int, int> graphStats = buildTheGraph(roi, m_storage, edgeStorage);
@@ -83,7 +85,6 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
     if(m_config.m_LRTmode) {
         minLevel = 2;//a triplet + 1 confirmation
     }
-
 
 	std::vector<GNN_Edge*> vSeeds;
 
@@ -106,6 +107,7 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
     TrigFTF_GNN_TrackingFilter tFilter(*m_layerGeometry, edgeStorage); //add this file in
 	
 	for(auto pS : vSeeds) {
+	
         if(pS->m_level == -1) continue;
 
         TrigFTF_GNN_EdgeState rs(false); //this is in tracking filter as well
@@ -115,7 +117,7 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
         if(!rs.m_initialized) {
             continue;
         }
-
+		
         if(static_cast<int>(rs.m_vs.size()) < minLevel) continue;
 
         std::vector<const GNN_Node*> vN;
@@ -133,19 +135,19 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 
         if(vN.size()<3) continue; 
 	
-       
+       //std::cout<<"jasper: number of elemts in vN is: "<<vN.size()<<std::endl;
 		//add to seed container:
 		std::array<SpacePointIndex2, 3> Sp_Indexes{};
-		int index = 0;
-		for(const auto* vNptr : vN){
-
-			Sp_Indexes[index] = vNptr->sp_idx();
-			index ++;
-		}
 		
+		for(std::size_t i = 0; i<3; i++){
+		//std::cout<<"Jasper: within loop on line 143"<<std::endl;
+			Sp_Indexes[i] = vN.at(i)->sp_idx();
+			
+		}
+		//std::cout<<"Jasper: just before adding to create seed"<<std::endl;
 		SeedContainer.createSeed(Sp_Indexes);
     }
-
+	//std::cout<<"Jasper: returning seed container"<<std::endl;
     ACTS_DEBUG("GBTS created "<<SeedContainer.size()<<" seeds");
 
     return SeedContainer;
@@ -155,22 +157,22 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 std::vector<std::vector<SeedingToolBase::GNN_Node>> 
   SeedingToolBase::CreateNodes(const auto& container, int MaxLayers){
 
-	std::vector<std::vector<SeedingToolBase::GNN_Node>> node_storage;
+	std::vector<std::vector<SeedingToolBase::GNN_Node>> node_storage(MaxLayers);
 	//reserve for better efficiency 
-	//std::cout<<"Jasper: max layers is "<<MaxLayers<<std::endl;
-	node_storage.resize(MaxLayers+1); //to avoid seg fault due to layers going from [0,197] i.e 198 actual layers
+	//std::cout<<"Jasper: max layers is "<<" "<<MaxLayers<<std::endl;
+	
 	
 	for(auto& v : node_storage) v.reserve(100000);
-	int sp_counter = 0;
+	
 		for(auto sp : std::get<0>(container)){
 
 		
 			//for every sp in container,
 			//add its variables to node_storage organised by layer 
 			int layer = sp.extra(std::get<1>(container));
-			//std::cout<<"Jasper: layer is: "<<layer<<std::endl;
+			//std::cout<<"Jasper: layer id fo spacepoint is"<<" "<<layer<<std::endl;
 			//add node to storage 
-			SeedingToolBase::GNN_Node& node = node_storage[layer].emplace_back(layer); // this is the issue
+			SeedingToolBase::GNN_Node& node = node_storage[layer].emplace_back(layer); 
 			
 			//fill the node with spacepoint variables
 			
@@ -182,12 +184,17 @@ std::vector<std::vector<SeedingToolBase::GNN_Node>>
 			node.m_idx = sp.index();//change node so that is uses SpacePointIndex2 (doesnt affect code but i guess it looks cleaner)
 			node.m_pcw = sp.extra(std::get<2>(container));
 			
-			/*sp_counter++;
-			std::cout<<"Jasper: spacepoints processed: "<<sp_counter<<std::endl; */
+			
 		}
-	//std::cout<<"Jasper: Node storage returned"<<std::endl;
+		std::size_t total_sp = 0; 
+	for(std::size_t i = 0; i <node_storage.size();i++){
+		 total_sp += node_storage[i].size();
+		
+	}
+	//std::cout<<"Jasper: total nodes is "<<total_sp<<std::endl;
+	//std::cout<<"Jasper: node storage successfully completed"<<std::endl;
 	return node_storage;
-
+	
 }
 
 std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, const std::unique_ptr<TrigFTF_GNN_DataStorage>& storage, std::vector<TrigFTF_GNN_Edge>& edgeStorage) const {
