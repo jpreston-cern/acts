@@ -35,10 +35,10 @@ class TrigInDetSiLayer {
         m_maxBound(max) {}
 };
 
-class TrigFTF_GNN_Layer {
+class GbtsLayer {
 public:
-  TrigFTF_GNN_Layer(const TrigInDetSiLayer&, float, int);
-  ~TrigFTF_GNN_Layer();
+  GbtsLayer(const TrigInDetSiLayer&, float, int);
+  ~GbtsLayer();
 
   int getEtaBin(float, float) const;
 
@@ -47,7 +47,7 @@ public:
 
   int num_bins() const {return m_bins.size();} 
 
-  bool verifyBin(const TrigFTF_GNN_Layer*, int, int, float, float) const;
+  bool verifyBin(const GbtsLayer*, int, int, float, float) const;
 
   const TrigInDetSiLayer& m_layer;
   std::vector<int> m_bins;//eta-bin indices
@@ -67,13 +67,13 @@ protected:
 
 };
 
-class TrigFTF_GNN_Geometry {
+class GbtsGeometry {
 public:
-  TrigFTF_GNN_Geometry(const std::vector<TrigInDetSiLayer>&, const std::unique_ptr<GNN_FasTrackConnector>&);
-  ~TrigFTF_GNN_Geometry();
+  GbtsGeometry(const std::vector<TrigInDetSiLayer>&, const std::unique_ptr<GbtsConnector>&);
+  ~GbtsGeometry();
   
-  const TrigFTF_GNN_Layer* getTrigFTF_GNN_LayerByKey(unsigned int) const;
-  const TrigFTF_GNN_Layer* getTrigFTF_GNN_LayerByIndex(int) const;
+  const GbtsLayer* getGbtsLayerByKey(unsigned int) const;
+  const GbtsLayer* getGbtsLayerByIndex(int) const;
 
   int num_bins() const {return m_nEtaBins;}
   unsigned int num_layers() const {return m_layArray.size();}
@@ -81,12 +81,12 @@ public:
   
 protected:
 
-  const TrigFTF_GNN_Layer* addNewLayer(const TrigInDetSiLayer&, int);
+  const GbtsLayer* addNewLayer(const TrigInDetSiLayer&, int);
 
   float m_etaBinWidth;
 
-  std::map<unsigned int, TrigFTF_GNN_Layer*> m_layMap;
-  std::vector<TrigFTF_GNN_Layer*> m_layArray;
+  std::map<unsigned int, GbtsLayer*> m_layMap;
+  std::vector<GbtsLayer*> m_layArray;
   
   int m_nEtaBins;
 

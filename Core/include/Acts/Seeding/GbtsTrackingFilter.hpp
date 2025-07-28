@@ -21,29 +21,29 @@
 
 namespace Acts::Experimental {
 
-struct TrigFTF_GNN_EdgeState {
+struct GbtsEdgeState {
 
 public:
 
 struct Compare {
-    bool operator()(const struct TrigFTF_GNN_EdgeState* s1, const struct TrigFTF_GNN_EdgeState* s2) {
+    bool operator()(const struct GbtsEdgeState* s1, const struct GbtsEdgeState* s2) {
       return s1->m_J > s2->m_J;
     }
   };
 
 
-  TrigFTF_GNN_EdgeState() {};
+  GbtsEdgeState() {};
 
-  TrigFTF_GNN_EdgeState(bool f) : m_initialized(f) {};
+  GbtsEdgeState(bool f) : m_initialized(f) {};
 
-  ~TrigFTF_GNN_EdgeState() {};
+  ~GbtsEdgeState() {};
 
-  void initialize(TrigFTF_GNN_Edge*);
-  void clone(const struct TrigFTF_GNN_EdgeState&);
+  void initialize(GbtsEdge*);
+  void clone(const struct GbtsEdgeState&);
 
   float m_J{};
 
-  std::vector<TrigFTF_GNN_Edge*> m_vs;
+  std::vector<GbtsEdge*> m_vs;
 
   float m_X[3]{}, m_Y[2]{}, m_Cx[3][3]{}, m_Cy[2][2]{};
   float m_refX{}, m_refY{}, m_c{}, m_s{};
@@ -54,29 +54,29 @@ struct Compare {
 
 #define MAX_EDGE_STATE 2500
 
-class TrigFTF_GNN_TrackingFilter {
+class GbtsTrackingFilter {
  public:
-  TrigFTF_GNN_TrackingFilter(const std::vector<TrigInDetSiLayer>&, std::vector<TrigFTF_GNN_Edge>&);
-  ~TrigFTF_GNN_TrackingFilter(){};
+  GbtsTrackingFilter(const std::vector<TrigInDetSiLayer>&, std::vector<GbtsEdge>&);
+  ~GbtsTrackingFilter(){};
 
-  void followTrack(TrigFTF_GNN_Edge*, TrigFTF_GNN_EdgeState&);
+  void followTrack(GbtsEdge*, GbtsEdgeState&);
 
  protected:
 
-  void propagate(TrigFTF_GNN_Edge*, TrigFTF_GNN_EdgeState&);
+  void propagate(GbtsEdge*, GbtsEdgeState&);
 
-  bool update(TrigFTF_GNN_Edge*, TrigFTF_GNN_EdgeState&);
+  bool update(GbtsEdge*, GbtsEdgeState&);
 
   int getLayerType(int);  
 
 
   const std::vector<TrigInDetSiLayer>& m_geo;
   
-  std::vector<TrigFTF_GNN_Edge>& m_segStore;
+  std::vector<GbtsEdge>& m_segStore;
  
-  std::vector<TrigFTF_GNN_EdgeState*> m_stateVec;
+  std::vector<GbtsEdgeState*> m_stateVec;
 
-  TrigFTF_GNN_EdgeState m_stateStore[MAX_EDGE_STATE];
+  GbtsEdgeState m_stateStore[MAX_EDGE_STATE];
 
   int m_globalStateCounter{0};
 

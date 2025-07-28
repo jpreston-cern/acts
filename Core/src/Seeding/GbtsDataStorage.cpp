@@ -9,7 +9,7 @@
 #include<algorithm>
 namespace Acts::Experimental {
 
-TrigFTF_GNN_EtaBin::TrigFTF_GNN_EtaBin(): m_minRadius(0), m_maxRadius(0) {
+GbtsEtaBin::GbtsEtaBin(): m_minRadius(0), m_maxRadius(0) {
 
   m_in.clear();
   m_vn.clear();
@@ -17,15 +17,15 @@ TrigFTF_GNN_EtaBin::TrigFTF_GNN_EtaBin(): m_minRadius(0), m_maxRadius(0) {
   m_vn.reserve(1000);
 }
 
-TrigFTF_GNN_EtaBin::~TrigFTF_GNN_EtaBin() {
+GbtsEtaBin::~GbtsEtaBin() {
   m_in.clear();
   m_vn.clear();
   m_params.clear();
 }
 
-void TrigFTF_GNN_EtaBin::sortByPhi() {
+void GbtsEtaBin::sortByPhi() {
   
-  std::vector<std::pair<float, const TrigFTF_GNN_Node*> > phiBuckets[32];
+  std::vector<std::pair<float, const GbtsNode*> > phiBuckets[32];
 
   int nBuckets = 31;
 
@@ -48,7 +48,7 @@ void TrigFTF_GNN_EtaBin::sortByPhi() {
 }
 
 
-void TrigFTF_GNN_EtaBin::initializeNodes() {
+void GbtsEtaBin::initializeNodes() {
   
   if(m_vn.empty()) return;
   
@@ -58,15 +58,15 @@ void TrigFTF_GNN_EtaBin::initializeNodes() {
   for(auto& v : m_in) v.reserve(50);//reasonably high number of incoming edges per node
   
   std::transform(m_vn.begin(), m_vn.end(), m_params.begin(),
-                   [](const TrigFTF_GNN_Node* pN) { std::array<float,5> a = {-100.0, 100.0, pN->phi(), pN->r(), pN->z()}; return a;});
+                   [](const GbtsNode* pN) { std::array<float,5> a = {-100.0, 100.0, pN->phi(), pN->r(), pN->z()}; return a;});
     
   auto [min_iter, max_iter] = std::minmax_element(m_vn.begin(), m_vn.end(),
-						  [](const TrigFTF_GNN_Node* s, const TrigFTF_GNN_Node* s1) { return (s->r() < s1->r()); });
+						  [](const GbtsNode* s, const GbtsNode* s1) { return (s->r() < s1->r()); });
   m_maxRadius = (*max_iter)->r();
   m_minRadius = (*min_iter)->r();
 }
 
-void TrigFTF_GNN_EtaBin::generatePhiIndexing(float dphi) {
+void GbtsEtaBin::generatePhiIndexing(float dphi) {
 
   for(unsigned int nIdx=0;nIdx<m_vn.size();nIdx++) {
 
@@ -90,20 +90,20 @@ void TrigFTF_GNN_EtaBin::generatePhiIndexing(float dphi) {
   
 }
 
-TrigFTF_GNN_DataStorage::TrigFTF_GNN_DataStorage(const TrigFTF_GNN_Geometry& g) : m_geo(g) {
+GbtsDataStorage::GbtsDataStorage(const GbtsGeometry& g) : m_geo(g) {
   m_etaBins.resize(g.num_bins());
 }
 
 
-TrigFTF_GNN_DataStorage::~TrigFTF_GNN_DataStorage() {
+GbtsDataStorage::~GbtsDataStorage() {
 
 }
 
-int TrigFTF_GNN_DataStorage::loadPixelGraphNodes(short layerIndex, const std::vector<TrigFTF_GNN_Node>& coll, bool useML) {
+int GbtsDataStorage::loadPixelGraphNodes(short layerIndex, const std::vector<GbtsNode>& coll, bool useML) {
 
   int nLoaded = 0;
 
-  const TrigFTF_GNN_Layer* pL = m_geo.getTrigFTF_GNN_LayerByIndex(layerIndex);
+  const GbtsLayer* pL = m_geo.getGbtsLayerByIndex(layerIndex);
 
   if(pL == nullptr) {
     return -1;
@@ -137,11 +137,11 @@ int TrigFTF_GNN_DataStorage::loadPixelGraphNodes(short layerIndex, const std::ve
   return nLoaded;
 }
 
-int TrigFTF_GNN_DataStorage::loadStripGraphNodes(short layerIndex, const std::vector<TrigFTF_GNN_Node>& coll) {
+int GbtsDataStorage::loadStripGraphNodes(short layerIndex, const std::vector<GbtsNode>& coll) {
 
   int nLoaded = 0;
 
-  const TrigFTF_GNN_Layer* pL = m_geo.getTrigFTF_GNN_LayerByIndex(layerIndex);
+  const GbtsLayer* pL = m_geo.getGbtsLayerByIndex(layerIndex);
 
   if(pL == nullptr) {
     return -1;
@@ -162,7 +162,7 @@ int TrigFTF_GNN_DataStorage::loadStripGraphNodes(short layerIndex, const std::ve
   return nLoaded;
 }
 
-unsigned int TrigFTF_GNN_DataStorage::numberOfNodes() const {
+unsigned int GbtsDataStorage::numberOfNodes() const {
 
   unsigned int n=0;
   
@@ -172,12 +172,12 @@ unsigned int TrigFTF_GNN_DataStorage::numberOfNodes() const {
   return n;
 }
 
-void TrigFTF_GNN_DataStorage::sortByPhi() {
+void GbtsDataStorage::sortByPhi() {
     
   for(auto& b : m_etaBins) b.sortByPhi();
 }
 
-void TrigFTF_GNN_DataStorage::initializeNodes(bool useML) {
+void GbtsDataStorage::initializeNodes(bool useML) {
   
   for(auto& b : m_etaBins) {
     b.initializeNodes();
@@ -189,7 +189,7 @@ void TrigFTF_GNN_DataStorage::initializeNodes(bool useML) {
 
   for(unsigned int layerIdx=0;layerIdx<nL;layerIdx++) {
 
-    const TrigFTF_GNN_Layer* pL = m_geo.getTrigFTF_GNN_LayerByIndex(layerIdx);
+    const GbtsLayer* pL = m_geo.getGbtsLayerByIndex(layerIdx);
 
     if(pL->m_layer.m_subdet < 20000) {//skip strips volumes: layers in range [1200X-1400X]
       continue;
@@ -203,7 +203,7 @@ void TrigFTF_GNN_DataStorage::initializeNodes(bool useML) {
 
     for(int b=0;b<nBins;b++) {//loop over eta-bins in Layer
 
-      TrigFTF_GNN_EtaBin& B = m_etaBins.at(pL->m_bins.at(b));
+      GbtsEtaBin& B = m_etaBins.at(pL->m_bins.at(b));
 
       if(B.empty()) continue;
       
@@ -221,7 +221,7 @@ void TrigFTF_GNN_DataStorage::initializeNodes(bool useML) {
   }
 }
 
-void TrigFTF_GNN_DataStorage::generatePhiIndexing(float dphi) {
+void GbtsDataStorage::generatePhiIndexing(float dphi) {
   for(auto& b : m_etaBins) b.generatePhiIndexing(dphi);
 }
 

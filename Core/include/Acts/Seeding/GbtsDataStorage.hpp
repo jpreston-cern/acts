@@ -24,11 +24,11 @@ namespace Acts::Experimental {
 #define MAX_SEG_PER_NODE 1000 //was 30
 #define N_SEG_CONNS  6 //was 6
 
-class TrigFTF_GNN_Geometry;
+class GbtsGeometry;
 
-struct TrigFTF_GNN_Node {
+struct GbtsNode {
 
-  TrigFTF_GNN_Node(unsigned short l) : m_x(0), m_y(0), m_z(0), m_r(0), m_phi(0), m_layer(l), m_pcw(0) {};
+  GbtsNode(unsigned short l) : m_x(0), m_y(0), m_z(0), m_r(0), m_phi(0), m_layer(l), m_pcw(0) {};
 
   inline float x() const {return m_x;}
   inline float y() const {return m_y;}
@@ -48,19 +48,19 @@ struct TrigFTF_GNN_Node {
 };
 
 
-class TrigFTF_GNN_EtaBin {
+class GbtsEtaBin {
 public:
 
    struct CompareNodesByPhi {
 
-    bool operator()(const TrigFTF_GNN_Node* n1, const TrigFTF_GNN_Node* n2) {
+    bool operator()(const GbtsNode* n1, const GbtsNode* n2) {
       return n1->phi() < n2->phi();
     }
 
   };
   
-  TrigFTF_GNN_EtaBin();
-  ~TrigFTF_GNN_EtaBin();
+  GbtsEtaBin();
+  ~GbtsEtaBin();
 
   void sortByPhi();
   void initializeNodes();
@@ -78,7 +78,7 @@ public:
     return m_maxRadius;
   }
   
-  std::vector<const TrigFTF_GNN_Node*> m_vn;//nodes of the graph
+  std::vector<const GbtsNode*> m_vn;//nodes of the graph
   std::vector<std::pair<float, unsigned int> > m_vPhiNodes;
   std::vector<std::vector<unsigned int> > m_in;//vectors of incoming edges, stores indicies of edges in the edge vector
   std::vector<std::array<float,5> > m_params;//node attributes: m_minCutOnTau, m_maxCutOnTau, m_phi, m_r, m_z;
@@ -87,13 +87,13 @@ public:
   
 };
 
-class TrigFTF_GNN_DataStorage {
+class GbtsDataStorage {
 public:
-  TrigFTF_GNN_DataStorage(const TrigFTF_GNN_Geometry&);
-  ~TrigFTF_GNN_DataStorage();
+  GbtsDataStorage(const GbtsGeometry&);
+  ~GbtsDataStorage();
 
-  int loadPixelGraphNodes(short, const std::vector<TrigFTF_GNN_Node>&, bool);
-  int loadStripGraphNodes(short, const std::vector<TrigFTF_GNN_Node>&);
+  int loadPixelGraphNodes(short, const std::vector<GbtsNode>&, bool);
+  int loadStripGraphNodes(short, const std::vector<GbtsNode>&);
   
   unsigned int numberOfNodes() const;
   void sortByPhi();
@@ -101,40 +101,40 @@ public:
   void generatePhiIndexing(float);
 
 
-  TrigFTF_GNN_EtaBin& getEtaBin(int idx) {
+  GbtsEtaBin& getEtaBin(int idx) {
     if(idx >= static_cast<int>(m_etaBins.size())) idx = idx-1;
     return m_etaBins.at(idx);
   }
 
 protected:
 
-  const TrigFTF_GNN_Geometry& m_geo;
+  const GbtsGeometry& m_geo;
 
-  std::vector<TrigFTF_GNN_EtaBin> m_etaBins; 
+  std::vector<GbtsEtaBin> m_etaBins; 
 
 };
 
-class TrigFTF_GNN_Edge {
+class GbtsEdge {
 public:
 
   struct CompareLevel {
   public:
-    bool operator()(const TrigFTF_GNN_Edge* pE1, const TrigFTF_GNN_Edge* pE2) {
+    bool operator()(const GbtsEdge* pE1, const GbtsEdge* pE2) {
       return pE1->m_level > pE2->m_level;
     }
   };
   
-  TrigFTF_GNN_Edge(const TrigFTF_GNN_Node* n1, const TrigFTF_GNN_Node* n2, float p1, float p2, float p3) : m_n1(n1), m_n2(n2), m_level(1), m_next(1), m_nNei(0) {
+  GbtsEdge(const GbtsNode* n1, const GbtsNode* n2, float p1, float p2, float p3) : m_n1(n1), m_n2(n2), m_level(1), m_next(1), m_nNei(0) {
     m_p[0] = p1;
     m_p[1] = p2;
     m_p[2] = p3;
   }
   
-  TrigFTF_GNN_Edge() : m_n1(nullptr), m_n2(nullptr), m_level(-1), m_next(-1), m_nNei(0) {};
+  GbtsEdge() : m_n1(nullptr), m_n2(nullptr), m_level(-1), m_next(-1), m_nNei(0) {};
   
   
-  const TrigFTF_GNN_Node* m_n1{nullptr};
-  const TrigFTF_GNN_Node* m_n2{nullptr};
+  const GbtsNode* m_n1{nullptr};
+  const GbtsNode* m_n2{nullptr};
 
   signed char m_level{-1}, m_next{-1};
 

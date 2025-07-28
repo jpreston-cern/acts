@@ -60,7 +60,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   //create the connection objects
   else {
 
-     m_connector = std::make_unique<Acts::Experimental::GNN_FasTrackConnector>(input_ifstream, m_cfg.seedFinderConfig.m_LRTmode);
+     m_connector = std::make_unique<Acts::Experimental::GbtsConnector>(input_ifstream, m_cfg.seedFinderConfig.m_LRTmode);
   
     // option that allows for adding custom eta binning (default is at 0.2)
     if (m_cfg.seedFinderConfig.m_etaBinOverride != 0.0f) {
@@ -71,7 +71,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   }
 
   // initiliase the object that holds all the geometry information needed for the algorithm
-  m_gbtsGeo = std::make_unique<Acts::Experimental::TrigFTF_GNN_Geometry>(m_layerGeometry, m_connector); 
+  m_gbtsGeo = std::make_unique<Acts::Experimental::GbtsGeometry>(m_layerGeometry, m_connector); 
 
   ACTS_DEBUG("Property useML "<< m_cfg.seedFinderConfig.m_useML);
   ACTS_DEBUG("Property pTmin "<<m_cfg.seedFinderConfig.m_minPt);
@@ -93,7 +93,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
 
   // this is now calling on a core algorithm
   //std::cout<<"Jasper: finder initialised"<<std::endl;
-  Acts::Experimental::SeedingToolBase finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
+  Acts::Experimental::SeedFinderGbts finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
   //std::cout<<"Jasper: finder completed"<<std::endl;
   //used to reserve size of nodes 2D vector in core

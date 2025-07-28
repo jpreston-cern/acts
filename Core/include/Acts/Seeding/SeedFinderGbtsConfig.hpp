@@ -20,75 +20,41 @@
 namespace Acts::Experimental {
 
 struct SeedFinderGbtsConfig {
-  // // how many sigmas of scattering angle should be considered?
-  float sigmaScattering = 5;
-
-  // Seed cut
-  float minPt = 400. * Acts::UnitConstants::MeV;
-
-  //   //detector ROI
-  //   // derived values, set on SeedFinder construction
-  float highland = 0;
-  float maxScatteringAngle2 = 0;
-  /// for load space points
-
-  // Parameter which can loosen the tolerance of the track seed to form a
-  // helix. This is useful for e.g. misaligned seeding.
-  float helixCutTolerance = 1.;
-
-  float m_phiSliceWidth{};    // initialised in loadSpacePoints function
-  float m_nMaxPhiSlice = 53;  // used to calculate phi slices
-  bool m_useClusterWidth =
-      false;  // bool for use of cluster width in loadSpacePoints function
-  std::string ConnectorInputFile;  // Path to the connector configuration file
-                                   // that defines the layer connections
   
+ // GbtsSeedingAlgorithm options 
+  bool BeamSpotCorrection = false;
+  std::string ConnectorInputFile{};  // Path to the connector configuration file
+                                     // that defines the layer connections
 
-  // for runGbts_TrackFinder
+ //BuildTheGraph() options
+  double ptCoeff = 0.29997 * 1.9972 / 2.0; // ~0.3*B/2 - assumes nominal field of 2*T
+  float minPt = 400. * Acts::UnitConstants::MeV;
   bool m_useEtaBinning = true;  // bool to use eta binning from geometry structure
   bool m_doubletFilterRZ = true;  // bool applies new Z cuts on doublets
-  float m_minDeltaRadius = 2.0;   // min dr for doublet
-  float m_tripletD0Max = 4.0;     // D0 cut for triplets
-  unsigned int m_maxTripletBufferLength = 3; // maximum number of space points per triplet
-  int m_nMaxEdges = 2000000;       // max number of Gbts edges/doublets
-  float cut_dphi_max = 0.012;   // phi cut for triplets
-  float cut_dcurv_max = 0.001;  // curv cut for triplets
-  float cut_tau_ratio_max = 0.007;  // tau cut for doublets and triplets
-  float maxOuterRadius = 550.0;     // used to calculate Z cut on doublets
-  float m_minPt = 1000.0;
-  float m_tripletPtMinFrac = 0.3;
-  float m_tripletPtMin = m_minPt * m_tripletPtMinFrac;  // Limit on triplet pt
-  double ptCoeff =
-      0.29997 * 1.9972 / 2.0;  // ~0.3*B/2 - assumes nominal field of 2*T
+  int m_nMaxEdges = 2000000;     // max number of Gbts edges/doublets
+  float m_minDeltaRadius = 2.0;
 
- //for GbtsSeedingAlgorithm
- bool BeamSpotCorrection = false;
-
- std::vector<TrigInDetSiLayer> m_layerGeometry;
- //NEW VERAIBLES START
-  
-  
+ //SeedFinderGbts option
   bool m_LRTmode = false;
-  bool m_useML = true;
-
-  
+  bool m_useML = false; //use cluster width 
   bool m_matchBeforeCreate = false;
-  
-  float m_etaBinOverride = 0.0f; //specify non-zero to override eta bin width from connection file (default 0.2 in createLinkingScheme.py) (USED)
-  
-  
-  std::string m_connectionFile{};
-
-  
   bool m_useOldTunings = false;
-
   bool m_tau_ratio_cut = 0.007;
-
-  //NEW VARIABLES END 
+  float m_etaBinOverride = 0.0f; //specify non-zero to override eta bin width from connection file (default 0.2 in createLinkingScheme.py)
+  float m_nMaxPhiSlice = 53; // used to calculate phi slices
+  float m_minPt = 1000.0;
+  float m_phiSliceWidth{}; //derived in CreatSeeds function
+ 
   
-
-
-
+  
+   
+  
+//unsure if i still need these
+  float sigmaScattering = 5;  
+  float highland = 0;
+  float maxScatteringAngle2 = 0;
+  bool m_useClusterWidth = false; //defineitly get rid of this one 
+  std::vector<TrigInDetSiLayer> m_layerGeometry; //get rid off
 
   // ROI:
   bool containsPhi() {

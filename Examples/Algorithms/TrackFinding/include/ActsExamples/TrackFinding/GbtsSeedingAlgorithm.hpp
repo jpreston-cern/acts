@@ -94,12 +94,12 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   Config m_cfg{};
   
   // object that processes and holds connection table information 
-  std::unique_ptr<Acts::Experimental::GNN_FasTrackConnector> m_connector = nullptr;
+  std::unique_ptr<Acts::Experimental::GbtsConnector> m_connector = nullptr;
 
   // object that holds all geometry information after:
   // connection table has been processed 
   // vector of logical layers that have been created
-  std::unique_ptr<Acts::Experimental::TrigFTF_GNN_Geometry> m_gbtsGeo = nullptr;
+  std::unique_ptr<Acts::Experimental::GbtsGeometry> m_gbtsGeo = nullptr;
 
   //collection of geometry objects used by GBTS
   std::vector<Acts::Experimental::TrigInDetSiLayer> m_layerGeometry{};

@@ -8,7 +8,7 @@
 
 namespace Acts::Experimental {
 
-    TrigFTF_GNN_Layer::TrigFTF_GNN_Layer(const TrigInDetSiLayer& ls, float ew, int bin0) : m_layer(ls), m_etaBinWidth(ew) {
+    GbtsLayer::GbtsLayer(const TrigInDetSiLayer& ls, float ew, int bin0) : m_layer(ls), m_etaBinWidth(ew) {
 
     if(m_layer.m_type == 0) {//barrel
         m_r1 = m_layer.m_refCoord;
@@ -119,7 +119,7 @@ namespace Acts::Experimental {
     }
     }
 
-    bool TrigFTF_GNN_Layer::verifyBin(const TrigFTF_GNN_Layer* pL, int b1, int b2, float min_z0, float max_z0) const {
+    bool GbtsLayer::verifyBin(const GbtsLayer* pL, int b1, int b2, float min_z0, float max_z0) const {
 
     float z1min = m_minBinCoord.at(b1);
     float z1max = m_maxBinCoord.at(b1);
@@ -179,7 +179,7 @@ namespace Acts::Experimental {
     }
 
 
-    int TrigFTF_GNN_Layer::getEtaBin(float zh, float rh) const {
+    int GbtsLayer::getEtaBin(float zh, float rh) const {
     
     if(m_bins.size() == 1) return m_bins.at(0);
 
@@ -196,25 +196,25 @@ namespace Acts::Experimental {
     return m_bins.at(idx);//index in the global storage
     }
 
-    float TrigFTF_GNN_Layer::getMinBinRadius(int idx) const {
+    float GbtsLayer::getMinBinRadius(int idx) const {
     if(idx >= static_cast<int>(m_minRadius.size())) idx = idx-1;
     if(idx < 0) idx = 0;
     
     return m_minRadius.at(idx);
     }
 
-    float TrigFTF_GNN_Layer::getMaxBinRadius(int idx) const {
+    float GbtsLayer::getMaxBinRadius(int idx) const {
     if(idx >= static_cast<int>(m_maxRadius.size())) idx = idx-1;
     if(idx < 0) idx = 0;
     
     return m_maxRadius.at(idx);
     }
 
-    TrigFTF_GNN_Layer::~TrigFTF_GNN_Layer() {
+    GbtsLayer::~GbtsLayer() {
     m_bins.clear();
     }
 
-    TrigFTF_GNN_Geometry::TrigFTF_GNN_Geometry(const std::vector<TrigInDetSiLayer>& layers, const std::unique_ptr<GNN_FasTrackConnector>& conn) : m_nEtaBins(0) {
+    GbtsGeometry::GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers, const std::unique_ptr<GbtsConnector>& conn) : m_nEtaBins(0) {
 
     const float min_z0 = -168.0;
     const float max_z0 =  168.0;
@@ -222,7 +222,7 @@ namespace Acts::Experimental {
     m_etaBinWidth = conn->m_etaBin;
 
     for(const auto& layer : layers) {
-        const TrigFTF_GNN_Layer* pL = addNewLayer(layer, m_nEtaBins);
+        const GbtsLayer* pL = addNewLayer(layer, m_nEtaBins);
         m_nEtaBins += pL->num_bins();
     }
     
@@ -231,17 +231,17 @@ namespace Acts::Experimental {
 
     int lastBin1 = -1;
     
-    for(std::map<int, std::vector<GNN_FasTrackConnection*> >::const_iterator it = conn->m_connMap.begin();it!=conn->m_connMap.end();++it) {
+    for(std::map<int, std::vector<GbtsConnection*> >::const_iterator it = conn->m_connMap.begin();it!=conn->m_connMap.end();++it) {
 
-        const std::vector<GNN_FasTrackConnection*>& vConn = (*it).second;
+        const std::vector<GbtsConnection*>& vConn = (*it).second;
 
-        for(std::vector<GNN_FasTrackConnection*>::const_iterator cIt=vConn.begin();cIt!=vConn.end();++cIt) {
+        for(std::vector<GbtsConnection*>::const_iterator cIt=vConn.begin();cIt!=vConn.end();++cIt) {
         
         unsigned int src = (*cIt)->m_src;//n2 : the new connectors
         unsigned int dst = (*cIt)->m_dst;//n1
         
-        const TrigFTF_GNN_Layer* pL1 = getTrigFTF_GNN_LayerByKey(dst);
-        const TrigFTF_GNN_Layer* pL2 = getTrigFTF_GNN_LayerByKey(src);
+        const GbtsLayer* pL1 = getGbtsLayerByKey(dst);
+        const GbtsLayer* pL2 = getGbtsLayerByKey(src);
         
         if (pL1==nullptr) {
         std::cout << " skipping invalid dst layer " << dst << std::endl; 
@@ -282,36 +282,36 @@ namespace Acts::Experimental {
     }
         
 
-    TrigFTF_GNN_Geometry::~TrigFTF_GNN_Geometry() {
-    for(std::vector<TrigFTF_GNN_Layer*>::iterator it =  m_layArray.begin();it!=m_layArray.end();++it) {
+    GbtsGeometry::~GbtsGeometry() {
+    for(std::vector<GbtsLayer*>::iterator it =  m_layArray.begin();it!=m_layArray.end();++it) {
         delete (*it);
     }
     m_layMap.clear();m_layArray.clear();
     }
 
-    const TrigFTF_GNN_Layer* TrigFTF_GNN_Geometry::getTrigFTF_GNN_LayerByKey(unsigned int key) const {
-    std::map<unsigned int, TrigFTF_GNN_Layer*>::const_iterator it = m_layMap.find(key);
+    const GbtsLayer* GbtsGeometry::getGbtsLayerByKey(unsigned int key) const {
+    std::map<unsigned int, GbtsLayer*>::const_iterator it = m_layMap.find(key);
     if(it == m_layMap.end()) {
         return nullptr;
     }
     return (*it).second;
     }
 
-    const TrigFTF_GNN_Layer* TrigFTF_GNN_Geometry::getTrigFTF_GNN_LayerByIndex(int idx) const {
+    const GbtsLayer* GbtsGeometry::getGbtsLayerByIndex(int idx) const {
     return m_layArray.at(idx);
     }
 
 
 
-    const TrigFTF_GNN_Layer* TrigFTF_GNN_Geometry::addNewLayer(const TrigInDetSiLayer& l, int bin0) {
+    const GbtsLayer* GbtsGeometry::addNewLayer(const TrigInDetSiLayer& l, int bin0) {
 
     unsigned int layerKey = l.m_subdet;
 
     float ew = m_etaBinWidth;
     
-    TrigFTF_GNN_Layer* pHL = new TrigFTF_GNN_Layer(l, ew, bin0);
+    GbtsLayer* pHL = new GbtsLayer(l, ew, bin0);
     
-    m_layMap.insert(std::pair<unsigned int, TrigFTF_GNN_Layer*>(layerKey, pHL));
+    m_layMap.insert(std::pair<unsigned int, GbtsLayer*>(layerKey, pHL));
     m_layArray.push_back(pHL);
     return pHL;
     }

@@ -18,11 +18,11 @@
 
 namespace Acts::Experimental {
 
-  GNN_FasTrackConnection::GNN_FasTrackConnection(unsigned int s, unsigned int d) : m_src(s), m_dst(d) { 
+  GbtsConnection::GbtsConnection(unsigned int s, unsigned int d) : m_src(s), m_dst(d) { 
 
   }
 
-  GNN_FasTrackConnector::GNN_FasTrackConnector(std::ifstream& inFile, bool LRTmode) {
+  GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
 
     m_connMap.clear();
     m_layerGroups.clear();
@@ -39,7 +39,7 @@ namespace Acts::Experimental {
 
       inFile >> lIdx >> stage >> src >> dst >> height >> width >> nEntries;
       
-      GNN_FasTrackConnection* pC = new GNN_FasTrackConnection(src, dst);
+      GbtsConnection* pC = new GbtsConnection(src, dst);
       
       int dummy;
 
@@ -64,19 +64,19 @@ namespace Acts::Experimental {
         }
       }
 
-      std::map<int, std::vector<GNN_FasTrackConnection*> >::iterator it = m_connMap.find(stage);
+      std::map<int, std::vector<GbtsConnection*> >::iterator it = m_connMap.find(stage);
       
       if(it == m_connMap.end()) {
-        std::vector<GNN_FasTrackConnection*> v = {pC};
+        std::vector<GbtsConnection*> v = {pC};
         m_connMap.insert(std::make_pair(stage, v));
       } else (*it).second.push_back(pC);
     }
 
     //re-arrange the connection stages
 
-    std::list<const GNN_FasTrackConnection*> lConns;
+    std::list<const GbtsConnection*> lConns;
 
-    std::map<int, std::vector<const GNN_FasTrackConnection*> > newConnMap;
+    std::map<int, std::vector<const GbtsConnection*> > newConnMap;
     
     for(const auto& conn : m_connMap) {
       std::copy(conn.second.begin(), conn.second.end(), std::back_inserter(lConns));
@@ -123,9 +123,9 @@ namespace Acts::Experimental {
 
       //remove connections which use zeroLayer as destination
 
-      std::vector<const GNN_FasTrackConnection*> theStage;
+      std::vector<const GbtsConnection*> theStage;
 
-      std::list<const GNN_FasTrackConnection*>::iterator cIt = lConns.begin();
+      std::list<const GbtsConnection*>::iterator cIt = lConns.begin();
 
       while(cIt!=lConns.end()) {
         if(zeroLayers.find((*cIt)->m_dst) != zeroLayers.end()) {//check if contains
@@ -145,23 +145,23 @@ namespace Acts::Experimental {
 
     //the doublet making is done using "outside-in" approach hence the reverse iterations
 
-    for(std::map<int, std::vector<const GNN_FasTrackConnection*> >::reverse_iterator it = newConnMap.rbegin();it!=newConnMap.rend();++it, currentStage++) {
+    for(std::map<int, std::vector<const GbtsConnection*> >::reverse_iterator it = newConnMap.rbegin();it!=newConnMap.rend();++it, currentStage++) {
 
-      const std::vector<const GNN_FasTrackConnection*> & vConn = (*it).second;
+      const std::vector<const GbtsConnection*> & vConn = (*it).second;
       
       //loop over links, extract all connections for the stage, group sources by L1 (dst) index
       
-      std::map<unsigned int, std::vector<const GNN_FasTrackConnection*> > l1ConnMap;
+      std::map<unsigned int, std::vector<const GbtsConnection*> > l1ConnMap;
 
       for(const auto* conn : vConn) {
 
         unsigned int dst = conn->m_dst;
 
-        std::map<unsigned int, std::vector<const GNN_FasTrackConnection*> >::iterator l1MapIt = l1ConnMap.find(dst);
+        std::map<unsigned int, std::vector<const GbtsConnection*> >::iterator l1MapIt = l1ConnMap.find(dst);
         if(l1MapIt != l1ConnMap.end()) 
     (*l1MapIt).second.push_back(conn);
         else {
-    std::vector<const GNN_FasTrackConnection*> v = {conn};
+    std::vector<const GbtsConnection*> v = {conn};
     l1ConnMap.insert(std::make_pair(dst, v));
         } 
       }
@@ -181,7 +181,7 @@ namespace Acts::Experimental {
 
   }
 
-  GNN_FasTrackConnector::~GNN_FasTrackConnector() {
+  GbtsConnector::~GbtsConnector() {
 
     m_layerGroups.clear();
 

@@ -19,9 +19,9 @@
 namespace Acts::Experimental {
 
 
-SeedingToolBase::SeedingToolBase(
+SeedFinderGbts::SeedFinderGbts(
 	SeedFinderGbtsConfig config,
-    const TrigFTF_GNN_Geometry* gbtsGeo,
+    const GbtsGeometry* gbtsGeo,
 	const std::vector<TrigInDetSiLayer>* layerGeometry,
     std::unique_ptr<const Acts::Logger> logger) 
     : m_config(config),
@@ -31,7 +31,7 @@ SeedingToolBase::SeedingToolBase(
 	  m_logger(std::move(logger)) {}
 
 
-SeedContainer2 SeedingToolBase::CreateSeeds(
+SeedContainer2 SeedFinderGbts::CreateSeeds(
 	const RoiDescriptor& roi, const SPContainerComponentsType& SpContainerComponents, 
 	int max_layers){
 	
@@ -104,13 +104,13 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 
     //backtracking
 
-    TrigFTF_GNN_TrackingFilter tFilter(*m_layerGeometry, edgeStorage); //add this file in
+    GbtsTrackingFilter tFilter(*m_layerGeometry, edgeStorage); 
 	
 	for(auto pS : vSeeds) {
 	
         if(pS->m_level == -1) continue;
 
-        TrigFTF_GNN_EdgeState rs(false); //this is in tracking filter as well
+        GbtsEdgeState rs(false); //this is in tracking filter as well
 
         tFilter.followTrack(pS, rs);
 
@@ -138,13 +138,18 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
        //std::cout<<"jasper: number of elemts in vN is: "<<vN.size()<<std::endl;
 		//add to seed container:
 		std::array<SpacePointIndex2, 3> Sp_Indexes{};
+		//std::cout<<"Jasper: loop check"<<std::endl;
 		
+		
+
 		for(std::size_t i = 0; i<3; i++){
 		//std::cout<<"Jasper: within loop on line 143"<<std::endl;
 			Sp_Indexes[i] = vN.at(i)->sp_idx();
-			
+				
 		}
-		//std::cout<<"Jasper: just before adding to create seed"<<std::endl;
+		
+			
+			
 		SeedContainer.createSeed(Sp_Indexes);
     }
 	//std::cout<<"Jasper: returning seed container"<<std::endl;
@@ -154,10 +159,10 @@ SeedContainer2 SeedingToolBase::CreateSeeds(
 		
 }
 
-std::vector<std::vector<SeedingToolBase::GNN_Node>> 
-  SeedingToolBase::CreateNodes(const auto& container, int MaxLayers){
+std::vector<std::vector<SeedFinderGbts::GNN_Node>> 
+  SeedFinderGbts::CreateNodes(const auto& container, int MaxLayers){
 
-	std::vector<std::vector<SeedingToolBase::GNN_Node>> node_storage(MaxLayers);
+	std::vector<std::vector<SeedFinderGbts::GNN_Node>> node_storage(MaxLayers);
 	//reserve for better efficiency 
 	//std::cout<<"Jasper: max layers is "<<" "<<MaxLayers<<std::endl;
 	
@@ -172,7 +177,7 @@ std::vector<std::vector<SeedingToolBase::GNN_Node>>
 			int layer = sp.extra(std::get<1>(container));
 			//std::cout<<"Jasper: layer id fo spacepoint is"<<" "<<layer<<std::endl;
 			//add node to storage 
-			SeedingToolBase::GNN_Node& node = node_storage[layer].emplace_back(layer); 
+			SeedFinderGbts::GNN_Node& node = node_storage[layer].emplace_back(layer); 
 			
 			//fill the node with spacepoint variables
 			
@@ -197,28 +202,26 @@ std::vector<std::vector<SeedingToolBase::GNN_Node>>
 	
 }
 
-std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, const std::unique_ptr<TrigFTF_GNN_DataStorage>& storage, std::vector<TrigFTF_GNN_Edge>& edgeStorage) const {
+std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, const std::unique_ptr<GbtsDataStorage>& storage, std::vector<GbtsEdge>& edgeStorage) const {
 
-  const float M_2PI = 2.0*M_PI;
   
-  const float cut_dphi_max      = m_config.m_LRTmode ? 0.07f : 0.012f;
-  const float cut_dcurv_max     = m_config.m_LRTmode ? 0.015f : 0.001f;
-  const float cut_tau_ratio_max = m_config.m_LRTmode ? 0.015f : static_cast<float>(m_config.m_tau_ratio_cut);
+  
+  const float cut_dphi_max      = m_config.m_LRTmode ? 0.07f : 0.012f; // phi cut for triplets
+  const float cut_dcurv_max     = m_config.m_LRTmode ? 0.015f : 0.001f; // curv cut for triplets
+  const float cut_tau_ratio_max = m_config.m_LRTmode ? 0.015f : static_cast<float>(m_config.m_tau_ratio_cut); // tau cut for doublets and triplets
   const float min_z0            = m_config.m_LRTmode ? -600.0 : roi.zedMinus();
   const float max_z0            = m_config.m_LRTmode ? 600.0 : roi.zedPlus();
   const float min_deltaPhi      = m_config.m_LRTmode ? 0.01f : 0.001f;
   
-  const float maxOuterRadius    = m_config.m_LRTmode ? 1050.0 : 550.0;
+  const float maxOuterRadius    = m_config.m_LRTmode ? 1050.0 : 550.0; // used to calculate Z cut on doublets
 
   const float cut_zMinU = min_z0 + maxOuterRadius*roi.dzdrMinus();
   const float cut_zMaxU = max_z0 + maxOuterRadius*roi.dzdrPlus();
 
-  const float ptCoeff = 0.29997*1.9972/2.0;// ~0.3*B/2 - assuming nominal field of 2*T
-
   float tripletPtMin = 0.8*m_config.m_minPt;//correction due to limited pT resolution
   const float pt_scale     = 900.0/m_config.m_minPt;//to re-scale original tunings done for the 900 MeV pT cut
 
-  float maxCurv = ptCoeff/tripletPtMin;
+  float maxCurv = m_config.ptCoeff/tripletPtMin;
  
   float maxKappa_high_eta          = m_config.m_LRTmode ? 1.0*maxCurv : std::sqrt(0.8)*maxCurv;
   float maxKappa_low_eta           = m_config.m_LRTmode ? 1.0*maxCurv : std::sqrt(0.6)*maxCurv;
@@ -230,7 +233,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 
   const float dphi_coeff                 = m_config.m_LRTmode ? 1.0*maxCurv : 0.68*maxCurv;
   
-  const float minDeltaRadius = 2.0;
+  
     
   float deltaPhi = 0.5f*m_config.m_phiSliceWidth;//the default sliding window along phi
  
@@ -242,7 +245,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 
   for(const auto& bg : m_geo->bin_groups()) {//loop over bin groups
     
-    TrigFTF_GNN_EtaBin& B1 = storage->getEtaBin(bg.first);
+    GbtsEtaBin& B1 = storage->getEtaBin(bg.first);
 
     if(B1.empty()) continue;
 
@@ -250,7 +253,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
  
     for(const auto& b2_idx : bg.second) {
 
-      const TrigFTF_GNN_EtaBin& B2 = storage->getEtaBin(b2_idx);
+      const GbtsEtaBin& B2 = storage->getEtaBin(b2_idx);
 
       if(B2.empty()) continue;
       
@@ -313,7 +316,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 	  
 	  float dr = r2 - r1;
 	
-	  if(dr < minDeltaRadius) {
+	  if(dr < m_config.m_minDeltaRadius) {
 	    continue;
 	  }
 	
@@ -402,7 +405,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 	    
 	    for(const auto& inEdgeIdx : v2In) {//looking for neighbours of the new edge
 	    
-	      TrigFTF_GNN_Edge* pS = &(edgeStorage.at(inEdgeIdx));
+	      GbtsEdge* pS = &(edgeStorage.at(inEdgeIdx));
 	      
 	      if(pS->m_nNei >= N_SEG_CONNS) continue;
 	    
@@ -414,8 +417,8 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
 	      
 	      float dPhi =  Phi2 - pS->m_p[2];
 	      
-	      if(dPhi<-M_PI) dPhi += M_2PI;
-	      else if(dPhi>M_PI) dPhi -= M_2PI;
+	      if(dPhi<-M_PI) dPhi += 2*std::numbers::pi;
+	      else if(dPhi>M_PI) dPhi -= 2*std::numbers::pi;
 	      
 	      if(dPhi < -cut_dphi_max || dPhi > cut_dphi_max) {
 		continue;
@@ -445,7 +448,7 @@ std::pair<int, int> SeedingToolBase::buildTheGraph(const RoiDescriptor& roi, con
   return std::make_pair(nEdges, nConnections);
 }
 
-int SeedingToolBase::runCCA(int nEdges, std::vector<TrigFTF_GNN_Edge>& edgeStorage) const {
+int SeedFinderGbts::runCCA(int nEdges, std::vector<GbtsEdge>& edgeStorage) const {
 
   const int maxIter = 15;
 
@@ -453,11 +456,11 @@ int SeedingToolBase::runCCA(int nEdges, std::vector<TrigFTF_GNN_Edge>& edgeStora
 
   int iter = 0;
   
-  std::vector<TrigFTF_GNN_Edge*> v_old;
+  std::vector<GbtsEdge*> v_old;
   
   for(int edgeIndex=0;edgeIndex<nEdges;edgeIndex++) {
 
-    TrigFTF_GNN_Edge* pS = &(edgeStorage[edgeIndex]);
+    GbtsEdge* pS = &(edgeStorage[edgeIndex]);
     if(pS->m_nNei == 0) continue;
     
     v_old.push_back(pS);//TO-DO: increment level for segments as they already have at least one neighbour
@@ -466,7 +469,7 @@ int SeedingToolBase::runCCA(int nEdges, std::vector<TrigFTF_GNN_Edge>& edgeStora
   for(;iter<maxIter;iter++) {
 
     //generate proposals
-    std::vector<TrigFTF_GNN_Edge*> v_new;
+    std::vector<GbtsEdge*> v_new;
     v_new.clear();
     v_new.reserve(v_old.size());
     
@@ -478,7 +481,7 @@ int SeedingToolBase::runCCA(int nEdges, std::vector<TrigFTF_GNN_Edge>& edgeStora
 	
         unsigned int nextEdgeIdx = pS->m_vNei[nIdx];
             
-        TrigFTF_GNN_Edge* pN = &(edgeStorage[nextEdgeIdx]);
+        GbtsEdge* pN = &(edgeStorage[nextEdgeIdx]);
             
         if(pS->m_level == pN->m_level) {
           next_level = pS->m_level + 1;

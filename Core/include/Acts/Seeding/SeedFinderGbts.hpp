@@ -30,17 +30,17 @@ using SPContainerComponentsType = std::tuple<
                                              SpacePointColumnProxy<int, true>,
                                              SpacePointColumnProxy<float, true>>;
 
-class SeedingToolBase{
+class SeedFinderGbts{
  public:
 
-  SeedingToolBase( const SeedFinderGbtsConfig config,
-                   const TrigFTF_GNN_Geometry* gbtsGeo,
+  SeedFinderGbts( const SeedFinderGbtsConfig config,
+                   const GbtsGeometry* gbtsGeo,
 	                 const std::vector<TrigInDetSiLayer>* layerGeometry,
                    std::unique_ptr<const Acts::Logger> logger);
 
-  typedef TrigFTF_GNN_Node GNN_Node;
-  typedef TrigFTF_GNN_DataStorage GNN_DataStorage;
-  typedef TrigFTF_GNN_Edge GNN_Edge;
+  typedef GbtsNode GNN_Node;
+  typedef GbtsDataStorage GNN_DataStorage;
+  typedef GbtsEdge GNN_Edge;
 
   SeedContainer2 CreateSeeds(
 	  const RoiDescriptor& roi, 
@@ -48,7 +48,7 @@ class SeedingToolBase{
 	  int max_layers);
   
   
-  std::vector<std::vector<SeedingToolBase::GNN_Node>> 
+  std::vector<std::vector<SeedFinderGbts::GNN_Node>> 
     CreateNodes(const auto& container, int MaxLayers);
 
   std::pair<int, int> buildTheGraph(const RoiDescriptor&, const std::unique_ptr<GNN_DataStorage>&, std::vector<GNN_Edge>&) const;
@@ -59,7 +59,7 @@ class SeedingToolBase{
   
   SeedFinderGbtsConfig m_config;
 
-  const TrigFTF_GNN_Geometry* m_geo;
+  const GbtsGeometry* m_geo;
 
   std::unique_ptr<GNN_DataStorage> m_storage = nullptr;
 

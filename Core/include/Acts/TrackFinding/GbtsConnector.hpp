@@ -18,9 +18,9 @@
 namespace Acts::Experimental {
 
 
-  struct GNN_FasTrackConnection {
+  struct GbtsConnection {
     
-    GNN_FasTrackConnection(unsigned int, unsigned int);
+    GbtsConnection(unsigned int, unsigned int);
 
     unsigned int m_src, m_dst;
     
@@ -29,28 +29,28 @@ namespace Acts::Experimental {
   };
 
 
-  class GNN_FasTrackConnector {
+  class GbtsConnector {
 
   public:
 
     struct LayerGroup {
-    LayerGroup(unsigned int l1Key, const std::vector<const GNN_FasTrackConnection*>& v) : m_dst(l1Key), m_sources(v) {};
+    LayerGroup(unsigned int l1Key, const std::vector<const GbtsConnection*>& v) : m_dst(l1Key), m_sources(v) {};
 
       unsigned int m_dst;//the target layer of the group
 
-      std::vector<const GNN_FasTrackConnection*> m_sources;//the source layers of the group
+      std::vector<const GbtsConnection*> m_sources;//the source layers of the group
 
     };
 
   public:
 
-    GNN_FasTrackConnector(std::ifstream&, bool LRTmode);
-    ~GNN_FasTrackConnector();
+    GbtsConnector(std::ifstream&, bool LRTmode);
+    ~GbtsConnector();
 
     float m_etaBin;
 
     std::map<int, std::vector<struct LayerGroup> > m_layerGroups;
-    std::map<int, std::vector<GNN_FasTrackConnection*> > m_connMap;
+    std::map<int, std::vector<GbtsConnection*> > m_connMap;
 
   };
 
