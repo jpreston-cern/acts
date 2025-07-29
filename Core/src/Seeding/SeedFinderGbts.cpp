@@ -104,7 +104,7 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 
     //backtracking
 
-    GbtsTrackingFilter tFilter(*m_layerGeometry, edgeStorage); 
+    GbtsTrackingFilter tFilter(*m_layerGeometry, edgeStorage, m_config); 
 	
 	for(auto pS : vSeeds) {
 	

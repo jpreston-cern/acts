@@ -80,7 +80,7 @@ void GbtsEdgeState::clone(const GbtsEdgeState& st) {
   m_initialized = true;
 }
 
-GbtsTrackingFilter::GbtsTrackingFilter(const std::vector<TrigInDetSiLayer>& g, std::vector<GbtsEdge>& sb) : m_geo(g), m_segStore(sb) { }
+GbtsTrackingFilter::GbtsTrackingFilter(const std::vector<TrigInDetSiLayer>& g, std::vector<GbtsEdge>& sb, SeedFinderGbtsConfig& config) : m_geo(g), m_segStore(sb), m_config(config) { }
 
 void GbtsTrackingFilter::followTrack(GbtsEdge* pS, GbtsEdgeState& output) {
 

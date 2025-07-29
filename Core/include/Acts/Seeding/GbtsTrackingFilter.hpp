@@ -12,6 +12,7 @@
 #include "Acts/Seeding/GbtsDataStorage.hpp"  //includes geo which has trigindetsilayer, may move this to trigbase
 #include "Acts/Utilities/Logger.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
+#include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -56,7 +57,7 @@ struct Compare {
 
 class GbtsTrackingFilter {
  public:
-  GbtsTrackingFilter(const std::vector<TrigInDetSiLayer>&, std::vector<GbtsEdge>&);
+  GbtsTrackingFilter(const std::vector<TrigInDetSiLayer>&, std::vector<GbtsEdge>&, SeedFinderGbtsConfig& config);
   ~GbtsTrackingFilter(){};
 
   void followTrack(GbtsEdge*, GbtsEdgeState&);
@@ -79,6 +80,8 @@ class GbtsTrackingFilter {
   GbtsEdgeState m_stateStore[MAX_EDGE_STATE];
 
   int m_globalStateCounter{0};
+
+  SeedFinderGbtsConfig& m_config;
 
 };
 

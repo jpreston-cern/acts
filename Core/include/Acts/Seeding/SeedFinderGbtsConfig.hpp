@@ -26,14 +26,7 @@ struct SeedFinderGbtsConfig {
   std::string ConnectorInputFile{};  // Path to the connector configuration file
                                      // that defines the layer connections
 
- //BuildTheGraph() options
-  double ptCoeff = 0.29997 * 1.9972 / 2.0; // ~0.3*B/2 - assumes nominal field of 2*T
-  float minPt = 400. * Acts::UnitConstants::MeV;
-  bool m_useEtaBinning = true;  // bool to use eta binning from geometry structure
-  bool m_doubletFilterRZ = true;  // bool applies new Z cuts on doublets
-  int m_nMaxEdges = 2000000;     // max number of Gbts edges/doublets
-  float m_minDeltaRadius = 2.0;
-
+ 
  //SeedFinderGbts option
   bool m_LRTmode = false;
   bool m_useML = false; //use cluster width 
@@ -44,7 +37,15 @@ struct SeedFinderGbtsConfig {
   float m_nMaxPhiSlice = 53; // used to calculate phi slices
   float m_minPt = 1000.0;
   float m_phiSliceWidth{}; //derived in CreatSeeds function
- 
+
+    //BuildTheGraph() options
+  double ptCoeff = 0.29997 * 1.9972 / 2.0; // ~0.3*B/2 - assumes nominal field of 2*T
+  float minPt = 400. * Acts::UnitConstants::MeV;
+  bool m_useEtaBinning = true;  // bool to use eta binning from geometry structure
+  bool m_doubletFilterRZ = true;  // bool applies new Z cuts on doublets
+  int m_nMaxEdges = 2000000;     // max number of Gbts edges/doublets
+  float m_minDeltaRadius = 2.0;
+
   
   
    
@@ -56,12 +57,7 @@ struct SeedFinderGbtsConfig {
   bool m_useClusterWidth = false; //defineitly get rid of this one 
   std::vector<TrigInDetSiLayer> m_layerGeometry; //get rid off
 
-  // ROI:
-  bool containsPhi() {
-    return false;
-    // need to implement this function
-    
-  }
+  
 
   ////
   // 2 member functions
