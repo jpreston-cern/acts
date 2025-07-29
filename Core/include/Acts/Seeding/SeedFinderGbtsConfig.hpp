@@ -46,7 +46,23 @@ struct SeedFinderGbtsConfig {
   int m_nMaxEdges = 2000000;     // max number of Gbts edges/doublets
   float m_minDeltaRadius = 2.0;
 
-  
+  //GbtsTrackingFilter
+    //Update()
+  float sigma_t = 0.0003;
+  float sigma_w = 0.00009;
+
+  float sigmaMS = 0.016;
+
+  float sigma_x = 0.25;//was 0.22
+  float sigma_y = 2.5;//was 1.7
+
+  float weight_x = 0.5;
+  float weight_y = 0.5;
+
+  float maxDChi2_x = 60.0;//35.0;
+  float maxDChi2_y = 60.0;//31.0;
+
+  float add_hit = 14.0;
   
    
   

@@ -176,21 +176,6 @@ void GbtsTrackingFilter::propagate(GbtsEdge* pS, GbtsEdgeState& ts) {
 
 bool GbtsTrackingFilter::update(GbtsEdge* pS, GbtsEdgeState& ts) {
 
-  const float sigma_t = 0.0003;
-  const float sigma_w = 0.00009;
-
-  const float sigmaMS = 0.016;
-
-  const float sigma_x = 0.25;//was 0.22
-  const float sigma_y = 2.5;//was 1.7
-
-  const float weight_x = 0.5;
-  const float weight_y = 0.5;
-
-  const float maxDChi2_x = 60.0;//35.0;
-  const float maxDChi2_y = 60.0;//31.0;
-
-  const float add_hit = 14.0;
 
   if(ts.m_Cx[2][2] < 0.0 || ts.m_Cx[1][1] < 0.0 || ts.m_Cx[0][0] < 0.0) {
     std::cout<<"Negative cov_x"<<std::endl;
@@ -202,13 +187,13 @@ bool GbtsTrackingFilter::update(GbtsEdge* pS, GbtsEdgeState& ts) {
 
   //add ms.
 
-  ts.m_Cx[2][2] += sigma_w*sigma_w;
-  ts.m_Cx[1][1] += sigma_t*sigma_t;
+  ts.m_Cx[2][2] += m_config.sigma_w*m_config.sigma_w;
+  ts.m_Cx[1][1] += m_config.sigma_t*m_config.sigma_t;
 
   int type1 = getLayerType(pS->m_n2->layer());
 
   float t2 = type1 == 0 ? 1.0 + ts.m_Y[1]*ts.m_Y[1] : 1.0 + 1.0/(ts.m_Y[1]*ts.m_Y[1]); 
-  float s1 = sigmaMS*t2;
+  float s1 = m_config.sigmaMS*t2;
   float s2 = s1*s1;
 
   s2 *= std::sqrt(t2);
@@ -272,14 +257,14 @@ bool GbtsTrackingFilter::update(GbtsEdge* pS, GbtsEdgeState& ts) {
   int type = getLayerType(pS->m_n1->layer());
 
   if(type == 0) {//barrel TO-DO: split into barrel Pixel and barrel SCT
-    sigma_rz = sigma_y*sigma_y;
+    sigma_rz = m_config.sigma_y*m_config.sigma_y;
   }
   else {
-    sigma_rz = sigma_y*ts.m_Y[1];
+    sigma_rz = m_config.sigma_y*ts.m_Y[1];
     sigma_rz = sigma_rz*sigma_rz;
   }
 
-  float Dx = 1.0/(Cx[0][0] + sigma_x*sigma_x);
+  float Dx = 1.0/(Cx[0][0] + m_config.sigma_x*m_config.sigma_x);
 
   float Dy = 1.0/(Cy[0][0] + sigma_rz);
 
@@ -287,11 +272,11 @@ bool GbtsTrackingFilter::update(GbtsEdge* pS, GbtsEdgeState& ts) {
   float dchi2_y = resid_y*resid_y*Dy;
 
 
-  if(dchi2_x > maxDChi2_x || dchi2_y > maxDChi2_y) {
+  if(dchi2_x > m_config.maxDChi2_x || dchi2_y > m_config.maxDChi2_y) {
     return false;
   }
 
-  ts.m_J += add_hit - dchi2_x*weight_x - dchi2_y*weight_y;
+  ts.m_J += m_config.add_hit - dchi2_x*m_config.weight_x - dchi2_y*m_config.weight_y;
 
   //state update
 
