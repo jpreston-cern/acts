@@ -65,17 +65,8 @@ struct SeedFinderGbtsConfig {
   float add_hit = 14.0;
   
    
-  
-//unsure if i still need these
-  float sigmaScattering = 5;  
-  float highland = 0;
-  float maxScatteringAngle2 = 0;
-  bool m_useClusterWidth = false; //defineitly get rid of this one 
-  std::vector<TrigInDetSiLayer> m_layerGeometry; //get rid off
+    
 
-  
-
-  ////
   // 2 member functions
   SeedFinderGbtsConfig calculateDerivedQuantities() const {
     // thorw statement if the isInternalUnits member is false, ie if dont call
