@@ -32,7 +32,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
  public:
   struct Config {
     
-    //TO DO: need to change python binds so it gives just a string and not a vector 
+     
     // this is used to initiliase the handle that points to the container of spacepoints 
     std::string inputSpacePoints; 
 
@@ -45,8 +45,6 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     Acts::SeedFinderOptions seedFinderOptions;
     // the connection table (parsed from csv file) used to make geoemetry cuts be GBTS
     std::string layerMappingFile;
-
-    std::vector<Acts::GeometryIdentifier> geometrySelection;
 
     //Holds detector information, used to make the geometry objects used by GBTS
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;

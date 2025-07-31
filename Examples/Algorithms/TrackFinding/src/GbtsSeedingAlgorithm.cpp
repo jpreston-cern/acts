@@ -218,7 +218,7 @@ Acts::Experimental::SPContainerComponentsType
       int ACTS_lay_id = indexSourceLink.geometryId().layer(); 
       int ACTS_mod_id = indexSourceLink.geometryId().sensitive();
 
-      // dont want strips or HGTD (NOTE: which ones are which?)
+      // dont want strips or HGTD 
       if (ACTS_vol_id == 2 || ACTS_vol_id == 22 || ACTS_vol_id == 23 ||
           ACTS_vol_id == 24) {
         continue;
@@ -265,7 +265,7 @@ Acts::Experimental::SPContainerComponentsType
       if(m_cfg.seedFinderConfig.BeamSpotCorrection){
 
         //not implemented here as no beamspot corrections available in examples
-        
+        //but is available in athena 
       }else{
         //add spacepoints to new container 
         

@@ -1255,9 +1255,6 @@ def addGbtsSeeding(
         seedFinderConfig=seedFinderConfig,
         seedFinderOptions=seedFinderOptions,
         layerMappingFile=layerMappingFile,
-        geometrySelection=acts.examples.readJsonGeometryList(
-            str(geoSelectionConfigFile)
-        ),
         trackingGeometry=trackingGeometry,
         fill_module_csv=False,
         inputClusters="clusters",

@@ -176,7 +176,7 @@ void addTrackFinding(Context& ctx) {
   ACTS_PYTHON_DECLARE_ALGORITHM(
       ActsExamples::GbtsSeedingAlgorithm, mex, "GbtsSeedingAlgorithm",
       inputSpacePoints, outputSeeds, seedFinderConfig, seedFinderOptions,
-      layerMappingFile, geometrySelection, trackingGeometry, ActsGbtsMap,
+      layerMappingFile, trackingGeometry, ActsGbtsMap,
       fill_module_csv, inputClusters);
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
