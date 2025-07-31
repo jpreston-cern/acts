@@ -34,7 +34,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     
     //TO DO: need to change python binds so it gives just a string and not a vector 
     // this is used to initiliase the handle that points to the container of spacepoints 
-    std::vector<std::string> inputSpacePoints; 
+    std::string inputSpacePoints; 
 
     // this is used to initiliase the handle that points to the container of seeds
     std::string outputSeeds;

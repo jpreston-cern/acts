@@ -1251,7 +1251,7 @@ def addGbtsSeeding(
 
     seedingAlg = acts.examples.GbtsSeedingAlgorithm(
         level=logLevel,
-        inputSpacePoints=[spacePoints],
+        inputSpacePoints= spacePoints,
         outputSeeds="seeds",
         seedFinderConfig=seedFinderConfig,
         seedFinderOptions=seedFinderOptions,

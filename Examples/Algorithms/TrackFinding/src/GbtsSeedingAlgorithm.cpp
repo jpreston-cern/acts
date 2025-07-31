@@ -35,7 +35,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   //std::cout<<"Jasper: constructor start"<<std::endl;
   //initialise the spacepoint, seed and cluster handles 
-  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints.at(0)); //TO DO: change bindings so it only gives a string instead of a vector 
+  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints); //TO DO: change bindings so it only gives a string instead of a vector 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
   m_inputClusters.initialize(m_cfg.inputClusters);
 
