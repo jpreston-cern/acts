@@ -50,7 +50,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
 
     //conversion between ACTS labelling of volume, layer and modules to that used by GBTS
-    std::map<std::pair<int, int>, std::pair<int, int>> ActsGbtsMap;
+    mutable std::map<std::pair<int, int>, std::tuple<int, int, int>> ActsGbtsMap;
 
     bool fill_module_csv = false;
 
@@ -75,13 +75,13 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   // own class functions
   // make the map between ACTS labelling (ID's) and GBTS labelling (ID's)
-  std::map<std::pair<int, int>, std::pair<int, int>> makeActsGbtsMap() const;
+  std::map<std::pair<int, int>, std::tuple<int, int, int>> makeActsGbtsMap() const;
 
   // make the container that holds the spacepoints that have been given 
   // all the veriables needed for GBTS
   Acts::Experimental::SPContainerComponentsType MakeSpContainer(
       const AlgorithmContext &ctx,
-      std::map<std::pair<int, int>, std::pair<int, int>> map) const;
+      std::map<std::pair<int, int>, std::tuple<int, int, int>> map) const;
 
   // makes the geometry objects used by GBTS that correspond to the objects in the connection table
   // for easy these are sometimes called "logical layers"
@@ -101,13 +101,9 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
 
   //collection of geometry objects used by GBTS
   std::vector<Acts::Experimental::TrigInDetSiLayer> m_layerGeometry{};
-  
-  // map of GBTS ID's to the index of the vector holding logical layers
+  //used to assign LayerIds to the GbtsActsMap
   mutable std::map<int, int> m_LayeridMap{};
-  
-  //will get rid of this in final version (useful for debuggin at the moment)
-  mutable std::vector<int> m_GbtsIDs {};
-  
+   
   //handle that points to the container of input spacepoints 
   ReadDataHandle<SimSpacePointContainer> m_inputSpacePoints{this, "InputSpacePoints"};
 

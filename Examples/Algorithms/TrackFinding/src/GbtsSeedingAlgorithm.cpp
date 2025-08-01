@@ -33,7 +33,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
 
-  //std::cout<<"Jasper: constructor start"<<std::endl;
+  
   //initialise the spacepoint, seed and cluster handles 
   m_inputSpacePoints.initialize(m_cfg.inputSpacePoints); //TO DO: change bindings so it only gives a string instead of a vector 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
@@ -45,7 +45,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   // create the TrigInDetSiLayers (Logical Layers),
   //as well as a map that tracks there index in m_layerGeometry
   m_layerGeometry = LayerNumbering();
-  //std::cout<<"Jasper: m_layerGeometry has"<<" "<<m_layerGeometry.size()<<" "<<"elements in it"<<std::endl;
+  
   //parse connection file 
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.ConnectorInputFile.c_str(), std::ifstream::in);
@@ -76,26 +76,26 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   ACTS_DEBUG("Property useML "<< m_cfg.seedFinderConfig.m_useML);
   ACTS_DEBUG("Property pTmin "<<m_cfg.seedFinderConfig.m_minPt);
   ACTS_DEBUG("Property LRTmode "<<m_cfg.seedFinderConfig.m_LRTmode);
-  //std::cout<<"Jasper: constructor end"<<std::endl;
+  
 } 
 
 // execute:
 ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   const AlgorithmContext &ctx) const {
 
-  //std::cout<<"Jasper: execute start"<<std::endl;
+  
   //take spacepoints, add veriables needed for GBTS and add them to new container 
   //due to how spacepoint container works, we need to keep the container and the external coloumns we added alive 
   //this is done by using a tuple of the core container and the two extra coloumns
   auto SpContainerComponents = MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
-  //std::cout<<"Jasper: MAkeSpContainer() completed"<<std::endl;
+  
   //TO DO: HAVE A RINT OUT OF ALL SPACEPOINTS AFTER MAKING
 
   // this is now calling on a core algorithm
-  //std::cout<<"Jasper: finder initialised"<<std::endl;
+ 
   Acts::Experimental::SeedFinderGbts finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
-  //std::cout<<"Jasper: finder completed"<<std::endl;
+  
   //used to reserve size of nodes 2D vector in core
   int max_layers = m_LayeridMap.size();
 
@@ -106,9 +106,9 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
       0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
  
   // create the seeds
-  //std::cout<<"Jasper: create seeds called"<<std::endl;
+  
   Acts::Experimental::SeedContainer2 seeds = finder.CreateSeeds(internalRoi, SpContainerComponents, max_layers);
-  //std::cout<<"Jasper: creat seeds finished"<<std::endl;
+  
   // move seeds to simseedcontainer to be used down stream 
   // currently as simseeds need to be hard types we can only have 3 SP in them, 
   // but in future we should be able to have any length seed
@@ -137,9 +137,9 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   return ActsExamples::ProcessCode::SUCCESS;
 }
 
-std::map<std::pair<int, int>, std::pair<int, int>>
+std::map<std::pair<int, int>, std::tuple<int, int,int>>
 ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
-  std::map<std::pair<int, int>, std::pair<int, int>> ActsGbts;
+  std::map<std::pair<int, int>, std::tuple<int, int, int>> ActsGbts;
 
   //pare the acts to gbts mapping file 
   std::ifstream data(
@@ -165,7 +165,7 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
     int Gbts = stoi(i[5]);
     int eta_mod = stoi(i[6]);
     int ACTS_joint = ACTS_vol * 100 + ACTS_lay;
-    ActsGbts.insert({{ACTS_joint, ACTS_mod}, {Gbts, eta_mod}});
+    ActsGbts.insert({{ACTS_joint, ACTS_mod}, {Gbts, eta_mod, 0}});
   }
 
   return ActsGbts;
@@ -174,7 +174,7 @@ ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
 Acts::Experimental::SPContainerComponentsType 
   ActsExamples::GbtsSeedingAlgorithm::MakeSpContainer(
     const AlgorithmContext &ctx,
-    std::map<std::pair<int, int>, std::pair<int, int>> map) const {
+    std::map<std::pair<int, int>, std::tuple<int, int, int>> map) const {
 
   //new seeding container test
   //initialise input spacepoints from handle and define new container 
@@ -197,7 +197,7 @@ Acts::Experimental::SPContainerComponentsType
  
       
     // for loop filling space
-    int counter = 0;
+    
     for (const auto &spacePoint : spacePoints) {
       // Gbts space point vector
       // loop over space points, call on map
@@ -247,8 +247,7 @@ Acts::Experimental::SPContainerComponentsType
 
       // now should be pixel with Gbts ID:
       int Gbts_id =
-          Find->second
-              .first;  // new map the item is a pair so want first from it
+          std::get<0>(Find->second);  // new map the item is a pair so want first from it
 
       if (Gbts_id == 0) {
         ACTS_WARNING("No assigned Gbts ID for key for volume id: "
@@ -256,8 +255,6 @@ Acts::Experimental::SPContainerComponentsType
       }
 
       // access IDs from map
-      int eta_mod = Find->second.second;
-      int combined_id = Gbts_id * 1000 + eta_mod;
       
       auto newSp = coreSpacePoints.createSpacePoint();
       
@@ -278,11 +275,9 @@ Acts::Experimental::SPContainerComponentsType
       }
       newSp.r() = spacePoint.r();
       newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
-      newSp.extra(LayerColoumn) = m_LayeridMap.at(combined_id);
+      newSp.extra(LayerColoumn) = std::get<2>(Find->second);
       newSp.extra(ClusterWidthColoumn) = 0; // false input as this is not available in examples
       
-      counter++;
-      //std::cout<<"Jasper: spacepoint converted to new container :"<<counter<<std::endl;
     }
     
     
@@ -293,9 +288,9 @@ Acts::Experimental::SPContainerComponentsType
 
 std::vector<Acts::Experimental::TrigInDetSiLayer>
 ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
-  std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector;
-  std::vector<std::size_t> count_vector;
-
+  std::vector<Acts::Experimental::TrigInDetSiLayer> input_vector{};
+  std::vector<std::size_t> count_vector{};
+  
   m_cfg.trackingGeometry->visitSurfaces([this, &input_vector, &count_vector](
                                             const Acts::Surface *surface) {
     Acts::GeometryIdentifier geoid = surface->geometryId();
@@ -332,18 +327,18 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
                        0);  // here the key needs to be pair of(vol*100+lay, 0)
     auto Find = m_cfg.ActsGbtsMap.find(key);
     int Gbts_id = 0;               // initialise first to avoid FLTUND later
-    Gbts_id = Find->second.first;  // new map, item is pair want first
+    Gbts_id = std::get<0>(Find->second);  // new map, item is pair want first
     if (Find ==
         m_cfg.ActsGbtsMap
             .end()) {  // if end then make new key of (vol*100+lay, modid)
       key = std::make_pair(ACTS_joint_id, mod_id);  // mod ID
       Find = m_cfg.ActsGbtsMap.find(key);
-      Gbts_id = Find->second.first;
+      Gbts_id = std::get<0>(Find->second);
     }
 
     short barrel_ec = 0;  // a variable that says if barrrel, 0 = barrel
-    int eta_mod = Find->second.second;
-
+    int eta_mod = std::get<1>(Find->second);
+    
     // assign barrel_ec depending on Gbts_layer
     if (79 < Gbts_id && Gbts_id < 85) {  // 80s, barrel
       barrel_ec = 0;
@@ -399,11 +394,23 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
           1);  // so the element exists and not divinding by 0
 
       //tracking the index of each TrigInDetSiLayer as there added to the vector
-      int LayerID = count_vector.size() - 1;//so layer ID referres to actual index and not size of vector 
+      int LayerID = count_vector.size() - 1;//so layer ID referres to actual index and not size of vector
+      std::get<2>(Find->second) = LayerID; 
       m_LayeridMap.insert({combined_id, LayerID}); 
-      m_GbtsIDs.push_back(combined_id);
+      
+      
     }
+    //look up for every combined ID to see if it has a layer 
+    auto FindLayer = m_LayeridMap.find(combined_id);
+    if(FindLayer == m_LayeridMap.end()){
+      
+      ACTS_WARNING("No assigned Layer ID for combined ID: "<<combined_id);
+    }else{
 
+      std::get<2>(Find->second) = FindLayer->second;
+    }
+    
+    
     if (m_cfg.fill_module_csv) {
       std::fstream fout;
       fout.open("ACTS_modules.csv",
@@ -419,15 +426,10 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
            << sqrt(center(0) * center(0) + center(1) * center(1))  // r
            << "\n";
     }
-  });
-  /*
-  for (std::size_t i = 0; i < m_LayeridMap.size(); i++){ //check to see if layer ID map is filled 
 
-    int Gbts_id_new = m_GbtsIDs[i];
-    std::cout<<"Jasper: layer is :"
-             <<" "<<m_LayeridMap.at(Gbts_id_new)<<" "<<"with Gbts ID: "<<" "<<Gbts_id_new
-             <<std::endl;          
-  }*/
+    
+  });
+ 
   
   for (std::size_t i = 0; i < input_vector.size(); i++) {
     input_vector[i].m_refCoord = input_vector[i].m_refCoord / count_vector[i];
