@@ -9,10 +9,8 @@
 #include "Acts/Surfaces/ConvexPolygonBounds.hpp"
 
 #include "Acts/Definitions/Algebra.hpp"
-#include "Acts/Surfaces/BoundaryTolerance.hpp"
-#include "Acts/Surfaces/detail/BoundaryCheckHelper.hpp"
+#include "Acts/Surfaces/detail/VerticesHelper.hpp"
 
-#include <optional>
 #include <ostream>
 
 namespace Acts {
@@ -40,17 +38,36 @@ std::vector<double> ConvexPolygonBoundsBase::values() const {
   return values;
 }
 
+void ConvexPolygonBoundsBase::calculateCenter(
+    std::span<const Vector2> vertices) {
+  Vector2 sum = Vector2::Zero();
+  for (const auto& vertex : vertices) {
+    sum += vertex;
+  }
+  m_center = sum / static_cast<double>(vertices.size());
+}
+
+Vector2 ConvexPolygonBoundsBase::center() const {
+  return m_center;
+}
+
 ConvexPolygonBounds<PolygonDynamic>::ConvexPolygonBounds(
     const std::vector<Vector2>& vertices)
     : m_vertices(vertices.begin(), vertices.end()),
-      m_boundingBox(makeBoundingBox(vertices)) {}
+      m_boundingBox(makeBoundingBox(vertices)) {
+  calculateCenter(vertices);
+}
 
 bool ConvexPolygonBounds<PolygonDynamic>::inside(
-    const Vector2& lposition,
-    const BoundaryTolerance& boundaryTolerance) const {
-  return detail::insidePolygon(
-      std::span<const Vector2>(m_vertices.data(), m_vertices.size()),
-      boundaryTolerance, lposition, std::nullopt);
+    const Vector2& lposition) const {
+  return detail::VerticesHelper::isInsidePolygon(lposition, m_vertices);
+}
+
+Vector2 ConvexPolygonBounds<PolygonDynamic>::closestPoint(
+    const Vector2& lposition, const SquareMatrix2& metric) const {
+  return detail::VerticesHelper::computeClosestPointOnPolygon(
+      lposition, std::span<const Vector2>(m_vertices.data(), m_vertices.size()),
+      metric);
 }
 
 std::vector<Vector2> ConvexPolygonBounds<PolygonDynamic>::vertices(

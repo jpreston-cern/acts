@@ -1,5 +1,5 @@
-add_library(
-    ActsExamplesDigitization
+acts_add_library(
+    ExamplesDigitization
     SHARED
     src/DigitizationAlgorithm.cpp
     src/DigitizationConfig.cpp
@@ -12,14 +12,6 @@ target_include_directories(
     ActsExamplesDigitization
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
-target_link_libraries(
-    ActsExamplesDigitization
-    PUBLIC ActsCore ActsExamplesFramework
-)
+target_link_libraries(ActsExamplesDigitization PUBLIC Acts::ExamplesFramework)
 
-acts_compile_headers(ActsExamplesDigitization GLOB "include/**/*.hpp")
-
-install(
-    TARGETS ActsExamplesDigitization
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
+acts_compile_headers(ExamplesDigitization GLOB "include/**/*.hpp")

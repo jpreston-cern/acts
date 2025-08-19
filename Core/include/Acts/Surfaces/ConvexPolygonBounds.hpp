@@ -9,7 +9,6 @@
 #pragma once
 
 #include "Acts/Definitions/Algebra.hpp"
-#include "Acts/Surfaces/BoundaryTolerance.hpp"
 #include "Acts/Surfaces/PlanarBounds.hpp"
 #include "Acts/Surfaces/RectangleBounds.hpp"
 #include "Acts/Surfaces/SurfaceBounds.hpp"
@@ -17,6 +16,7 @@
 #include <array>
 #include <cstddef>
 #include <iosfwd>
+#include <span>
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
@@ -34,10 +34,18 @@ class ConvexPolygonBoundsBase : public PlanarBounds {
   /// @param sl is the ostream to be written into
   std::ostream& toStream(std::ostream& sl) const final;
 
+  /// Return the bounds type of this bounds object.
+  /// @return The bounds type
+  BoundsType type() const final { return eConvexPolygon; }
+
   /// Return the bound values as dynamically sized vector
-  ///
   /// @return this returns a copy of the internal values
   std::vector<double> values() const final;
+
+  /// @copydoc SurfaceBounds::center
+  /// @note For ConvexPolygonBounds: returns average of all vertices (vertex
+  ///       centroid)
+  Vector2 center() const final;
 
  protected:
   /// Return a rectangle bounds instance that encloses a set of vertices.
@@ -54,6 +62,12 @@ class ConvexPolygonBoundsBase : public PlanarBounds {
   template <typename coll_t>
     requires std::same_as<typename coll_t::value_type, Acts::Vector2>
   static void convex_impl(const coll_t& vertices) noexcept(false);
+
+  void calculateCenter(std::span<const Vector2> vertices);
+
+ private:
+  /// Cached center position
+  Vector2 m_center;
 };
 
 /// This is the actual implementation of the bounds.
@@ -96,15 +110,14 @@ class ConvexPolygonBounds : public ConvexPolygonBoundsBase {
   /// @param values The values to build up the vertices
   explicit ConvexPolygonBounds(const value_array& values) noexcept(false);
 
-  BoundsType type() const final { return SurfaceBounds::eConvexPolygon; }
+  /// @copydoc SurfaceBounds::inside
+  bool inside(const Vector2& lposition) const final;
 
-  /// Return whether a local 2D point lies inside of the bounds defined by this
-  /// object.
-  /// @param lposition The local position to check
-  /// @param boundaryTolerance The `BoundaryTolerance` object handling tolerances.
-  /// @return Whether the points is inside
-  bool inside(const Vector2& lposition,
-              const BoundaryTolerance& boundaryTolerance) const final;
+  /// @copydoc SurfaceBounds::closestPoint
+  Vector2 closestPoint(const Vector2& lposition,
+                       const SquareMatrix2& metric) const final;
+
+  using SurfaceBounds::inside;
 
   /// Return the vertices
   ///
@@ -145,17 +158,14 @@ class ConvexPolygonBounds<PolygonDynamic> : public ConvexPolygonBoundsBase {
   /// @param vertices The list of vertices.
   explicit ConvexPolygonBounds(const std::vector<Vector2>& vertices);
 
-  /// Return the bounds type of this bounds object.
-  /// @return The bounds type
-  BoundsType type() const final { return SurfaceBounds::eConvexPolygon; }
+  /// @copydoc SurfaceBounds::inside
+  bool inside(const Vector2& lposition) const final;
 
-  /// Return whether a local 2D point lies inside of the bounds defined by this
-  /// object.
-  /// @param lposition The local position to check
-  /// @param boundaryTolerance The `BoundaryTolerance` object handling tolerances.
-  /// @return Whether the points is inside
-  bool inside(const Vector2& lposition,
-              const BoundaryTolerance& boundaryTolerance) const final;
+  /// @copydoc SurfaceBounds::closestPoint
+  Vector2 closestPoint(const Vector2& lposition,
+                       const SquareMatrix2& metric) const final;
+
+  using SurfaceBounds::inside;
 
   /// Return the vertices
   ///
