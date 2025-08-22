@@ -150,7 +150,8 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 		
 			
 			
-		SeedContainer.createSeed(Sp_Indexes);
+		auto seed = SeedContainer.createSeed();
+		seed.assignSpacePointIndices(Sp_Indexes);
     }
 	//std::cout<<"Jasper: returning seed container"<<std::endl;
     ACTS_DEBUG("GBTS created "<<SeedContainer.size()<<" seeds");

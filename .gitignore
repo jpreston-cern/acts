@@ -43,9 +43,18 @@ codegen/src/codegen.egg-info/
 
 #files to ignore 
 acts-itk/
-log_log.log
 compile.log
-run_script.sh
-runtime.log
+fakeRatio_vs_eta_overlay.pdf
 heap_memory.log
 heap_profile.massif
+overlay_eff_eta
+overlay_eff_eta_crosses_caps
+overlay_eff_eta_crosses_caps.cxx
+overlay_eff_pT_crosses_caps
+overlay_eff_pT_crosses_caps.cxx
+overlay_fake_eta_crosses_caps
+overlay_fake_eta_crosses_caps.cxx
+run_script.sh
+runtime.log
+trackeff_vs_eta_overlay.pdf
+trackeff_vs_pT_overlay.pdf
