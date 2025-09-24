@@ -1285,7 +1285,7 @@ def addGbtsSeeding(
     logLevel = acts.examples.defaultLogging(sequence, logLevel)()
     layerMappingFile = str(layerMappingConfigFile)  # turn path into string
     ConnectorInputFileStr = str(ConnectorInputConfigFile)
-    seedFinderConfig = acts.SeedFinderGbtsConfig(
+    seedFinderConfig = acts.examples.SeedFinderGbtsConfig(
         **acts.examples.defaultKWArgs(
             sigmaScattering=seedFinderConfigArg.sigmaScattering,
             minPt=seedFinderConfigArg.minPt,
