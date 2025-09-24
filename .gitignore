@@ -40,3 +40,21 @@ codegen/src/codegen.egg-info/
 !.clang-tidy
 !.oclint
 !.devcontainer
+
+#my files 
+acts-itk/
+compile.log
+fakeRatio_vs_eta_overlay.pdf
+heap_memory.log
+heap_profile.massif
+overlay_eff_eta
+overlay_eff_eta_crosses_caps
+overlay_eff_eta_crosses_caps.cxx
+overlay_eff_pT_crosses_caps
+overlay_eff_pT_crosses_caps.cxx
+overlay_fake_eta_crosses_caps
+overlay_fake_eta_crosses_caps.cxx
+run_script.sh
+runtime.log
+trackeff_vs_eta_overlay.pdf
+trackeff_vs_pT_overlay.pdf
