@@ -36,7 +36,9 @@ class SeedFinderGbts{
   SeedFinderGbts( const SeedFinderGbtsConfig config,
                    const GbtsGeometry* gbtsGeo,
 	                 const std::vector<TrigInDetSiLayer>* layerGeometry,
-                   std::unique_ptr<const Acts::Logger> logger);
+                    std::unique_ptr<const Acts::Logger> logger =
+                     Acts::getDefaultLogger("Finder",
+                                            Acts::Logging::Level::INFO));
 
   typedef GbtsNode GNN_Node;
   typedef GbtsDataStorage GNN_DataStorage;
