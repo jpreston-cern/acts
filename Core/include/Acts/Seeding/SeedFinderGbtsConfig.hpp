@@ -40,7 +40,6 @@ struct SeedFinderGbtsConfig {
 
     //BuildTheGraph() options
   double ptCoeff = 0.29997 * 1.9972 / 2.0; // ~0.3*B/2 - assumes nominal field of 2*T
-  float minPt = 400. * Acts::UnitConstants::MeV;
   bool m_useEtaBinning = true;  // bool to use eta binning from geometry structure
   bool m_doubletFilterRZ = true;  // bool applies new Z cuts on doublets
   int m_nMaxEdges = 2000000;     // max number of Gbts edges/doublets
