@@ -32,10 +32,10 @@ struct SeedFinderGbtsConfig {
   bool m_useML = false; //use cluster width 
   bool m_matchBeforeCreate = false;
   bool m_useOldTunings = false;
-  bool m_tau_ratio_cut = 0.007;
+  float m_tau_ratio_cut = 0.007;
   float m_etaBinOverride = 0.0f; //specify non-zero to override eta bin width from connection file (default 0.2 in createLinkingScheme.py)
   float m_nMaxPhiSlice = 53; // used to calculate phi slices
-  float m_minPt = 1000.0;
+  float m_minPt = 1. * Acts::UnitConstants::GeV;
   float m_phiSliceWidth{}; //derived in CreatSeeds function
 
     //BuildTheGraph() options

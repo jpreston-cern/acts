@@ -86,7 +86,9 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   // makes the geometry objects used by GBTS that correspond to the objects in the connection table
   // for easy these are sometimes called "logical layers"
   std::vector<Acts::Experimental::TrigInDetSiLayer> LayerNumbering() const;
-
+  
+  void printSeedFinderGbtsConfig(const Acts::Experimental::SeedFinderGbtsConfig& cfg);
+  
   private:
   
   Config m_cfg{};
