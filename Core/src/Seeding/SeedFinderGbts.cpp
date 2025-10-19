@@ -54,7 +54,7 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
       if(is_pixel){ //placeholder for now until strip hits are added in
 		
 		nPixelLoaded += m_storage->loadPixelGraphNodes(l, nodes, m_config.m_useML);
-		
+		//std::cout<<"Jasper: "<<nodes.size()<<""<<"loaded at layer "<<l<<std::endl;
 	  }else{
 		nStripLoaded += m_storage->loadStripGraphNodes(l, nodes);
 	  }
@@ -75,7 +75,7 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
     std::pair<int, int> graphStats = buildTheGraph(roi, m_storage, edgeStorage);
 
     ACTS_DEBUG("Created graph with "<<graphStats.first<<" edges and "<<graphStats.second<< " edge links");
-
+	std::cout<<"Created graph with "<<graphStats.first<<" edges and "<<graphStats.second<< " edge links"<<std::endl;
 	int maxLevel = runCCA(graphStats.first, edgeStorage);
 
     ACTS_DEBUG("Reached Level "<<maxLevel<<" after GNN iterations");
@@ -176,7 +176,7 @@ std::vector<std::vector<SeedFinderGbts::GNN_Node>>
 			//for every sp in container,
 			//add its variables to node_storage organised by layer 
 			int layer = sp.extra(std::get<1>(container));
-			//std::cout<<"Jasper: layer id fo spacepoint is"<<" "<<layer<<std::endl;
+			//std::cout<<"Jasper core: layer id fo spacepoint is"<<" "<<layer<<std::endl;
 			//add node to storage 
 			SeedFinderGbts::GNN_Node& node = node_storage[layer].emplace_back(layer); 
 			
@@ -243,7 +243,7 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
   edgeStorage.reserve(m_config.m_nMaxEdges);
   
   int nEdges = 0;
-
+  std::cout<<"Jasper: number of bin groups is : "<<m_geo->bin_groups().size()<<std::endl;
   for(const auto& bg : m_geo->bin_groups()) {//loop over bin groups
     
     GbtsEtaBin& B1 = storage->getEtaBin(bg.first);
