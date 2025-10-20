@@ -249,7 +249,7 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
     GbtsEtaBin& B1 = storage->getEtaBin(bg.first);
 
     if(B1.empty()) continue;
-
+	//std::cout<<"Jasper: B1 not empty"<<std::endl;
     float rb1 = B1.getMinBinRadius();
  
     for(const auto& b2_idx : bg.second) {
@@ -257,7 +257,7 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
       const GbtsEtaBin& B2 = storage->getEtaBin(b2_idx);
 
       if(B2.empty()) continue;
-      
+      //std::cout<<"Jasper: B2 not empty"<<std::endl;
       float rb2 = B2.getMaxBinRadius();
     
       if(m_config.m_useEtaBinning) {
@@ -283,7 +283,7 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
 	std::vector<unsigned int>& v1In = B1.m_in[n1Idx];   
 
 	if(v1In.size() >= MAX_SEG_PER_NODE) continue;
-      
+      //std::cout<<"Jasper: passed max_seg_PerNode"<<std::endl;
 	const std::array<float, 5>& n1pars = B1.m_params[n1Idx];
 
 	float phi1 = n1pars[2];
@@ -409,13 +409,13 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
 	      GbtsEdge* pS = &(edgeStorage.at(inEdgeIdx));
 	      
 	      if(pS->m_nNei >= N_SEG_CONNS) continue;
-	    
+			//std::cout<<"Jasper: pass mac seg cons"<<std::endl;
 	      float tau_ratio = pS->m_p[0]*uat_2 - 1.0f;
 	      
 	      if(std::abs(tau_ratio) > cut_tau_ratio_max){//bad match
 		continue;
 	      }
-	      
+	      //std::cout<<"Jasper: pass tau ratio cut"<<std::endl;
 	      float dPhi =  Phi2 - pS->m_p[2];
 	      
 	      if(dPhi<-M_PI) dPhi += 2*std::numbers::pi;
@@ -424,13 +424,13 @@ std::pair<int, int> SeedFinderGbts::buildTheGraph(const RoiDescriptor& roi, cons
 	      if(dPhi < -cut_dphi_max || dPhi > cut_dphi_max) {
 		continue;
 	      }
-            
+		  //std::cout<<"Jasper: dphi max cut passed"<<std::endl;
 	      float dcurv = curv2 - pS->m_p[1];
             
 	      if(dcurv < -cut_dcurv_max || dcurv > cut_dcurv_max) {
 		continue;
 	      }
-            
+		  	//std::cout<<"Jasper: dcurv max cut passed"<<std::endl;
 	      pS->m_vNei[pS->m_nNei++] = outEdgeIdx;
 	    
 	      nConnections++;
