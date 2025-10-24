@@ -121,19 +121,24 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   seedContainerForStorage.reserve(seeds.size());
   for (const auto& seed : seeds) {
     auto sps = seed.spacePointIndices();
-    seedContainerForStorage.emplace_back(*std::get<0>(SpContainerComponents).at(sps[0])
+    unsigned int indices = sps.size()-1;
+    size_t mid = static_cast<size_t>(std::round(indices / 2.0));
+    seedContainerForStorage.emplace_back(*std::get<0>(SpContainerComponents).at(sps[0])//first spacepoint
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>(),
-                                         *std::get<0>(SpContainerComponents).at(sps[1])
+                                         *std::get<0>(SpContainerComponents).at(sps[mid]) //middle spacepoint
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>(),
-                                         *std::get<0>(SpContainerComponents).at(sps[2])
+                                         *std::get<0>(SpContainerComponents).at(sps[indices]) //last spacepoint
                                               .sourceLinks()[0]
                                               .get<const SimSpacePoint*>());
 
     //not sure if these have set values in GBTSv2 but are currently set to the defaults 
     seedContainerForStorage.back().setVertexZ(seed.vertexZ()); 
     seedContainerForStorage.back().setQuality(seed.quality());
+    std::cout<<"Jasper: size of seed is "<<seed.size()<<std::endl;
+    std::cout<<"Jasper: indices size is "<<indices<<std::endl;
+    std::cout<<"Jasper: spacepoint indexes are "<<0<<" "<<mid <<" "<<indices<<std::endl;
   }
 
   

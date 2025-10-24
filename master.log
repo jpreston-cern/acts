@@ -1,0 +1,77 @@
+nohup: ignoring input
+Sourcing environment...
+CMake configuring...
+-- Using compiler flags: -Wall -Wextra -Wpedantic -Wshadow -Wzero-as-null-pointer-constant -Wold-style-cast 
+-- Checking C++20 std::format support
+-- Checking C++20 std::format support - ok
+-- Building nlohmann_json as part of the ACTS project
+-- Using the single-header code from /home/ppd/jasper/QT/acts/build/_deps/nlohmann_json-src/single_include/
+-- Building pybind11 as part of the ACTS project
+-- pybind11 v2.13.1 
+-- Enable component 'Core' in 'Core'
+-- Configuring codegen: preparing uv
+-- Found uv: /home/ppd/jasper/QT/acts/build/uv/uv-x86_64-unknown-linux-musl/uv
+-- uv version: uv 0.7.19
+-- Ignore component 'PluginActSVG' in 'Plugins/ActSVG'
+-- Ignore component 'PluginFastJet' in 'Plugins/FastJet'
+-- Enable component 'PluginFpeMonitoring' in 'Plugins/FpeMonitoring'
+-- Does backtrace work with the default include
+-- Does backtrace work with the default include - no
+-- Could not find backtrace header file
+-- Does backtrace work without linker flag
+-- Does backtrace work without linker flag - no
+-- Does backtrace work with linker flag
+-- Does backtrace work with linker flag - no
+-- Unable to set up stacktrace setup: use noop
+-- Ignore component 'PluginGeant4' in 'Plugins/Geant4'
+-- Ignore component 'PluginGeoModel' in 'Plugins/GeoModel'
+-- Enable component 'PluginJson' in 'Plugins/Json'
+-- Ignore component 'PluginOnnx' in 'Plugins/Onnx'
+-- Ignore component 'PluginGnn' in 'Plugins/Gnn'
+-- Ignore component 'PluginDetray' in 'Plugins/Detray'
+-- Ignore component 'PluginCovfie' in 'Plugins/Covfie'
+-- Ignore component 'PluginHashing' in 'Plugins/Hashing'
+-- Enable component 'PluginRoot' in 'Plugins/Root'
+-- Ignore component 'PluginDD4hep' in 'Plugins/DD4hep'
+-- Ignore component 'PluginPodio' in 'Plugins/Podio'
+-- Ignore component 'PluginEDM4hep' in 'Plugins/EDM4hep'
+-- Enable component 'Fatras' in 'Fatras'
+-- Ignore component 'FatrasGeant4' in 'Fatras/Geant4'
+-- Ignore component 'Alignment' in 'Alignment'
+-- Enable subdirectory 'Python'
+-- Enable subdirectory 'Examples'
+-- Ignore subdirectory 'Examples/Algorithms/Geant4'
+-- Enable subdirectory 'Examples/Algorithms/GeneratorsPythia8'
+-- Ignore subdirectory 'Examples/Algorithms/Traccc'
+-- Ignore subdirectory 'Examples/Algorithms/TrackFindingGnn'
+-- Ignore subdirectory 'Examples/Algorithms/TrackFindingML'
+-- Ignore subdirectory 'Examples/Algorithms/Jets'
+-- Ignore subdirectory 'Examples/Algorithms/Alignment'
+-- Ignore subdirectory 'Examples/Detectors/DD4hepDetector'
+-- Ignore subdirectory 'Examples/Detectors/Geant4Detector'
+-- Ignore subdirectory 'Examples/Detectors/GeoModelDetector'
+-- Ignore subdirectory 'Examples/Framework/ML'
+-- Ignore subdirectory 'Examples/Io/EDM4hep'
+-- Examples HepMC3 IO: checking for zlib
+-- Examples HepMC3 IO: checking for zlib - found
+-- Examples HepMC3 IO: checking for lzma
+-- Examples HepMC3 IO: checking for lzma - found
+-- Examples HepMC3 IO: checking for bzip2
+-- Examples HepMC3 IO: checking for bzip2 - found
+-- Examples HepMC3 IO: checking for zstd
+-- Examples HepMC3 IO: checking for zstd - found
+-- Examples HepMC3 IO: checking for ROOT IO
+-- Examples HepMC3 IO: checking for ROOT IO - found
+-- Enable subdirectory 'Examples/Io/Root'
+-- Ignore subdirectory 'Examples/Io/Svg'
+-- Ignore subdirectory 'Examples/Io/Podio'
+-- Enable subdirectory 'Examples/Python'
+-- Ignore subdirectory 'Examples/Scripts'
+-- Ignore subdirectory 'docs'
+-- Configuring done (5.9s)
+-- Generating done (6.9s)
+-- Build files have been written to: /home/ppd/jasper/QT/acts/build
+Building files...
+Sourcing python bindings...
+INFO:    Acts Python 3.11 bindings setup complete.
+Running Gbtsv2 seeding...

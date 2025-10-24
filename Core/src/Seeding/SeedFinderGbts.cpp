@@ -137,17 +137,18 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 	
        //std::cout<<"jasper: number of elemts in vN is: "<<vN.size()<<std::endl;
 		//add to seed container:
-		std::array<SpacePointIndex2, 3> Sp_Indexes{};
+		std::vector<SpacePointIndex2> Sp_Indexes{};
+		Sp_Indexes.reserve(vN.size());
 		//std::cout<<"Jasper: loop check"<<std::endl;
 		
 		
 
-		for(std::size_t i = 0; i<3; i++){
+		for(std::size_t i = 0; i<vN.size(); i++){
 		//std::cout<<"Jasper: within loop on line 143"<<std::endl;
-			Sp_Indexes[i] = vN.at(i)->sp_idx();
+			Sp_Indexes.emplace_back(vN.at(i)->sp_idx());
 				
 		}
-		
+		//std::cout<<"Jasper: the final SP index count is :"<<Sp_Indexes.size()<<std::endl;
 			
 			
 		auto seed = SeedContainer.createSeed();
