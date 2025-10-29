@@ -28,7 +28,7 @@
 #include <stdexcept>
 #include <vector>
 
-// constructor: contains set up that happens once per run 
+ 
 ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
@@ -73,13 +73,8 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   // initiliase the object that holds all the geometry information needed for the algorithm
   m_gbtsGeo = std::make_unique<Acts::Experimental::GbtsGeometry>(m_layerGeometry, m_connector); 
 
-  ACTS_DEBUG("Property useML "<< m_cfg.seedFinderConfig.m_useML);
-  ACTS_DEBUG("Property pTmin "<<m_cfg.seedFinderConfig.m_minPt);
-  ACTS_DEBUG("Property LRTmode "<<m_cfg.seedFinderConfig.m_LRTmode);
+  //manually convert min Pt as no conversion available in ACTS Examples (currently inputs as 0.9 GeV but need 900 MeV)
   m_cfg.seedFinderConfig.m_minPt = m_cfg.seedFinderConfig.m_minPt*1000;
-  std::cout<<"Jasper: the Pt is set to: "<<m_cfg.seedFinderConfig.m_minPt<<std::endl;
-  
-  std::cout<<"Jasper: the tau ratio is set to: "<<m_cfg.seedFinderConfig.m_tau_ratio_cut<<std::endl;
   printSeedFinderGbtsConfig(m_cfg.seedFinderConfig);
 } 
 
@@ -94,10 +89,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   //this is done by using a tuple of the core container and the two extra coloumns
   auto SpContainerComponents = MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
   
-  //TO DO: HAVE A RINT OUT OF ALL SPACEPOINTS AFTER MAKING
-
   // this is now calling on a core algorithm
- 
   Acts::Experimental::SeedFinderGbts finder(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
                                             logger().cloneWithSuffix("GbtdFinder"));
   
@@ -115,7 +107,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   Acts::Experimental::SeedContainer2 seeds = finder.CreateSeeds(internalRoi, SpContainerComponents, max_layers);
   
   // move seeds to simseedcontainer to be used down stream 
-  // currently as simseeds need to be hard types we can only have 3 SP in them, 
+  // currently as simseeds need to be hard types so only 3 spacepoint can be added
   // but in future we should be able to have any length seed
   SimSeedContainer seedContainerForStorage;
   seedContainerForStorage.reserve(seeds.size());
@@ -136,9 +128,6 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
     //not sure if these have set values in GBTSv2 but are currently set to the defaults 
     seedContainerForStorage.back().setVertexZ(seed.vertexZ()); 
     seedContainerForStorage.back().setQuality(seed.quality());
-    std::cout<<"Jasper: size of seed is "<<seed.size()<<std::endl;
-    std::cout<<"Jasper: indices size is "<<indices<<std::endl;
-    std::cout<<"Jasper: spacepoint indexes are "<<0<<" "<<mid <<" "<<indices<<std::endl;
   }
 
   
@@ -151,7 +140,7 @@ std::map<std::pair<int, int>, std::tuple<int, int,int>>
 ActsExamples::GbtsSeedingAlgorithm::makeActsGbtsMap() const {
   std::map<std::pair<int, int>, std::tuple<int, int, int>> ActsGbts;
 
-  //pare the acts to gbts mapping file 
+  //prepare the acts to gbts mapping file 
   std::ifstream data(
       m_cfg.layerMappingFile);  // 0 in this file refers to no Gbts ID
   std::string line;
@@ -268,21 +257,11 @@ Acts::Experimental::SPContainerComponentsType
       
       auto newSp = coreSpacePoints.createSpacePoint();
       
-      //apply beamspot corrections if needed
-      if(m_cfg.seedFinderConfig.BeamSpotCorrection){
-
-        //not implemented here as no beamspot corrections available in examples
-        //but is available in athena 
-      }else{
-        //add spacepoints to new container 
-        
-        newSp.assignSourceLinks(
-          std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)});
-        newSp.x() = spacePoint.x();
-        newSp.y() = spacePoint.y();
-        newSp.z() = spacePoint.z();
-        
-      }
+      newSp.assignSourceLinks(
+        std::array<Acts::SourceLink, 1>{Acts::SourceLink(&spacePoint)});
+      newSp.x() = spacePoint.x();
+      newSp.y() = spacePoint.y();
+      newSp.z() = spacePoint.z();
       newSp.r() = spacePoint.r();
       newSp.phi() = std::atan2(spacePoint.y(), spacePoint.x());
       newSp.extra(LayerColoumn) = std::get<2>(Find->second);
@@ -453,36 +432,36 @@ ActsExamples::GbtsSeedingAlgorithm::LayerNumbering() const {
 
 
 void ActsExamples::GbtsSeedingAlgorithm::printSeedFinderGbtsConfig(const Acts::Experimental::SeedFinderGbtsConfig& cfg) {
-  std::cout << "===== SeedFinderGbtsConfig =====" << std::endl;
+  ACTS_DEBUG( "===== SeedFinderGbtsConfig =====");
 
-  std::cout << "BeamSpotCorrection: " << cfg.BeamSpotCorrection << " (default: false)" << std::endl;
-  std::cout << "ConnectorInputFile: " << cfg.ConnectorInputFile << " (default: empty string)" << std::endl;
-  std::cout << "m_LRTmode: " << cfg.m_LRTmode << " (default: false)" << std::endl;
-  std::cout << "m_useML: " << cfg.m_useML << " (default: false)" << std::endl;
-  std::cout << "m_matchBeforeCreate: " << cfg.m_matchBeforeCreate << " (default: false)" << std::endl;
-  std::cout << "m_useOldTunings: " << cfg.m_useOldTunings << " (default: false)" << std::endl;
-  std::cout << "m_tau_ratio_cut: " << cfg.m_tau_ratio_cut << " (default: 0.007)" << std::endl;
-  std::cout << "m_etaBinOverride: " << cfg.m_etaBinOverride << " (default: 0.0)" << std::endl;
-  std::cout << "m_nMaxPhiSlice: " << cfg.m_nMaxPhiSlice << " (default: 53)" << std::endl;
-  std::cout << "m_minPt: " << cfg.m_minPt << " (default: 1.0 * Acts::UnitConstants::GeV)" << std::endl;
-  std::cout << "m_phiSliceWidth: " << cfg.m_phiSliceWidth << " (default: derived)" << std::endl;
-  std::cout << "ptCoeff: " << cfg.ptCoeff << " (default: 0.29997 * 1.9972 / 2.0)" << std::endl;
-  std::cout << "m_useEtaBinning: " << cfg.m_useEtaBinning << " (default: true)" << std::endl;
-  std::cout << "m_doubletFilterRZ: " << cfg.m_doubletFilterRZ << " (default: true)" << std::endl;
-  std::cout << "m_nMaxEdges: " << cfg.m_nMaxEdges << " (default: 2000000)" << std::endl;
-  std::cout << "m_minDeltaRadius: " << cfg.m_minDeltaRadius << " (default: 2.0)" << std::endl;
-  std::cout << "sigma_t: " << cfg.sigma_t << " (default: 0.0003)" << std::endl;
-  std::cout << "sigma_w: " << cfg.sigma_w << " (default: 0.00009)" << std::endl;
-  std::cout << "sigmaMS: " << cfg.sigmaMS << " (default: 0.016)" << std::endl;
-  std::cout << "sigma_x: " << cfg.sigma_x << " (default: 0.25)" << std::endl;
-  std::cout << "sigma_y: " << cfg.sigma_y << " (default: 2.5)" << std::endl;
-  std::cout << "weight_x: " << cfg.weight_x << " (default: 0.5)" << std::endl;
-  std::cout << "weight_y: " << cfg.weight_y << " (default: 0.5)" << std::endl;
-  std::cout << "maxDChi2_x: " << cfg.maxDChi2_x << " (default: 60.0)" << std::endl;
-  std::cout << "maxDChi2_y: " << cfg.maxDChi2_y << " (default: 60.0)" << std::endl;
-  std::cout << "add_hit: " << cfg.add_hit << " (default: 14.0)" << std::endl;
+  ACTS_DEBUG( "BeamSpotCorrection: " << cfg.BeamSpotCorrection << " (default: false)");
+  ACTS_DEBUG( "ConnectorInputFile: " << cfg.ConnectorInputFile << " (default: empty string)");
+  ACTS_DEBUG( "m_LRTmode: " << cfg.m_LRTmode << " (default: false)");
+  ACTS_DEBUG( "m_useML: " << cfg.m_useML << " (default: false)");
+  ACTS_DEBUG( "m_matchBeforeCreate: " << cfg.m_matchBeforeCreate << " (default: false)");
+  ACTS_DEBUG( "m_useOldTunings: " << cfg.m_useOldTunings << " (default: false)");
+  ACTS_DEBUG( "m_tau_ratio_cut: " << cfg.m_tau_ratio_cut << " (default: 0.007)");
+  ACTS_DEBUG( "m_etaBinOverride: " << cfg.m_etaBinOverride << " (default: 0.0)");
+  ACTS_DEBUG( "m_nMaxPhiSlice: " << cfg.m_nMaxPhiSlice << " (default: 53)");
+  ACTS_DEBUG( "m_minPt: " << cfg.m_minPt << " (default: 1.0 * Acts::UnitConstants::GeV)");
+  ACTS_DEBUG( "m_phiSliceWidth: " << cfg.m_phiSliceWidth << " (default: derived)");
+  ACTS_DEBUG( "ptCoeff: " << cfg.ptCoeff << " (default: 0.29997 * 1.9972 / 2.0)");
+  ACTS_DEBUG( "m_useEtaBinning: " << cfg.m_useEtaBinning << " (default: true)");
+  ACTS_DEBUG( "m_doubletFilterRZ: " << cfg.m_doubletFilterRZ << " (default: true)");
+  ACTS_DEBUG( "m_nMaxEdges: " << cfg.m_nMaxEdges << " (default: 2000000)");
+  ACTS_DEBUG( "m_minDeltaRadius: " << cfg.m_minDeltaRadius << " (default: 2.0)");
+  ACTS_DEBUG( "sigma_t: " << cfg.sigma_t << " (default: 0.0003)");
+  ACTS_DEBUG( "sigma_w: " << cfg.sigma_w << " (default: 0.00009)");
+  ACTS_DEBUG( "sigmaMS: " << cfg.sigmaMS << " (default: 0.016)");
+  ACTS_DEBUG( "sigma_x: " << cfg.sigma_x << " (default: 0.25)");
+  ACTS_DEBUG( "sigma_y: " << cfg.sigma_y << " (default: 2.5)");
+  ACTS_DEBUG( "weight_x: " << cfg.weight_x << " (default: 0.5)");
+  ACTS_DEBUG( "weight_y: " << cfg.weight_y << " (default: 0.5)");
+  ACTS_DEBUG( "maxDChi2_x: " << cfg.maxDChi2_x << " (default: 60.0)");
+  ACTS_DEBUG( "maxDChi2_y: " << cfg.maxDChi2_y << " (default: 60.0)");
+  ACTS_DEBUG( "add_hit: " << cfg.add_hit << " (default: 14.0)");
 
-  std::cout << "================================" << std::endl;
+  ACTS_DEBUG( "================================");
 }
 
 

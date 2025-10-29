@@ -39,14 +39,15 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
     // this is used to initiliase the handle that points to the container of seeds
     std::string outputSeeds;
 
-    //contains all the options used to steer the algorithm 
-    //includes both user options avilable to cahnge in the python script and those seen just be the algorithm
+    // contains all the options used to steer the algorithm 
+    // includes both user options avilable to change in the python script and those seen just be the algorithm
     Acts::Experimental::SeedFinderGbtsConfig seedFinderConfig;
     Acts::SeedFinderOptions seedFinderOptions;
+
     // the connection table (parsed from csv file) used to make geoemetry cuts be GBTS
     std::string layerMappingFile;
 
-    //Holds detector information, used to make the geometry objects used by GBTS
+    // holds detector information, used to make the geometry objects used by GBTS
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
 
     //conversion between ACTS labelling of volume, layer and modules to that used by GBTS
@@ -60,7 +61,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   };
 
   // access to config
-  //allows bindings to work 
+  //allows python bindings to work 
   const Config &config() const { return m_cfg; }
 
   // constructor:
@@ -74,35 +75,37 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   ProcessCode execute(const AlgorithmContext &ctx) const override;
 
   // own class functions
-  // make the map between ACTS labelling (ID's) and GBTS labelling (ID's)
+  // make the map between ACTS geometry ID's and GBTS geometry ID's
   std::map<std::pair<int, int>, std::tuple<int, int, int>> makeActsGbtsMap() const;
 
-  // make the container that holds the spacepoints that have been given 
-  // all the veriables needed for GBTS
+  // make the container that holds spacepoints that have been given 
+  // all the veriables needed for GBTS algorithm to run
   Acts::Experimental::SPContainerComponentsType MakeSpContainer(
       const AlgorithmContext &ctx,
       std::map<std::pair<int, int>, std::tuple<int, int, int>> map) const;
 
   // makes the geometry objects used by GBTS that correspond to the objects in the connection table
-  // for easy these are sometimes called "logical layers"
+  // for ease these are sometimes called "logical layers"
   std::vector<Acts::Experimental::TrigInDetSiLayer> LayerNumbering() const;
   
   void printSeedFinderGbtsConfig(const Acts::Experimental::SeedFinderGbtsConfig& cfg);
   
   private:
   
+  //holds all objects either used in intialise or handed out of algorithm
   Config m_cfg{};
   
   // object that processes and holds connection table information 
   std::unique_ptr<Acts::Experimental::GbtsConnector> m_connector = nullptr;
 
   // object that holds all geometry information after:
-  // connection table has been processed 
-  // vector of logical layers that have been created
+    // connection table has been processed 
+    // vector of logical layers that have been created
   std::unique_ptr<Acts::Experimental::GbtsGeometry> m_gbtsGeo = nullptr;
 
   //collection of geometry objects used by GBTS
   std::vector<Acts::Experimental::TrigInDetSiLayer> m_layerGeometry{};
+  
   //used to assign LayerIds to the GbtsActsMap
   mutable std::map<int, int> m_LayeridMap{};
    
