@@ -54,7 +54,6 @@ overlay_eff_pT_crosses_caps
 overlay_eff_pT_crosses_caps.cxx
 overlay_fake_eta_crosses_caps
 overlay_fake_eta_crosses_caps.cxx
-run_script.sh
 runtime.log
 trackeff_vs_eta_overlay.pdf
 trackeff_vs_pT_overlay.pdf
