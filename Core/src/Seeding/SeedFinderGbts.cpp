@@ -111,6 +111,8 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 
   ACTS_DEBUG("GBTS created " << SeedContainer.size() << " seeds");
 
+  m_storage->reset();
+
   return SeedContainer;
 }
 

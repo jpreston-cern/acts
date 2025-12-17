@@ -99,6 +99,18 @@ class GbtsDataStorage {
     return m_etaBins.at(idx);
   }
 
+  void reset(){
+    for (GbtsEtaBin& bin : m_etaBins) {
+      bin.m_vn.clear();
+      bin.m_in.clear();
+      bin.m_params.clear();
+      bin.m_vPhiNodes.clear();
+      bin.m_minRadius = 0;
+      bin.m_maxRadius = 0;
+      
+    }
+  }
+
  protected:
   const GbtsGeometry& m_geo;
   const SeedFinderGbtsConfig& m_config;
