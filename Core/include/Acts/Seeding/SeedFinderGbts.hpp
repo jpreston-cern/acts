@@ -53,10 +53,10 @@ class SeedFinderGbts {
 
   SeedContainer2 CreateSeeds(
       const RoiDescriptor& roi,
-      const SPContainerComponentsType& SpContainerComponents, int max_layers);
+      const SPContainerComponentsType& SpContainerComponents, int max_layers) const;
 
   std::vector<std::vector<GbtsNode>> CreateNodes(
-      const auto& container, int MaxLayers);
+      const auto& container, int MaxLayers) const;
 
   std::pair<int, int> buildTheGraph(
       const RoiDescriptor& roi, const std::unique_ptr<GbtsDataStorage>& storage,
@@ -72,8 +72,6 @@ class SeedFinderGbts {
   SeedFinderGbtsConfig m_config;
 
   const GbtsGeometry* m_geo;
-
-  std::unique_ptr<GbtsDataStorage> m_storage = nullptr;
 
   const std::vector<TrigInDetSiLayer>* m_layerGeometry;
 

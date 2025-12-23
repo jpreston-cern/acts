@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <numeric>
 #include <utility>
@@ -26,13 +27,19 @@ SeedFinderGbts::SeedFinderGbts(
     std::unique_ptr<const Acts::Logger> logger)
     : m_config(std::move(config)),
       m_geo(gbtsGeo),
-      m_storage(std::make_unique<GbtsDataStorage>(*m_geo, m_config)),
       m_layerGeometry(layerGeometry),
-      m_logger(std::move(logger)) {}
+      m_logger(std::move(logger)) {
+
+      m_config.phiSliceWidth = 2 * std::numbers::pi / m_config.nMaxPhiSlice;
+      
+      }
 
 SeedContainer2 SeedFinderGbts::CreateSeeds(
     const RoiDescriptor& roi,
-    const SPContainerComponentsType& SpContainerComponents, int max_layers) {
+    const SPContainerComponentsType& SpContainerComponents, int max_layers) const{
+
+  std::unique_ptr<GbtsDataStorage> storage = std::make_unique<GbtsDataStorage>(*m_geo, m_config);
+  
   SeedContainer2 SeedContainer;
   std::vector<std::vector<GbtsNode>> node_storage =
       CreateNodes(SpContainerComponents, max_layers);
@@ -49,25 +56,25 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
     bool is_pixel = true;
     if (is_pixel) {  // placeholder for now until strip hits are added in
 
-      nPixelLoaded += m_storage->loadPixelGraphNodes(l, nodes, m_config.useML);
+      nPixelLoaded += storage->loadPixelGraphNodes(l, nodes, m_config.useML);
 
     } else {
-      nStripLoaded += m_storage->loadStripGraphNodes(l, nodes);
+      nStripLoaded += storage->loadStripGraphNodes(l, nodes);
     }
   }
   ACTS_DEBUG("Loaded " << nPixelLoaded << " pixel spacepoints and "
                        << nStripLoaded << " strip spacepoints");
 
-  m_storage->sortByPhi();
+  storage->sortByPhi();
 
-  m_storage->initializeNodes(m_config.useML);
+  storage->initializeNodes(m_config.useML);
 
-  m_config.phiSliceWidth = 2 * std::numbers::pi / m_config.nMaxPhiSlice;
-  m_storage->generatePhiIndexing(1.5f * m_config.phiSliceWidth);
+  
+  storage->generatePhiIndexing(1.5f * m_config.phiSliceWidth);
 
   std::vector<GbtsEdge> edgeStorage;
 
-  std::pair<int, int> graphStats = buildTheGraph(roi, m_storage, edgeStorage);
+  std::pair<int, int> graphStats = buildTheGraph(roi, storage, edgeStorage);
 
   ACTS_DEBUG("Created graph with " << graphStats.first << " edges and "
                                    << graphStats.second << " edge links");
@@ -115,7 +122,7 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 }
 
 std::vector<std::vector<GbtsNode>> SeedFinderGbts::CreateNodes(
-    const auto& container, int MaxLayers) {
+    const auto& container, int MaxLayers) const{
   std::vector<std::vector<GbtsNode>> node_storage(MaxLayers);
   // reserve for better efficiency
 
