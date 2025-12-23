@@ -69,6 +69,10 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   // manually convert min Pt as no conversion available in ACTS Examples
   // (currently inputs as 0.9 GeV but need 900 MeV)
   m_cfg.seedFinderConfig.minPt = m_cfg.seedFinderConfig.minPt * 1000;
+
+  m_finder = std::make_unique<Acts::Experimental::SeedFinderGbts>(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
+      logger().cloneWithSuffix("GbtdFinder"));
+
   printSeedFinderGbtsConfig(m_cfg.seedFinderConfig);
 }
 
@@ -80,11 +84,6 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   // container and the external columns we added alive this is done by using a
   // tuple of the core container and the two extra columns
   auto SpContainerComponents = MakeSpContainer(ctx, m_cfg.ActsGbtsMap);
-
-  // this is now calling on a core algorithm
-  Acts::Experimental::SeedFinderGbts finder(
-      m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
-      logger().cloneWithSuffix("GbtdFinder"));
 
   // used to reserve size of nodes 2D vector in core
   int max_layers = m_LayeridMap.size();
@@ -99,7 +98,7 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
   // create the seeds
 
   Acts::SeedContainer2 seeds =
-      finder.CreateSeeds(internalRoi, SpContainerComponents, max_layers);
+      m_finder->CreateSeeds(internalRoi, SpContainerComponents, max_layers);
 
   // move seeds to simseedcontainer to be used down stream taking fist middle
   // and last sps currently as simseeds need to be hard types so only 3
