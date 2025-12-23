@@ -12,6 +12,7 @@
 #include "Acts/Seeding/GbtsDataStorage.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
 #include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
+#include "Acts/Seeding/GbtsLutParser.hpp"
 #include "Acts/TrackFinding/RoiDescriptor.hpp"
 #include "Acts/Utilities/Logger.hpp"
 
@@ -33,6 +34,7 @@ class SeedFinderGbts {
  public:
   SeedFinderGbts(const SeedFinderGbtsConfig config, const GbtsGeometry* gbtsGeo,
                  const std::vector<TrigInDetSiLayer>* layerGeometry,
+                 const GbtsLutParser* gbtsLutParser,
                  std::unique_ptr<const Acts::Logger> logger =
                      Acts::getDefaultLogger("Finder",
                                             Acts::Logging::Level::INFO));
@@ -74,6 +76,8 @@ class SeedFinderGbts {
   const GbtsGeometry* m_geo;
 
   const std::vector<TrigInDetSiLayer>* m_layerGeometry;
+
+  const GbtsLutParser* m_lutParser;
 
   std::unique_ptr<const Acts::Logger> m_logger =
       Acts::getDefaultLogger("Finder", Acts::Logging::Level::INFO);
