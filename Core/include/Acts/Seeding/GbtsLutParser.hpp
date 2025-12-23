@@ -20,13 +20,13 @@ namespace Acts::Experimental {
 
 class GbtsLutParser {
  public:
-  explicit GbtsLutParser(SeedFinderGbtsConfig& config) {
-    if (config.useML) {
-      if (config.lutInputFile.empty()) {
+  explicit GbtsLutParser(std::string& lutInputFile) {
+    
+      if (lutInputFile.empty()) {
         throw std::runtime_error("Cannot find ML predictor LUT file");
       } else {
         m_mlLUT.reserve(100);
-        std::ifstream ifs(std::string(config.lutInputFile).c_str());
+        std::ifstream ifs(std::string(lutInputFile).c_str());
 
         if (!ifs.is_open()) {
           throw std::runtime_error("Failed to open LUT file");
@@ -47,7 +47,7 @@ class GbtsLutParser {
 
         ifs.close();
       }
-    }
+    
   }
 
   const std::vector<std::array<float, 5>>& getParsedLut() const {

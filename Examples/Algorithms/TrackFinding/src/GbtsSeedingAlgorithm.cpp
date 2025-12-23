@@ -43,7 +43,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   // parse connection and LUT files
 
   m_lutParser = std::make_unique<Acts::Experimental::GbtsLutParser>(
-      m_cfg.seedFinderConfig);
+      m_cfg.seedFinderConfig.lutInputFile);
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.connectorInputFile.c_str(), std::ifstream::in);
 
