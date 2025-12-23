@@ -37,10 +37,6 @@ class SeedFinderGbts {
                      Acts::getDefaultLogger("Finder",
                                             Acts::Logging::Level::INFO));
 
-  using GNN_Node = GbtsNode;
-  using GNN_DataStorage = GbtsDataStorage;
-  using GNN_Edge = GbtsEdge;
-
   struct seedProperties {
     seedProperties(float quality, int clone, std::vector<unsigned int> sps)
         : seedQuality(quality), isClone(clone), spacepoints(std::move(sps)) {}
@@ -59,17 +55,17 @@ class SeedFinderGbts {
       const RoiDescriptor& roi,
       const SPContainerComponentsType& SpContainerComponents, int max_layers);
 
-  std::vector<std::vector<SeedFinderGbts::GNN_Node>> CreateNodes(
+  std::vector<std::vector<GbtsNode>> CreateNodes(
       const auto& container, int MaxLayers);
 
   std::pair<int, int> buildTheGraph(
-      const RoiDescriptor& roi, const std::unique_ptr<GNN_DataStorage>& storage,
-      std::vector<GNN_Edge>& edgeStorage) const;
+      const RoiDescriptor& roi, const std::unique_ptr<GbtsDataStorage>& storage,
+      std::vector<GbtsEdge>& edgeStorage) const;
 
-  int runCCA(int nEdges, std::vector<GNN_Edge>& edgeStorage) const;
+  int runCCA(int nEdges, std::vector<GbtsEdge>& edgeStorage) const;
 
   void extractSeedsFromTheGraph(
-      int maxLevel, int nEdges, int nHits, std::vector<GNN_Edge>& edgeStorage,
+      int maxLevel, int nEdges, int nHits, std::vector<GbtsEdge>& edgeStorage,
       std::vector<seedProperties>& vSeedCandidates) const;
 
  private:
@@ -77,7 +73,7 @@ class SeedFinderGbts {
 
   const GbtsGeometry* m_geo;
 
-  std::unique_ptr<GNN_DataStorage> m_storage = nullptr;
+  std::unique_ptr<GbtsDataStorage> m_storage = nullptr;
 
   const std::vector<TrigInDetSiLayer>* m_layerGeometry;
 
