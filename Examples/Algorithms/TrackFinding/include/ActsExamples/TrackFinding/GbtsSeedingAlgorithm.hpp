@@ -10,9 +10,9 @@
 
 #pragma once
 
+#include "Acts/Seeding/GbtsLutParser.hpp"
 #include "Acts/Seeding/SeedFinderGbts.hpp"
 #include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
-#include "Acts/Seeding/GbtsLutParser.hpp"
 #include "ActsExamples/EventData/Cluster.hpp"
 
 // in core
@@ -105,9 +105,9 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   // object that processes and holds connection table information
   std::unique_ptr<Acts::Experimental::GbtsConnector> m_connector = nullptr;
 
-  //object sued to parse the LUT ile 
+  // object sued to parse the LUT ile
   std::unique_ptr<Acts::Experimental::GbtsLutParser> m_lutParser = nullptr;
-  
+
   // object that holds all geometry information after:
   // connection table has been processed
   // vector of logical layers that have been created
@@ -116,7 +116,7 @@ class GbtsSeedingAlgorithm final : public IAlgorithm {
   // collection of geometry objects used by GBTS
   std::vector<Acts::Experimental::TrigInDetSiLayer> m_layerGeometry{};
 
-  //actual seed finder algorithm
+  // actual seed finder algorithm
   std::unique_ptr<Acts::Experimental::SeedFinderGbts> m_finder = nullptr;
 
   // used to assign LayerIds to the GbtsActsMap

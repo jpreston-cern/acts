@@ -42,7 +42,8 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   // parse connection and LUT files
 
-  m_lutParser = std::make_unique<Acts::Experimental::GbtsLutParser>(m_cfg.seedFinderConfig);
+  m_lutParser = std::make_unique<Acts::Experimental::GbtsLutParser>(
+      m_cfg.seedFinderConfig);
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.connectorInputFile.c_str(), std::ifstream::in);
 
@@ -72,8 +73,9 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   // (currently inputs as 0.9 GeV but need 900 MeV)
   m_cfg.seedFinderConfig.minPt = m_cfg.seedFinderConfig.minPt * 1000;
 
-  m_finder = std::make_unique<Acts::Experimental::SeedFinderGbts>(m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry, m_lutParser.get(), 
-      logger().cloneWithSuffix("GbtsFinder"));
+  m_finder = std::make_unique<Acts::Experimental::SeedFinderGbts>(
+      m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
+      m_lutParser.get(), logger().cloneWithSuffix("GbtsFinder"));
 
   printSeedFinderGbtsConfig(m_cfg.seedFinderConfig);
 }

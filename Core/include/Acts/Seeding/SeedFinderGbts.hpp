@@ -11,8 +11,8 @@
 #include "Acts/EventData/SeedContainer2.hpp"
 #include "Acts/Seeding/GbtsDataStorage.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
-#include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
 #include "Acts/Seeding/GbtsLutParser.hpp"
+#include "Acts/Seeding/SeedFinderGbtsConfig.hpp"
 #include "Acts/TrackFinding/RoiDescriptor.hpp"
 #include "Acts/Utilities/Logger.hpp"
 
@@ -55,10 +55,11 @@ class SeedFinderGbts {
 
   SeedContainer2 CreateSeeds(
       const RoiDescriptor& roi,
-      const SPContainerComponentsType& SpContainerComponents, int max_layers) const;
+      const SPContainerComponentsType& SpContainerComponents,
+      int max_layers) const;
 
-  std::vector<std::vector<GbtsNode>> CreateNodes(
-      const auto& container, int MaxLayers) const;
+  std::vector<std::vector<GbtsNode>> CreateNodes(const auto& container,
+                                                 int MaxLayers) const;
 
   std::pair<int, int> buildTheGraph(
       const RoiDescriptor& roi, const std::unique_ptr<GbtsDataStorage>& storage,

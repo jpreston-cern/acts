@@ -31,17 +31,17 @@ SeedFinderGbts::SeedFinderGbts(
       m_layerGeometry(layerGeometry),
       m_lutParser(gbtsLutParser),
       m_logger(std::move(logger)) {
-
-      m_config.phiSliceWidth = 2 * std::numbers::pi / m_config.nMaxPhiSlice;
-      
-      }
+  m_config.phiSliceWidth = 2 * std::numbers::pi / m_config.nMaxPhiSlice;
+}
 
 SeedContainer2 SeedFinderGbts::CreateSeeds(
     const RoiDescriptor& roi,
-    const SPContainerComponentsType& SpContainerComponents, int max_layers) const{
+    const SPContainerComponentsType& SpContainerComponents,
+    int max_layers) const {
+  auto& parsedLutFile = m_lutParser->getParsedLut();
+  std::unique_ptr<GbtsDataStorage> storage =
+      std::make_unique<GbtsDataStorage>(*m_geo, m_config, parsedLutFile);
 
-  std::unique_ptr<GbtsDataStorage> storage = std::make_unique<GbtsDataStorage>(*m_geo, m_config);
-  
   SeedContainer2 SeedContainer;
   std::vector<std::vector<GbtsNode>> node_storage =
       CreateNodes(SpContainerComponents, max_layers);
@@ -71,7 +71,6 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 
   storage->initializeNodes(m_config.useML);
 
-  
   storage->generatePhiIndexing(1.5f * m_config.phiSliceWidth);
 
   std::vector<GbtsEdge> edgeStorage;
@@ -124,7 +123,7 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 }
 
 std::vector<std::vector<GbtsNode>> SeedFinderGbts::CreateNodes(
-    const auto& container, int MaxLayers) const{
+    const auto& container, int MaxLayers) const {
   std::vector<std::vector<GbtsNode>> node_storage(MaxLayers);
   // reserve for better efficiency
 
