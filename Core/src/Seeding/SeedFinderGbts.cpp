@@ -124,25 +124,12 @@ SeedContainer2 SeedFinderGbts::CreateSeeds(
 
 std::vector<std::vector<GbtsNode>> SeedFinderGbts::CreateNodes(
     const auto& container, int MaxLayers) const {
+  
   std::vector<std::vector<GbtsNode>> node_storage(MaxLayers);
-  // reserve for better efficiency
+  for(auto& v : node_storage){
+    v.reserve(10000);
+  }
 
-  for (auto& v : node_storage) {
-    v.reserve(100000);
-  }
-  std::vector<int> reserves(MaxLayers, 0);
-  for(const auto& sp : std::get<0>(container)){
-    int layer = sp.extra(std::get<1>(container));
-    reserves[layer]++;
-
-  }
-  float total = 0;
-  for(std::size_t idx = 0; idx<static_cast<std::size_t>(MaxLayers); idx++){
-    std::cout<<"Jasper: number of nodes in layer "<<idx<<" is "<<reserves.at(idx)<<std::endl;
-    total += reserves.at(idx);
-  }
-  float mean = total/MaxLayers;
-  std::cout<<"Jasper: average nodes per layer is "<<mean<<std::endl;
   for (const auto& sp : std::get<0>(container)) {
     // for every sp in container,
     // add its variables to node_storage organised by layer
