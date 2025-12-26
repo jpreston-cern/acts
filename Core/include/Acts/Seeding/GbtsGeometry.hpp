@@ -72,7 +72,7 @@ class GbtsGeometry {
  public:
   GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers,
                const std::unique_ptr<GbtsConnector>& conn);
-  ~GbtsGeometry();
+  
 
   const GbtsLayer* getGbtsLayerByKey(std::uint32_t key) const;
   const GbtsLayer* getGbtsLayerByIndex(std::int32_t idx) const;
