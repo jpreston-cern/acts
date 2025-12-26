@@ -558,7 +558,7 @@ void SeedFinderGbts::extractSeedsFromTheGraph(
 
     GbtsEdgeState rs(false);
 
-    tFilter.followTrack(pS, rs);
+    tFilter.followTrack(*pS, rs);
 
     if (!rs.m_initialized) {
       continue;

@@ -32,7 +32,7 @@ struct GbtsEdgeState {
 
   explicit GbtsEdgeState(bool f) : m_initialized(f) {}
 
-  void initialize(GbtsEdge* pS);
+  void initialize(GbtsEdge& pS);
   void clone(const struct GbtsEdgeState& st);
 
   float m_J{};
@@ -56,12 +56,12 @@ class GbtsTrackingFilter {
                      const SeedFinderGbtsConfig& config);
   
 
-  void followTrack(GbtsEdge* pS, GbtsEdgeState& output);
+  void followTrack(GbtsEdge& pS, GbtsEdgeState& output);
 
  protected:
-  void propagate(GbtsEdge* pS, GbtsEdgeState& ts);
+  void propagate(GbtsEdge& pS, GbtsEdgeState& ts);
 
-  bool update(GbtsEdge* pS, GbtsEdgeState& ts);
+  bool update(GbtsEdge& pS, GbtsEdgeState& ts);
 
   int getLayerType(int l);
 
@@ -71,7 +71,7 @@ class GbtsTrackingFilter {
 
   std::vector<GbtsEdgeState*> m_stateVec;
 
-  GbtsEdgeState m_stateStore[MAX_EDGE_STATE];
+  std::array<GbtsEdgeState, MAX_EDGE_STATE> m_stateStore;
 
   int m_globalStateCounter{0};
 
