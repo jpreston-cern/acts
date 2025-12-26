@@ -74,8 +74,8 @@ class GbtsGeometry {
                const std::unique_ptr<GbtsConnector>& conn);
   ~GbtsGeometry();
 
-  const GbtsLayer* getGbtsLayerByKey(unsigned int key) const;
-  const GbtsLayer* getGbtsLayerByIndex(int idx) const;
+  const GbtsLayer* getGbtsLayerByKey(std::uint32_t key) const;
+  const GbtsLayer* getGbtsLayerByIndex(std::int32_t idx) const;
 
   inline unsigned int getGbtsLayerKeyByIndex(int idx) const {
     return m_layerKeys[idx];
