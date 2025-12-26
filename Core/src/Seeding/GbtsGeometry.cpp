@@ -223,8 +223,6 @@ float GbtsLayer::getMaxBinRadius(int idx) const {
   return m_maxRadius.at(idx);
 }
 
-
-
 GbtsGeometry::GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers,
                            const std::unique_ptr<GbtsConnector>& conn) {
   const float min_z0 = -168.0;
@@ -293,7 +291,6 @@ GbtsGeometry::GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers,
     }
   }
 }
-
 
 const GbtsLayer* GbtsGeometry::getGbtsLayerByKey(unsigned int key) const {
   std::map<unsigned int, GbtsLayer*>::const_iterator it = m_layMap.find(key);
