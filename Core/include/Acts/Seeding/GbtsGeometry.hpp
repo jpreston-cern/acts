@@ -36,7 +36,6 @@ class TrigInDetSiLayer {
 class GbtsLayer {
  public:
   GbtsLayer(const TrigInDetSiLayer* ls, float ew, int bin0);
-  
 
   int getEtaBin(float zh, float rh) const;
 
@@ -72,7 +71,6 @@ class GbtsGeometry {
  public:
   GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers,
                const std::unique_ptr<GbtsConnector>& conn);
-  
 
   const GbtsLayer* getGbtsLayerByKey(std::uint32_t key) const;
   const GbtsLayer* getGbtsLayerByIndex(std::int32_t idx) const;
