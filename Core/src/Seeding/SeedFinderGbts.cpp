@@ -128,7 +128,7 @@ std::vector<std::vector<GbtsNode>> SeedFinderGbts::CreateNodes(
   // reserve for better efficiency
 
   for (auto& v : node_storage) {
-    v.reserve(100000);
+    v.reserve(10000);
   }
 
   for (auto sp : std::get<0>(container)) {
