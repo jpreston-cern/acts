@@ -37,12 +37,12 @@ struct SeedFinderGbtsConfig {
       0.0f;  // specify non-zero to override eta bin width from connection file
              // (default 0.2 in createLinkingScheme.py)
   float nMaxPhiSlice = 53;  // used to calculate phi slices
-  float minPt = 1000. * UnitConstants::MeV;
+  float minPt = 1.0f * UnitConstants::GeV;
   float phiSliceWidth{};  // derived in CreatSeeds function
 
   // BuildTheGraph() options
   double ptCoeff =
-      0.29997 * 1.9972 / 2.0;  // ~0.3*B/2 - assumes nominal field of 2*T
+      0.29997 * 1.9972 / 2.0 * (UnitConstants::MeV /UnitConstants::mm);  // ~0.3*B/2 - assumes nominal field of 2*T
   bool useEtaBinning = true;  // bool to use eta binning from geometry structure
   bool doubletFilterRZ = true;  // bool applies new Z cuts on doublets
   int nMaxEdges = 2000000;      // max number of Gbts edges/doublets

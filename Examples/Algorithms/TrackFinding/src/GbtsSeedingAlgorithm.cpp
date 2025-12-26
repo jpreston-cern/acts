@@ -27,9 +27,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     ActsExamples::GbtsSeedingAlgorithm::Config cfg, Acts::Logging::Level lvl)
     : ActsExamples::IAlgorithm("SeedingAlgorithm", lvl), m_cfg(std::move(cfg)) {
   // initialise the spacepoint, seed and cluster handles
-  m_inputSpacePoints.initialize(
-      m_cfg.inputSpacePoints);  // TO DO: change bindings so it only gives a
-                                // string instead of a vector
+  m_inputSpacePoints.initialize(m_cfg.inputSpacePoints); 
   m_outputSeeds.initialize(m_cfg.outputSeeds);
   m_inputClusters.initialize(m_cfg.inputClusters);
 
@@ -47,14 +45,12 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
   std::ifstream input_ifstream(
       m_cfg.seedFinderConfig.connectorInputFile.c_str(), std::ifstream::in);
 
-  if (input_ifstream.peek() == std::ifstream::traits_type::eof()) {
+  if (!input_ifstream.is_open()) {
     ACTS_WARNING("Cannot find layer connections file ");
     throw std::runtime_error("connection file not found");
-
   }
 
-  // create the connection objects
-  else {
+    // create the connection objects
     m_connector = std::make_unique<Acts::Experimental::GbtsConnector>(
         input_ifstream, m_cfg.seedFinderConfig.LRTmode);
 
@@ -62,7 +58,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
     if (m_cfg.seedFinderConfig.etaBinOverride != 0.0f) {
       m_connector->m_etaBin = m_cfg.seedFinderConfig.etaBinOverride;
     }
-  }
+
 
   // initialise the object that holds all the geometry information needed for
   // the algorithm
@@ -71,8 +67,7 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   // manually convert min Pt as no conversion available in ACTS Examples
   // (currently inputs as 0.9 GeV but need 900 MeV)
-  m_cfg.seedFinderConfig.minPt = m_cfg.seedFinderConfig.minPt * 1000;
-
+  
   m_finder = std::make_unique<Acts::Experimental::SeedFinderGbts>(
       m_cfg.seedFinderConfig, m_gbtsGeo.get(), &m_layerGeometry,
       m_lutParser.get(), logger().cloneWithSuffix("GbtsFinder"));
@@ -94,8 +89,6 @@ ActsExamples::ProcessCode ActsExamples::GbtsSeedingAlgorithm::execute(
 
   // ROI file:Defines what region in detector we are interested in, currently
   // set to entire detector
-  //  Acts::Experimental::RoiDescriptor internalRoi(0, -5, 5, 0,
-  //  -std::numbers::pi, std::numbers::pi, 0, -225., 225.);
   Acts::Experimental::RoiDescriptor internalRoi(
       0, -4.5, 4.5, 0, -std::numbers::pi, std::numbers::pi, 0, -150., 150.);
 
