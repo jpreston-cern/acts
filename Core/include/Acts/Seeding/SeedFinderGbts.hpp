@@ -26,7 +26,7 @@ namespace Acts::Experimental {
 
 // defined the tuple template used to carry the spacepoint components
 using SPContainerComponentsType =
-    std::tuple<SpacePointContainer2, SpacePointColumnProxy<int, true>,
+    std::tuple<SpacePointContainer2, SpacePointColumnProxy<std::uint32_t, true>,
                SpacePointColumnProxy<float, true>,
                SpacePointColumnProxy<float, true>>;
 
@@ -40,12 +40,13 @@ class SeedFinderGbts {
                                             Acts::Logging::Level::INFO));
 
   struct seedProperties {
-    seedProperties(float quality, int clone, std::vector<unsigned int> sps)
+    seedProperties(float quality, std::int32_t clone,
+                   std::vector<std::uint32_t> sps)
         : seedQuality(quality), isClone(clone), spacepoints(std::move(sps)) {}
 
     float seedQuality{};
-    int isClone{};
-    std::vector<unsigned int> spacepoints{};
+    std::int32_t isClone{};
+    std::vector<std::uint32_t> spacepoints{};
 
     bool operator<(seedProperties const& o) const {
       return std::tie(seedQuality, isClone, spacepoints) <
@@ -56,19 +57,21 @@ class SeedFinderGbts {
   SeedContainer2 CreateSeeds(
       const RoiDescriptor& roi,
       const SPContainerComponentsType& SpContainerComponents,
-      int max_layers) const;
+      std::int32_t max_layers) const;
 
   std::vector<std::vector<GbtsNode>> CreateNodes(const auto& container,
-                                                 int MaxLayers) const;
+                                                 std::int32_t MaxLayers) const;
 
-  std::pair<int, int> buildTheGraph(
+  std::pair<std::int32_t, std::int32_t> buildTheGraph(
       const RoiDescriptor& roi, const std::unique_ptr<GbtsDataStorage>& storage,
       std::vector<GbtsEdge>& edgeStorage) const;
 
-  int runCCA(int nEdges, std::vector<GbtsEdge>& edgeStorage) const;
+  std::int32_t runCCA(std::int32_t nEdges,
+                      std::vector<GbtsEdge>& edgeStorage) const;
 
   void extractSeedsFromTheGraph(
-      int maxLevel, int nEdges, int nHits, std::vector<GbtsEdge>& edgeStorage,
+      std::int32_t maxLevel, std::int32_t nEdges, std::int32_t nHits,
+      std::vector<GbtsEdge>& edgeStorage,
       std::vector<seedProperties>& vSeedCandidates) const;
 
  private:

@@ -18,8 +18,8 @@
 #include <vector>
 namespace Acts::Experimental {
 
-constexpr int MAX_SEG_PER_NODE = 1000;
-constexpr int N_SEG_CONNS = 6;
+constexpr std::int32_t MAX_SEG_PER_NODE = 1000;
+constexpr std::int32_t N_SEG_CONNS = 6;
 
 class GbtsGeometry;
 
@@ -53,7 +53,7 @@ class GbtsNode {
  private:
   float m_x{}, m_y{}, m_z{}, m_r{}, m_phi{};
   std::uint16_t m_layer{10000};
-  std::uint32_t m_idx{std::numeric_limits<unsigned int>::max()};
+  std::uint32_t m_idx{std::numeric_limits<std::uint32_t>::max()};
   float m_pcw{}, m_locPosY{};
 };
 
@@ -79,15 +79,15 @@ class GbtsEtaBin {
 
   /// nodes of the graph
   std::vector<const GbtsNode*> m_vn;
-  std::vector<std::pair<float, unsigned int>> m_vPhiNodes;
+  std::vector<std::pair<float, std::uint32_t>> m_vPhiNodes;
   /// vectors of incoming edges, stores indices of edges in the edge vector
-  std::vector<std::vector<unsigned int>> m_in;
+  std::vector<std::vector<std::uint32_t>> m_in;
   /// node attributes: m_minCutOnTau, m_maxCutOnTau, m_phi, m_r, m_z;
   std::vector<std::array<float, 5>> m_params;
   float m_minRadius{};
   float m_maxRadius{};
 
-  unsigned int m_layerKey{0};
+  std::uint32_t m_layerKey{0};
 };
 
 class GbtsDataStorage {
@@ -96,18 +96,19 @@ class GbtsDataStorage {
       const GbtsGeometry* geometry, const SeedFinderGbtsConfig& config,
       const std::vector<std::array<float, 5>>& parsedLutFile);
 
-  int loadPixelGraphNodes(short layerIndex,
-                          const std::span<const GbtsNode> coll, bool useML);
-  int loadStripGraphNodes(short layerIndex,
-                          const std::span<const GbtsNode> coll);
+  std::int32_t loadPixelGraphNodes(std::int16_t layerIndex,
+                                   const std::span<const GbtsNode> coll,
+                                   bool useML);
+  std::int32_t loadStripGraphNodes(std::int16_t layerIndex,
+                                   const std::span<const GbtsNode> coll);
 
-  unsigned int numberOfNodes() const;
+  std::uint32_t numberOfNodes() const;
   void sortByPhi();
   void initializeNodes(bool useML);
   void generatePhiIndexing(float dphi);
 
-  GbtsEtaBin& getEtaBin(int idx) {
-    if (idx >= static_cast<int>(m_etaBins.size())) {
+  GbtsEtaBin& getEtaBin(std::int32_t idx) {
+    if (idx >= static_cast<std::int32_t>(m_etaBins.size())) {
       idx = idx - 1;
     }
     return m_etaBins.at(idx);
