@@ -10,8 +10,8 @@
 
 // TODO: update to C++17 style
 // Consider to moving to detail subdirectory
-#include <fstream>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace Acts::Experimental {

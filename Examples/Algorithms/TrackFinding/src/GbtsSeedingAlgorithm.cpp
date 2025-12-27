@@ -20,7 +20,6 @@
 #include <map>
 #include <numbers>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 
 ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
