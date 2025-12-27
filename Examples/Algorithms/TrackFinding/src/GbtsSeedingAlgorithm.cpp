@@ -44,24 +44,15 @@ ActsExamples::GbtsSeedingAlgorithm::GbtsSeedingAlgorithm(
 
   m_lutParser = std::make_unique<Acts::Experimental::GbtsLutParser>(
       m_cfg.seedFinderConfig.lutInputFile);
-  std::ifstream input_ifstream(
-      m_cfg.seedFinderConfig.connectorInputFile.c_str(), std::ifstream::in);
-
-  if (input_ifstream.peek() == std::ifstream::traits_type::eof()) {
-    ACTS_WARNING("Cannot find layer connections file ");
-    throw std::runtime_error("connection file not found");
-
-  }
 
   // create the connection objects
-  else {
-    m_connector = std::make_unique<Acts::Experimental::GbtsConnector>(
-        input_ifstream, m_cfg.seedFinderConfig.LRTmode);
+  m_connector = std::make_unique<Acts::Experimental::GbtsConnector>(
+      m_cfg.seedFinderConfig.connectorInputFile,
+      m_cfg.seedFinderConfig.LRTmode);
 
-    // option that allows for adding custom eta binning (default is at 0.2)
-    if (m_cfg.seedFinderConfig.etaBinOverride != 0.0f) {
-      m_connector->m_etaBin = m_cfg.seedFinderConfig.etaBinOverride;
-    }
+  // option that allows for adding custom eta binning (default is at 0.2)
+  if (m_cfg.seedFinderConfig.etaBinOverride != 0.0f) {
+    m_connector->m_etaBin = m_cfg.seedFinderConfig.etaBinOverride;
   }
 
   // initialise the object that holds all the geometry information needed for
