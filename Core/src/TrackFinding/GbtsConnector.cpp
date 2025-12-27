@@ -13,63 +13,64 @@
 #include <fstream>
 #include <iostream>
 #include <list>
+#include <memory>
 #include <set>
 #include <unordered_map>
 
 namespace Acts::Experimental {
 
-GbtsConnection::GbtsConnection(unsigned int s, unsigned int d)
+GbtsConnection::GbtsConnection(std::uint32_t s, std::uint32_t d)
     : m_src(s), m_dst(d) {}
 
 GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
   m_connMap.clear();
   m_layerGroups.clear();
 
-  int nLinks{};
+  std::int32_t nLinks{};
 
   inFile >> nLinks >> m_etaBin;
 
-  for (int l = 0; l < nLinks; l++) {
-    unsigned int stage{}, lIdx{}, src{}, dst{}, nEntries{};
-    int height{}, width{};
+  for (std::int32_t l = 0; l < nLinks; l++) {
+    std::uint32_t stage{}, lIdx{}, src{}, dst{}, nEntries{};
+    std::int32_t height{}, width{};
 
     inFile >> lIdx >> stage >> src >> dst >> height >> width >> nEntries;
 
-    GbtsConnection* pC = new GbtsConnection(src, dst);
+    std::unique_ptr<GbtsConnection> pC =
+        std::make_unique<GbtsConnection>(src, dst);
 
-    int dummy{};
+    std::int32_t dummy{};
 
-    for (int i = 0; i < height; i++) {
-      for (int j = 0; j < width; j++) {
+    for (std::int32_t i = 0; i < height; i++) {
+      for (std::int32_t j = 0; j < width; j++) {
         inFile >> dummy;  // pC->m_binTable[j+i*width];
       }
     }
 
-    int srcvol_id = src / 1000;
-    int dstvol_id = dst / 1000;
+    std::int32_t srcvol_id = src / 1000;
+    std::int32_t dstvol_id = dst / 1000;
 
     bool srcIsStrip = (srcvol_id == 13 || srcvol_id == 12 || srcvol_id == 14);
     bool dstIsStrip = (dstvol_id == 13 || dstvol_id == 12 || dstvol_id == 14);
     if (LRTmode) {
       if (!srcIsStrip || !dstIsStrip) {
-        delete pC;
         continue;
       }
     } else {
       if (srcIsStrip || dstIsStrip) {
-        delete pC;
         continue;
       }
     }
 
-    std::map<int, std::vector<GbtsConnection*> >::iterator it =
+    std::map<std::int32_t,
+             std::vector<std::unique_ptr<GbtsConnection>>>::iterator it =
         m_connMap.find(stage);
 
     if (it == m_connMap.end()) {
-      std::vector<GbtsConnection*> v = {pC};
+      std::vector<std::unique_ptr<GbtsConnection>> v = {std::move(pC)};
       m_connMap.insert(std::make_pair(stage, v));
     } else {
-      (*it).second.push_back(pC);
+      (*it).second.push_back(std::move(pC));
     }
   }
 
@@ -77,17 +78,18 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
 
   std::list<const GbtsConnection*> lConns;
 
-  std::map<int, std::vector<const GbtsConnection*> > newConnMap;
+  std::map<std::int32_t, std::vector<const GbtsConnection*>> newConnMap;
 
   for (const auto& conn : m_connMap) {
-    std::copy(conn.second.begin(), conn.second.end(),
-              std::back_inserter(lConns));
+    for (const auto& up : conn.second) {
+      lConns.push_back(up.get());
+    }
   }
 
-  int stageCounter = 0;
+  std::int32_t stageCounter = 0;
 
   while (!lConns.empty()) {
-    std::unordered_map<unsigned int, std::pair<int, int> >
+    std::unordered_map<std::uint32_t, std::pair<std::int32_t, std::int32_t>>
         mCounter;  // layerKey, nDst, nSrc
 
     for (const auto& conn : lConns) {
@@ -95,8 +97,8 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
       if (entryIt != mCounter.end()) {
         (*entryIt).second.first++;
       } else {
-        int nDst = 1;
-        int nSrc = 0;
+        std::int32_t nDst = 1;
+        std::int32_t nSrc = 0;
         mCounter.insert(
             std::make_pair(conn->m_dst, std::make_pair(nDst, nSrc)));
       }
@@ -105,8 +107,8 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
       if (entryIt != mCounter.end()) {
         (*entryIt).second.second++;
       } else {
-        int nDst = 0;
-        int nSrc = 1;
+        std::int32_t nDst = 0;
+        std::int32_t nSrc = 1;
         mCounter.insert(
             std::make_pair(conn->m_src, std::make_pair(nDst, nSrc)));
       }
@@ -114,7 +116,7 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
 
     // find layers with nSrc = 0
 
-    std::set<unsigned int> zeroLayers;
+    std::set<std::uint32_t> zeroLayers;
 
     for (const auto& layerCounts : mCounter) {
       if (layerCounts.second.second != 0) {
@@ -145,12 +147,13 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
 
   // create layer groups
 
-  int currentStage = 0;
+  std::int32_t currentStage = 0;
 
   // the doublet making is done using "outside-in" approach hence the reverse
   // iterations
 
-  for (std::map<int, std::vector<const GbtsConnection*> >::reverse_iterator it =
+  for (std::map<std::int32_t,
+                std::vector<const GbtsConnection*>>::reverse_iterator it =
            newConnMap.rbegin();
        it != newConnMap.rend(); ++it, currentStage++) {
     const std::vector<const GbtsConnection*>& vConn = (*it).second;
@@ -158,12 +161,12 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
     // loop over links, extract all connections for the stage, group sources by
     // L1 (dst) index
 
-    std::map<unsigned int, std::vector<const GbtsConnection*> > l1ConnMap;
+    std::map<std::uint32_t, std::vector<const GbtsConnection*>> l1ConnMap;
 
     for (const auto* conn : vConn) {
-      unsigned int dst = conn->m_dst;
+      std::uint32_t dst = conn->m_dst;
 
-      std::map<unsigned int, std::vector<const GbtsConnection*> >::iterator
+      std::map<std::uint32_t, std::vector<const GbtsConnection*>>::iterator
           l1MapIt = l1ConnMap.find(dst);
       if (l1MapIt != l1ConnMap.end()) {
         (*l1MapIt).second.push_back(conn);
@@ -185,19 +188,6 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
   }
 
   newConnMap.clear();
-}
-
-GbtsConnector::~GbtsConnector() {
-  m_layerGroups.clear();
-
-  for (auto& conn : m_connMap) {
-    for (auto& link : conn.second) {
-      delete link;
-    }
-    conn.second.clear();
-  }
-
-  m_connMap.clear();
 }
 
 }  // namespace Acts::Experimental
