@@ -67,10 +67,11 @@ GbtsConnector::GbtsConnector(std::ifstream& inFile, bool LRTmode) {
         m_connMap.find(stage);
 
     if (it == m_connMap.end()) {
-      std::vector<std::unique_ptr<GbtsConnection>> v = {std::move(pC)};
-      m_connMap.insert(std::make_pair(stage, v));
+      std::vector<std::unique_ptr<GbtsConnection>> v;
+      v.push_back(std::move(pC));              // move the unique_ptr in
+      m_connMap.emplace(stage, std::move(v));  // move the vector into the map
     } else {
-      (*it).second.push_back(std::move(pC));
+      it->second.push_back(std::move(pC));  // move into existing vector
     }
   }
 

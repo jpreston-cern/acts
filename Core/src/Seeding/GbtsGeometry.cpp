@@ -240,12 +240,14 @@ GbtsGeometry::GbtsGeometry(const std::vector<TrigInDetSiLayer>& layers,
 
   std::int32_t lastBin1 = -1;
 
-  for (std::map<std::int32_t, std::vector<GbtsConnection*> >::const_iterator
+  for (std::map<std::int32_t,
+                std::vector<std::unique_ptr<GbtsConnection>>>::const_iterator
            it = conn->m_connMap.begin();
        it != conn->m_connMap.end(); ++it) {
-    const std::vector<GbtsConnection*>& vConn = (*it).second;
+    const std::vector<std::unique_ptr<GbtsConnection>>& vConn = (*it).second;
 
-    for (std::vector<GbtsConnection*>::const_iterator cIt = vConn.begin();
+    for (std::vector<std::unique_ptr<GbtsConnection>>::const_iterator cIt =
+             vConn.begin();
          cIt != vConn.end(); ++cIt) {
       std::uint32_t src = (*cIt)->m_src;  // n2 : the new connectors
       std::uint32_t dst = (*cIt)->m_dst;  // n1

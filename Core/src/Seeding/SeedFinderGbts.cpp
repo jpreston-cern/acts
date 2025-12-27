@@ -175,14 +175,12 @@ std::pair<std::int32_t, std::int32_t> SeedFinderGbts::buildTheGraph(
 
   // correction due to limited pT resolution
   float tripletPtMin = 0.8f * m_config.minPt;
-  std::cout << "Jasper: minPt is " << m_config.minPt << std::endl;
-  std::cout << "Jasper: triplet pt is " << tripletPtMin << std::endl;
+
   // to re-scale original tunings done for the 900 MeV pT cut
   const float pt_scale = (0.9f * UnitConstants::GeV) / m_config.minPt;
-  std::cout << "Jasper: pt_scale is " << pt_scale << std::endl;
+
   float maxCurv = m_config.ptCoeff / tripletPtMin;
-  std::cout << "Jasper: ptCoeff is " << m_config.ptCoeff << std::endl;
-  std::cout << "Jasper: maxCurv is " << maxCurv << std::endl;
+
   float maxKappa_high_eta =
       m_config.LRTmode ? 1.0f * maxCurv : std::sqrt(0.8f) * maxCurv;
   float maxKappa_low_eta =
