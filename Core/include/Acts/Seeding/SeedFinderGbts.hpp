@@ -29,6 +29,16 @@ using SPContainerComponentsType =
                SpacePointColumnProxy<float, true>,
                SpacePointColumnProxy<float, true>>;
 
+struct GBTS_SlidingWindow {
+  GBTS_SlidingWindow() = default;
+
+  unsigned int m_first_it{};  // sliding window position
+  float m_deltaPhi{};         // window half-width;
+  bool m_has_nodes{};         // active or not
+
+  const GbtsEtaBin* m_bin{};  // associated eta bin
+};
+
 class SeedFinderGbts {
  public:
   SeedFinderGbts(const SeedFinderGbtsConfig config,
