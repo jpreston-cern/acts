@@ -130,9 +130,9 @@ bool GbtsLayer::verifyBin(const GbtsLayer* pL, int b1, int b2, float min_z0,
   float z1max = m_maxBinCoord.at(b1);
   float r1 = m_layer->m_refCoord;
 
-  if (m_layer->m_type == 0 && pL->m_layer->m_type == 0) {  // barrel <- barrel
+  const float tol = 5.0;
 
-    const float tol = 5.0;
+  if (m_layer->m_type == 0 && pL->m_layer->m_type == 0) {  // barrel <- barrel
 
     float min_b2 = pL->m_minBinCoord.at(b2);
     float max_b2 = pL->m_maxBinCoord.at(b2);
@@ -177,10 +177,103 @@ bool GbtsLayer::verifyBin(const GbtsLayer* pL, int b1, int b2, float min_z0,
       z0_min = (z1min * r2max - z2 * r1) / (r2max - r1);
     }
 
-    if (z0_max < min_z0 || z0_min > max_z0) {
+    if (z0_max < min_z0 - tol || z0_min > max_z0 + tol) {
       return false;
     }
     return true;
+  }
+
+  if (m_layer->m_type != 0 && pL->m_layer->m_type != 0) {  // endcap <- endcap
+
+    float z2 = pL->m_layer->m_refCoord;
+    float z1 = m_layer->m_refCoord;
+    float r2max = pL->m_maxBinCoord.at(b2);
+    float r2min = pL->m_minBinCoord.at(b2);
+    float r1max = m_maxBinCoord.at(b1);
+    float r1min = m_minBinCoord.at(b1);
+
+    if (r1min >= r2max) {
+      return false;
+    }
+
+    if (z2 > 0) {  // positive endcap
+
+      float z0_max = z1 - r1min * (z2 - z1) / (r2max - r1min);
+
+      if (z0_max < min_z0 - tol) {
+        return false;
+      }
+
+      if (r2min > r1max) {
+        float z0_min = z1 - r1max * (z2 - z1) / (r2min - r1max);
+
+        if (z0_min > max_z0 + tol) {
+          return false;
+        }
+      }
+    } else {  // negative endcap
+      float z0_min = z1 - r1min * (z2 - z1) / (r2max - r1min);
+
+      if (z0_min > max_z0 + tol) {
+        return false;
+      }
+
+      if (r2min > r1max) {
+        float z0_max = z1 - r1max * (z2 - z1) / (r2min - r1max);
+
+        if (z0_max < min_z0 - tol) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  if (m_layer->m_type != 0 && pL->m_layer->m_type == 0) {  // endcap <- barrel
+
+    float z1 = m_layer->m_refCoord;
+    float r1max = m_maxBinCoord.at(b1);
+    float r1min = m_minBinCoord.at(b1);
+
+    float z2min = pL->m_minBinCoord.at(b2);
+    float z2max = pL->m_maxBinCoord.at(b2);
+    float r2 = pL->m_layer->m_refCoord;
+
+    if (r2 < r1min) {
+      return false;
+    }
+
+    // interval 1
+
+    float z0_min = z1 - (z2max - z1) / (r2 / r1max - 1);
+    float z0_max = z1 - (z2max - z1) / (r2 / r1min - 1);
+
+    if (z0_min > z0_max) {
+      std::swap(z0_min, z0_max);
+    }
+
+    bool beyond_range = (z0_max < min_z0 - tol || z0_min > max_z0 + tol);
+
+    if (!beyond_range) {
+      return true;
+    }
+
+    // interval 2
+
+    z0_min = z1 - (z2min - z1) / (r2 / r1max - 1);
+    z0_max = z1 - (z2min - z1) / (r2 / r1min - 1);
+
+    if (z0_min > z0_max) {
+      std::swap(z0_min, z0_max);
+    }
+
+    beyond_range = (z0_max < min_z0 - tol || z0_min > max_z0 + tol);
+
+    if (!beyond_range) {
+      return true;
+    }
+
+    return false;
   }
 
   return true;
