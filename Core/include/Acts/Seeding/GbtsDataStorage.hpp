@@ -19,7 +19,6 @@
 
 namespace Acts::Experimental {
 
-constexpr int MAX_SEG_PER_NODE = 1000;
 constexpr int N_SEG_CONNS = 6;
 
 class GbtsGeometry;
@@ -85,10 +84,20 @@ class GbtsEtaBin {
   /// nodes of the graph
   std::vector<const GbtsNode*> m_vn;
   std::vector<std::pair<float, unsigned int>> m_vPhiNodes;
-  /// vectors of incoming edges, stores indices of edges in the edge vector
-  std::vector<std::vector<unsigned int>> m_in;
+
+  /// the index of the first incoming graph edge attached to the node
+  std::vector<unsigned int> m_vFirstEdge;
+
+  /// the total number of incoming graph edges attached to this node
+  std::vector<unsigned short> m_vNumEdges;
+
   /// node attributes: m_minCutOnTau, m_maxCutOnTau, m_phi, m_r, m_z;
   std::vector<std::array<float, 5>> m_params;
+
+  /// flag to indicate the node's outer neighbourhood isolation from previously
+  /// built graph
+  std::vector<unsigned short> m_vIsConnected;
+
   float m_minRadius{};
   float m_maxRadius{};
 

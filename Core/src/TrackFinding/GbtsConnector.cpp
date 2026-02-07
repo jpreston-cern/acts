@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <list>
+#include <ranges>
 #include <set>
 #include <unordered_map>
 
@@ -157,10 +158,8 @@ GbtsConnector::GbtsConnector(std::string& inFile, bool LRTmode) {
   // the doublet making is done using "outside-in" approach hence the reverse
   // iterations
 
-  for (std::map<int, std::vector<const GbtsConnection*> >::reverse_iterator it =
-           newConnMap.rbegin();
-       it != newConnMap.rend(); ++it, currentStage++) {
-    const std::vector<const GbtsConnection*>& vConn = (*it).second;
+  for (const auto& it : std::views::reverse(newConnMap)) {
+    const std::vector<const GbtsConnection*>& vConn = it.second;
 
     // loop over links, extract all connections for the stage, group sources by
     // L1 (dst) index
@@ -189,6 +188,8 @@ GbtsConnector::GbtsConnector(std::string& inFile, bool LRTmode) {
     }
 
     m_layerGroups.insert(std::make_pair(currentStage, lgv));
+
+    currentStage++;
   }
 
   newConnMap.clear();

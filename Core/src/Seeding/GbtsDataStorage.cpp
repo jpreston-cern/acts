@@ -18,6 +18,8 @@ namespace Acts::Experimental {
 
 GbtsEtaBin::GbtsEtaBin() {
   m_vn.reserve(1000);
+  m_vFirstEdge.reserve(1000);
+  m_vNumEdges.reserve(1000);
 }
 
 void GbtsEtaBin::sortByPhi() {
@@ -50,11 +52,9 @@ void GbtsEtaBin::initializeNodes() {
   }
 
   m_params.resize(m_vn.size());
-
-  m_in.resize(m_vn.size());
-  for (auto& v : m_in) {
-    v.reserve(50);  // reasonably high number of incoming edges per node
-  }
+  m_vFirstEdge.resize(m_vn.size(), 0);
+  m_vNumEdges.resize(m_vn.size(), 0);
+  m_vIsConnected.resize(m_vn.size(), 0);
 
   std::transform(
       m_vn.begin(), m_vn.end(), m_params.begin(), [](const GbtsNode* pN) {
