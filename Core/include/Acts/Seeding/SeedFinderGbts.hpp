@@ -28,6 +28,17 @@ using SPContainerComponentsType =
     std::tuple<SpacePointContainer2, SpacePointColumnProxy<std::uint32_t, true>,
                SpacePointColumnProxy<float, true>,
                SpacePointColumnProxy<float, true>>;
+struct GBTS_SlidingWindow {
+
+    GBTS_SlidingWindow() : m_first_it(0), m_deltaPhi(0.0), m_has_nodes(false), m_bin(nullptr) {};
+    
+    unsigned int m_first_it;// sliding window position
+    float m_deltaPhi;       // window half-width;
+    bool m_has_nodes;       // active or not
+
+    const GbtsEtaBin* m_bin;//associated eta bin
+  };
+
 
 /// Seed finder implementing the GBTs seeding workflow.
 class SeedFinderGbts {
