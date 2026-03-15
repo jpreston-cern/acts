@@ -34,7 +34,10 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   m_inputSpacePoints.initialize(m_cfg.inputSpacePoints);
   m_outputSeeds.initialize(m_cfg.outputSeeds);
   m_inputClusters.initialize(m_cfg.inputClusters);
-
+  
+  // parse the mapping file and turn into map
+  m_actsGbtsMap = makeActsGbtsMap();
+  
   // create the TrigInDetSiLayers (Logical Layers),
   // as well as a map that tracks there index in m_layerGeometry
   auto layerGeometry =
@@ -62,9 +65,6 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
 
   m_filter = Acts::Experimental::GbtsTrackingFilter(m_cfg.trackingFilterConfig,
                                                     geometry);
-
-  // parse the mapping file and turn into map
-  m_actsGbtsMap = makeActsGbtsMap();
 
   printConfig();
 }
