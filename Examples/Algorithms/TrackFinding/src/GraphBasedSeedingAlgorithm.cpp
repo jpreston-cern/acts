@@ -34,10 +34,10 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   m_inputSpacePoints.initialize(m_cfg.inputSpacePoints);
   m_outputSeeds.initialize(m_cfg.outputSeeds);
   m_inputClusters.initialize(m_cfg.inputClusters);
-  
+
   // parse the mapping file and turn into map
   m_actsGbtsMap = makeActsGbtsMap();
-  
+
   // create the TrigInDetSiLayers (Logical Layers),
   // as well as a map that tracks there index in m_layerGeometry
   auto layerGeometry =
@@ -278,15 +278,20 @@ GraphBasedSeedingAlgorithm::layerNumbering(const Acts::GeometryContext &gctx) {
     auto key = ActsIDs{actsJointId, 0};
     auto find = m_actsGbtsMap.find(key);
     // initialise first to avoid FLTUND later
-    std::uint32_t gbtsId = 0;
-    // new map, item is pair want first
-    gbtsId = std::get<0>(find->second);
-    // if end then make new key of (vol*100+lay, modid)
+
     if (find == m_actsGbtsMap.end()) {
-      key = ActsIDs{actsJointId, mod_id};  // mod ID
+      key = ActsIDs{actsJointId, mod_id};
       find = m_actsGbtsMap.find(key);
-      gbtsId = std::get<0>(find->second);
     }
+
+    if (find == m_actsGbtsMap.end()) {
+      ACTS_WARNING("Key not found in Gbts map for volume id: "
+                   << actsVolId << ", layer id: " << actsLayId
+                   << ", sensitive id: " << mod_id);
+      return;  // skip this surface in the visitor
+    }
+
+    std::uint32_t gbtsId = std::get<0>(find->second);
 
     Acts::Experimental::GbtsLayerType barrelEc =
         Acts::Experimental::GbtsLayerType::Barrel;  // a variable that says if

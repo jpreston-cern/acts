@@ -621,7 +621,8 @@ def print_rk4_dense(name_exprs, run_cse=True):
     return "\n".join(lines)
 
 
-output.write("""
+output.write(
+    """
 // This file is part of the ACTS project.
 //
 // Copyright (C) 2016 CERN for the benefit of the ACTS project
@@ -638,7 +639,8 @@ output.write("""
 #include "Acts/Utilities/Result.hpp"
 
 #include <cmath>
-""".strip())
+""".strip()
+)
 
 output.write("\n\n")
 

@@ -171,10 +171,12 @@ def run() -> None:
         for role, instances in sorted(role_instances.items(), key=lambda x: x[0]):
             fh.write(f"## {role_names[role]}\n")
             for instance in sorted(instances):
-                fh.write(f"""
+                fh.write(
+                    f"""
 :::{{{directives[role]}}} {instance}
 :::
-""")
+"""
+                )
             fh.write("\n")
 
 
