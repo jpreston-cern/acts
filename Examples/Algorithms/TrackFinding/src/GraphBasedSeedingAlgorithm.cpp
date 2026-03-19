@@ -55,7 +55,7 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   auto geometry = std::make_shared<Acts::Experimental::GbtsGeometry>(
       layerGeometry, layerConnectionMap);
 
-  m_finder = Acts::Experimental::GraphBasedTrackSeeder(
+  m_finder= Acts::Experimental::GraphBasedTrackSeeder(
       Acts::Experimental::GraphBasedTrackSeeder::DerivedConfig(
           m_cfg.seedFinderConfig),
       geometry, this->logger().cloneWithSuffix("GbtsFinder"));

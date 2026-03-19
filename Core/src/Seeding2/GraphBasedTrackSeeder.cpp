@@ -88,30 +88,27 @@ SeedContainer2 GraphBasedTrackSeeder::createSeeds(
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-  std::vector<SeedProperties> vSeedCandidates;
+  std::vector<std::pair<float, std::vector<std::uint32_t> >> vOutputSeeds;
   extractSeedsFromTheGraph(maxLevel, graphStats.first, spacePoints.size(),
-                           edgeStorage, vSeedCandidates, filter);
+                           edgeStorage, vOutputSeeds, filter);
 
-  if (vSeedCandidates.empty()) {
+  if (vOutputSeeds.empty()) {
     ACTS_WARNING("No Seed Candidates");
   }
 
-  for (const auto& seed : vSeedCandidates) {
-    if (seed.isClone != 0) {
-      continue;
-    }
+  for (const auto& seed : vOutputSeeds) {
 
     // add to seed container:
-    std::vector<SpacePointIndex2> Sp_Indexes{};
-    Sp_Indexes.reserve(seed.spacePoints.size());
+    std::vector<SpacePointIndex2> spIndexes{};
+    spIndexes.reserve(seed.second.size());
 
-    for (const auto& sp_idx : seed.spacePoints) {
-      Sp_Indexes.emplace_back(sp_idx);
+    for (const auto& sp_idx : seed.second) {
+      spIndexes.emplace_back(sp_idx);
     }
 
     auto newSeed = SeedContainer.createSeed();
-    newSeed.assignSpacePointIndices(Sp_Indexes);
-    newSeed.quality() = seed.seedQuality;
+    newSeed.assignSpacePointIndices(spIndexes);
+    newSeed.quality() = seed.first;
   }
 
   ACTS_DEBUG("GBTS created " << SeedContainer.size() << " seeds");
@@ -627,10 +624,10 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     std::uint32_t maxLevel, std::uint32_t nEdges, std::int32_t nHits,
     std::vector<GbtsEdge>& edgeStorage,
-    std::vector<SeedProperties>& vSeedCandidates,
+    std::vector<std::pair<float, std::vector<std::uint32_t> >> vOutputSeeds,
     const GbtsTrackingFilter& filter) const {
-  vSeedCandidates.clear();
 
+   
   // a triplet + 2 confirmation
   std::uint32_t minLevel = 3;
 
@@ -665,8 +662,15 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
                     [](const GbtsEdge* e) { return e->level; });
 
   // backtracking
+  std::vector<SeedProperties> vSeedCandidates;
 
   vSeedCandidates.reserve(vSeeds.size());
+  
+  std::vector<std::pair<float, std::uint32_t> > vArgSort;
+
+  vArgSort.reserve(vSeeds.size());
+
+  std::uint32_t seed_counter = 0;
 
   GbtsTrackingFilter::State filterState{};
 
@@ -706,22 +710,65 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
       continue;
     }
 
-    std::vector<std::uint32_t> vSpIdx;
-    vSpIdx.resize(vN.size());
+    std::uint32_t originalSeedSize = vN.size();
 
-    for (std::uint32_t k = 0; k < vN.size(); ++k) {
-      vSpIdx[k] = vN[k]->idx;
+    float originalSeedQuality = -rs.j/originalSeedSize;
+    
+    std::uint32_t seedSplitFlag = (seedEta < m_cfg.maxEtaForSeedSplit) && (originalSeedSize <= 5) ? 1 : 0;
+
+    if (seedSplitFlag == 1) {//split the seed by dropping spacepoints
+      
+      std::array< std::array<const GbtsNode*, 3>, 3> triplets{};//2 "drop-outs" and the original seed candidate
+      
+      std::array<float, 3> invRads{};//triplet parameter estimate
+
+      triplets[0] = {vN[0], vN[originalSeedSize/2], vN[originalSeedSize-1]};
+
+      std::vector<const GbtsNode*> dropOut1 = {vN.begin()+1, vN.end()}; //all but the first one
+      
+      triplets[1] = {dropOut1[0], dropOut1[(originalSeedSize-1)/2], dropOut1[originalSeedSize-2]};
+      
+      std::vector<const GbtsNode*> dropOut2;
+
+      dropOut2.reserve(originalSeedSize-1);
+      
+      for(std::uint32_t k = 0; k < originalSeedSize; ++k) {
+
+        if (k == originalSeedSize/2) { continue;//drop the middle SP in the original seed
+}
+        
+        dropOut2.emplace_back(vN[k]);
+      }
+
+      triplets[2] = {dropOut2[0], dropOut2[(originalSeedSize-1)/2], dropOut2[originalSeedSize-2]};
+
+      for (std::uint32_t k = 0; k < invRads.size(); k++) {
+
+        invRads[k] = estimate_curvature(triplets[k]);
+	
+      }
+
+      float diffs[3] = {std::abs(invRads[1] - invRads[0]), std::abs(invRads[2] - invRads[0]), std::abs(invRads[2] - invRads[1])};
+
+    bool confirmed = diffs[0] < m_cfg.maxInvRadDiff && diffs[1] < m_cfg.maxInvRadDiff && diffs[2] < m_cfg.maxInvRadDiff;
+
+    if (confirmed) {
+        seedSplitFlag = 0;//reset the flag
+      }
+
     }
 
-    vSeedCandidates.emplace_back(-rs.j / vN.size(), 0, std::move(vSpIdx));
+    vSeedCandidates.emplace_back(originalSeedQuality, 0, vN, seedSplitFlag);
+
+     vArgSort.emplace_back(originalSeedQuality, seed_counter);
+
+    ++seed_counter;
+
   }
 
   // clone removal code goes below ...
 
-  std::ranges::sort(vSeedCandidates,
-                    [](const SeedProperties& s1, const SeedProperties& s2) {
-                      return s1 < s2;
-                    });
+  std::sort(vArgSort.begin(), vArgSort.end());
 
   std::vector<std::uint32_t> h2t(nHits + 1, 0);  // hit to track associations
 
@@ -732,7 +779,7 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     // loop over space points indices
     for (const auto& h : seed.spacePoints) {
-      const std::uint32_t hitId = h + 1;
+      std::uint32_t hitId = h->idx + 1;
 
       const std::uint32_t tid = h2t[hitId];
 
@@ -744,15 +791,23 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     }
   }
 
-  for (std::uint32_t trackIdx = 0; trackIdx < vSeedCandidates.size();
-       ++trackIdx) {
-    const std::uint32_t nTotal = vSeedCandidates[trackIdx].spacePoints.size();
+  std::uint32_t trackIdx = 0;
+ 
+  for(const auto& ags : vArgSort) {
+
+    const auto& seed = vSeedCandidates[ags.second].spacePoints;
+    
+    std::uint32_t nTotal = seed.size();
+
     std::uint32_t nOther = 0;
 
     trackId = trackIdx + 1;
 
-    for (const auto& h : vSeedCandidates[trackIdx].spacePoints) {
-      const std::uint32_t hitId = h + 1;
+    ++trackIdx;
+
+    for(const auto& h : seed ) {
+
+       std::uint32_t hitId = h->idx + 1;
 
       const std::uint32_t tid = h2t[hitId];
 
@@ -764,9 +819,64 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     if (nOther > m_cfg.hitShareThreshold * nTotal) {
       // reject
-      vSeedCandidates[trackIdx].isClone = -1;
+     vSeedCandidates[ags.second].isClone = -1;
     }
   }
+  vOutputSeeds.reserve(vSeedCandidates.size());
+  
+  //drop the clones and split seeds if need be
+
+  for (const auto& seed : vSeedCandidates) {
+
+    if (seed.isClone != 0) { continue;//identified as a clone of a better candidate
+}
+
+    const auto& vN = seed.spacePoints;
+ 
+    if (seed.needsSplitting == 0) {
+      
+      //add seed to output
+
+      std::vector<std::uint32_t> vSpIdx;
+      
+      vSpIdx.resize(vN.size());
+    
+      for(std::uint32_t k = 0; k < vSpIdx.size(); k++) {
+	vSpIdx[k] = vN[k]->idx;
+      }
+
+      vOutputSeeds.emplace_back(seed.seedQuality, vSpIdx);
+
+      continue;
+
+    }
+
+    //seed split into "drop-out" seeds 
+
+    std::uint32_t seedSize = vN.size();
+        
+    std::array<std::size_t, 2> indices2drop = {0, seedSize / 2ul};//the first and the middle
+
+    for(const auto& skipIdx : indices2drop) {
+        
+      std::vector<std::uint32_t> newSeed;
+
+      newSeed.reserve(seedSize-1);
+        
+      for (std::uint32_t k = 0; k < seedSize; k++) {
+          
+	if (k ==  skipIdx) { continue;
+}
+          
+	newSeed.emplace_back(vN[k]->idx);
+         
+      }
+
+      vOutputSeeds.emplace_back(seed.seedQuality, newSeed);
+        
+    }
+  }
+
 }
 
 bool GraphBasedTrackSeeder::checkZ0BitMask(const std::uint16_t z0BitMask,
@@ -785,9 +895,7 @@ bool GraphBasedTrackSeeder::checkZ0BitMask(const std::uint16_t z0BitMask,
 
   // check adjacent bins as well
 
-  const float z0Resolution = 2.5;
-
-  const float dzm = dz - z0Resolution;
+  const float dzm = dz - m_cfg.z0Resolution;
 
   std::int32_t nextBin = static_cast<std::int32_t>(z0HistoCoeff * dzm);
 
@@ -797,7 +905,7 @@ bool GraphBasedTrackSeeder::checkZ0BitMask(const std::uint16_t z0BitMask,
     }
   }
 
-  const float dzp = dz + z0Resolution;
+  const float dzp = dz + m_cfg.z0Resolution;
 
   nextBin = static_cast<std::int32_t>(z0HistoCoeff * dzp);
 
@@ -808,6 +916,53 @@ bool GraphBasedTrackSeeder::checkZ0BitMask(const std::uint16_t z0BitMask,
   }
 
   return false;
+}
+
+float GraphBasedTrackSeeder::estimate_curvature(const std::array<const GbtsNode*, 3>& sps) const {
+
+  //conformal mapping with the center at the last spacepoint
+
+  float u[2], v[2];
+
+  float x0 = sps[2]->x;
+  float y0 = sps[2]->y;
+
+  float r0 = sps[2]->r;
+  
+  float cosA = x0/r0;
+  
+  float sinA = y0/r0;
+
+  
+  for(std::uint32_t k=0;k<2;++k) {
+
+    float dx = sps[k]->x - x0;
+
+    float dy = sps[k]->y - y0;
+
+    float r2Inv = 1.0/(dx*dx+dy*dy);
+    
+    float xn = dx*cosA + dy*sinA;
+    
+    float yn =-dx*sinA + dy*cosA;
+
+    u[k] = xn*r2Inv;
+    v[k] = yn*r2Inv;    
+  }
+
+  float du = u[0] - u[1];
+
+  if(du==0.0) { return 0.0;
+}
+  
+  float A = (v[0] - v[1])/du;
+
+  float B = v[1] - A*u[1];
+  
+  float R = std::sqrt(1 + A*A)/B; //signed radius in mm
+
+  return 1000.0/R; //inverse meters
+  
 }
 
 }  // namespace Acts::Experimental
