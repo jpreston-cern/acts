@@ -83,7 +83,14 @@ class GraphBasedTrackSeeder {
     float edgeMaskMinEta = 1.5;
     /// Threshold for hit sharing between seeds.
     float hitShareThreshold = 0.49;
+    ///
+    float maxEtaForSeedSplit = 0.6;
+    ///
+    float maxInvRadDiff = 0.7e-2;
 
+    //bit mask options
+    ///
+    float z0Resolution = 2.5;
     // GbtsDataStorage options
     /// Maximum endcap cluster width.
     float maxEndcapClusterWidth = 0.35;
@@ -107,20 +114,23 @@ class GraphBasedTrackSeeder {
     /// @param clone Clone flag
     /// @param sps Space point indices
     SeedProperties(float quality, std::int32_t clone,
-                   std::vector<std::uint32_t> sps)
-        : seedQuality(quality), isClone(clone), spacePoints(std::move(sps)) {}
+                   std::vector<const GbtsNode*> sps,
+                   std::uint32_t splitFlag)
+        : seedQuality(quality), isClone(clone), spacePoints(std::move(sps)), needsSplitting(splitFlag) {}
 
     /// Seed quality score.
     float seedQuality{};
     /// Clone flag.
     std::int32_t isClone{};
     /// Space point indices.
-    std::vector<std::uint32_t> spacePoints;
+    std::vector<const GbtsNode*> spacePoints;
+    /// Seed splitting flag.
+    std::uint32_t needsSplitting{};
 
     /// Comparison operator.
     /// @param o Other seed properties to compare
     /// @return True if this is less than other
-    auto operator<=>(const SeedProperties& o) const = default;
+    //auto operator<=>(const SeedProperties& o) const = default;
   };
 
   /// Sliding window in phi used to define range used for edge creation
@@ -206,7 +216,7 @@ class GraphBasedTrackSeeder {
   void extractSeedsFromTheGraph(std::uint32_t maxLevel, std::uint32_t nEdges,
                                 std::int32_t nHits,
                                 std::vector<GbtsEdge>& edgeStorage,
-                                std::vector<SeedProperties>& vSeedCandidates,
+                                std::vector<std::pair<float, std::vector<unsigned int> >> vOutputSeeds,
                                 const GbtsTrackingFilter& filter) const;
 
   /// Check to see if z0 of segment is within the expected z range of the
@@ -218,6 +228,8 @@ class GraphBasedTrackSeeder {
   /// @return Whether segment is within beamspot range
   bool checkZ0BitMask(std::uint16_t z0BitMask, float z0, float minZ0,
                       float z0HistoCoeff) const;
+  
+  float estimate_curvature(const std::array<const GbtsNode*, 3>&) const;
 };
 
 }  // namespace Acts::Experimental
