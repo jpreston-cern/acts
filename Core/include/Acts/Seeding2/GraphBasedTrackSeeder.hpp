@@ -122,7 +122,7 @@ class GraphBasedTrackSeeder {
     float seedQuality{};
     /// Clone flag.
     std::int32_t isClone{};
-    /// Space point indices.
+    /// Pointer to original spacepoint node
     std::vector<const GbtsNode*> spacePoints;
     /// Seed splitting flag.
     std::uint32_t needsSplitting{};
@@ -131,6 +131,18 @@ class GraphBasedTrackSeeder {
     /// @param o Other seed properties to compare
     /// @return True if this is less than other
     //auto operator<=>(const SeedProperties& o) const = default;
+  };
+
+  struct OutputSeed {
+
+    ///Constructor.
+    /// @param quality Seed Qquality score
+    /// @param sps index of spacepoint within container
+    OutputSeed(float quality, std::vector<std::uint32_t> sps) : seedQuality(quality), spacePoints(std::move(sps)) {}
+    
+    float seedQuality{};
+
+    std::vector<std::uint32_t> spacePoints;
   };
 
   /// Sliding window in phi used to define range used for edge creation
@@ -216,7 +228,7 @@ class GraphBasedTrackSeeder {
   void extractSeedsFromTheGraph(std::uint32_t maxLevel, std::uint32_t nEdges,
                                 std::int32_t nHits,
                                 std::vector<GbtsEdge>& edgeStorage,
-                                std::vector<std::pair<float, std::vector<unsigned int> >> vOutputSeeds,
+                                std::vector<OutputSeed> vOutputSeeds,
                                 const GbtsTrackingFilter& filter) const;
 
   /// Check to see if z0 of segment is within the expected z range of the

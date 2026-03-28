@@ -88,7 +88,7 @@ SeedContainer2 GraphBasedTrackSeeder::createSeeds(
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-  std::vector<std::pair<float, std::vector<std::uint32_t> >> vOutputSeeds;
+  std::vector<OutputSeed> vOutputSeeds;
   extractSeedsFromTheGraph(maxLevel, graphStats.first, spacePoints.size(),
                            edgeStorage, vOutputSeeds, filter);
 
@@ -100,15 +100,15 @@ SeedContainer2 GraphBasedTrackSeeder::createSeeds(
 
     // add to seed container:
     std::vector<SpacePointIndex2> spIndexes{};
-    spIndexes.reserve(seed.second.size());
+    spIndexes.reserve(seed.spacePoints.size());
 
-    for (const auto& sp_idx : seed.second) {
+    for (const auto& sp_idx : seed.spacePoints) {
       spIndexes.emplace_back(sp_idx);
     }
 
     auto newSeed = SeedContainer.createSeed();
     newSeed.assignSpacePointIndices(spIndexes);
-    newSeed.quality() = seed.first;
+    newSeed.quality() = seed.seedQuality;
   }
 
   ACTS_DEBUG("GBTS created " << SeedContainer.size() << " seeds");
@@ -557,7 +557,7 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 
   std::uint32_t iter = 0;
 
-  std::vector<GbtsEdge*> v_old;
+  std::vector<GbtsEdge*> vOld;
 
   for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
     GbtsEdge* pS = &(edgeStorage[edgeIndex]);
@@ -567,17 +567,17 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 
     // TODO: increment level for segments as they already have at least one
     // neighbour
-    v_old.push_back(pS);
+    vOld.push_back(pS);
   }
 
-  std::vector<GbtsEdge*> v_new;
-  v_new.reserve(v_old.size());
+  std::vector<GbtsEdge*> vNew;
+  vNew.reserve(vOld.size());
 
   // generate proposals
   for (; iter < maxIter; iter++) {
-    v_new.clear();
+    vNew.clear();
 
-    for (GbtsEdge* pS : v_old) {
+    for (GbtsEdge* pS : vOld) {
       std::int32_t nextLevel = pS->level;
 
       for (std::uint32_t nIdx = 0; nIdx < pS->nNei; ++nIdx) {
@@ -587,7 +587,7 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 
         if (pS->level == pN->level) {
           nextLevel = pS->level + 1;
-          v_new.push_back(pS);
+          vNew.push_back(pS);
           break;
         }
       }
@@ -600,7 +600,7 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 
     std::uint32_t nChanges = 0;
 
-    for (auto pS : v_new) {
+    for (auto pS : vNew) {
       if (pS->next != pS->level) {
         nChanges++;
         pS->level = pS->next;
@@ -614,8 +614,8 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
       break;
     }
 
-    v_old.swap(v_new);
-    v_new.clear();
+    vOld.swap(vNew);
+    vNew.clear();
   }
 
   return maxLevel;
@@ -624,7 +624,7 @@ std::int32_t GraphBasedTrackSeeder::runCCA(
 void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     std::uint32_t maxLevel, std::uint32_t nEdges, std::int32_t nHits,
     std::vector<GbtsEdge>& edgeStorage,
-    std::vector<std::pair<float, std::vector<std::uint32_t> >> vOutputSeeds,
+    std::vector<OutputSeed> vOutputSeeds,
     const GbtsTrackingFilter& filter) const {
 
    
@@ -670,7 +670,7 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
   vArgSort.reserve(vSeeds.size());
 
-  std::uint32_t seed_counter = 0;
+  std::uint32_t seedCounter = 0;
 
   GbtsTrackingFilter::State filterState{};
 
@@ -760,9 +760,9 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     vSeedCandidates.emplace_back(originalSeedQuality, 0, vN, seedSplitFlag);
 
-     vArgSort.emplace_back(originalSeedQuality, seed_counter);
+     vArgSort.emplace_back(originalSeedQuality, seedCounter);
 
-    ++seed_counter;
+    ++seedCounter;
 
   }
 
