@@ -206,7 +206,7 @@ class GraphBasedTrackSeeder {
   void extractSeedsFromTheGraph(std::uint32_t maxLevel, std::uint32_t nEdges,
                                 std::int32_t nHits,
                                 std::vector<GbtsEdge>& edgeStorage,
-                                std::vector<SeedProperties>& vSeedCandidates,
+                                std::vector<std::pair<float, std::vector<unsigned int> > >& vOutputSeeds,
                                 const GbtsTrackingFilter& filter) const;
 
   /// Check to see if z0 of segment is within the expected z range of the
@@ -218,6 +218,8 @@ class GraphBasedTrackSeeder {
   /// @return Whether segment is within beamspot range
   bool checkZ0BitMask(std::uint16_t z0BitMask, float z0, float minZ0,
                       float z0HistoCoeff) const;
+
+  float estimate_curvature(const std::array<const GbtsNode*, 3>&) const;
 };
 
 }  // namespace Acts::Experimental
