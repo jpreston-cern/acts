@@ -51,10 +51,16 @@ class GraphBasedTrackSeeder {
     bool matchBeforeCreate = false;
     /// Use legacy tuning parameters.
     bool useOldTunings = false;
+    ///description here
+    bool validateTriplets = true;
+    ///description here
+    bool useAdaptiveCuts = true;
     /// Tau ratio cut threshold.
-    float tauRatioCut = 0.008;
+    float tauRatioCut = 0.007;
     /// Tau ratio precut threshold.
     float tauRatioPrecut = 0.009f;
+    ///description here
+    float tauRatioCorr = 0.006;
     /// Eta bin width override (0 uses default from connection file).
     // specify non-zero to override eta bin width from connection file (default
     // 0.2 in createLinkingScheme.py)
@@ -222,7 +228,7 @@ class GraphBasedTrackSeeder {
 
   float estimate_curvature(const std::array<const GbtsNode*, 3>&) const;
 
-  bool validate_triplet(std::array<const GbtsNode*, 3>&, const float pt_scale) const;
+  bool validate_triplet(std::array<const GbtsNode*, 3>&, const float min_pt, const float tau_ratio, const float tau_ratio_cut ) const;
 };
 
 }  // namespace Acts::Experimental

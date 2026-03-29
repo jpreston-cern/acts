@@ -255,6 +255,8 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
 
     const std::uint32_t layerId1 = B1.layerId;
 
+    const bool isBarrel1 = (layerId1 / 10000) == 8;
+
     // prepare a sliding window for each bin2 in the group
 
     std::vector<SlidingWindow> phiSlidingWindow;
@@ -324,6 +326,8 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
         const GbtsEtaBin& B2 = *slw.bin;
 
         const unsigned int lk2 = B2.layerId;
+
+        const bool isBarrel2 = (lk2 / 10000) == 8;
 
         const float deltaPhi = slw.deltaPhi;
 
@@ -479,9 +483,30 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
                 continue;
               }
 
-              const float tauRatio = pS->p[0] * uat2 - 1.0f;
+              const unsigned int lk3 = m_geometry->layerIdByIndex(pS->n2->layer);
 
-              if (std::abs(tauRatio) > cutTauRatioMax) {  // bad match
+	      const bool isBarrel3 = (lk3 / 10000) == 8;
+
+              float abs_tau_ratio = std::abs(pS->p[0]*uat2 - 1.0f);
+	      float add_tau_ratio_corr = 0;
+	      
+	      if (m_cfg.useAdaptiveCuts) {
+
+		if (isBarrel1 && isBarrel2 && isBarrel3) {
+		  bool no_gap = ((lk3-lk2) == 1000) && ((lk2-layerId1) == 1000);
+		  if(!no_gap) {
+		    add_tau_ratio_corr = m_cfg.tauRatioCorr;//assume more scattering due to the layer in between
+		  }
+		}
+		else {
+		  bool mixed_triplet = isBarrel1 && isBarrel2 && !isBarrel3;
+		  if (mixed_triplet) {
+		    add_tau_ratio_corr = m_cfg.tauRatioCorr;
+		  }
+		}
+	      }
+
+              if(abs_tau_ratio > cutTauRatioMax + add_tau_ratio_corr){//bad match
                 continue;
               }
 
@@ -505,11 +530,11 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
 
               //final check: cuts on pT and d0
 
-	      if (layerId1 >= 80000 && layerId1 <= 82000 && lk2 >= 81000 && lk2 <= 84000) {//Pixel barrel
+	      if (isBarrel1 && isBarrel2 && isBarrel3) {//Pixel barrel
 
                 std::array<const GbtsNode*, 3> sps = {B1.vn[n1Idx], B2.vn[n2Idx], pS->n2};
 
-                if (!validate_triplet(sps, ptScale)) { continue;
+                if (!validate_triplet(sps, tripletPtMin, abs_tau_ratio, cutTauRatioMax) ) { continue;
 }
 		
               }
@@ -731,9 +756,9 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     float orig_seed_quality = -rs.j/orig_seed_size;
     
-    int seed_split_flag = (seedEta < max_eta_for_seed_split) && (orig_seed_size <= 5) ? 1 : 0;
+    int seed_split_flag = (seedEta < max_eta_for_seed_split) && (orig_seed_size > 3) && (orig_seed_size <= 5) ? 1 : 0;
 
-    if (seed_split_flag == 1) {//split the seed by dropping spacepoints
+    if (seed_split_flag != 0) {//split the seed by dropping spacepoints
       
       std::array< std::array<const GbtsNode*, 3>, 3> triplets{};//2 "drop-outs" and the original seed candidate
       
@@ -984,7 +1009,7 @@ float GraphBasedTrackSeeder::estimate_curvature(const std::array<const GbtsNode*
   
 }
 
-bool GraphBasedTrackSeeder::validate_triplet(std::array<const GbtsNode*, 3>& sps, const float pt_scale) const {
+bool GraphBasedTrackSeeder::validate_triplet(std::array<const GbtsNode*, 3>& sps, const float min_pT, const float tau_ratio, const float tau_ratio_cut) const {
   
   //conformal mapping with the center at the middle spacepoint
 
@@ -1027,21 +1052,29 @@ bool GraphBasedTrackSeeder::validate_triplet(std::array<const GbtsNode*, 3>& sps
 
   const float B = v[1] - A*u[1];
 
-  if (B != 0.0) {//straight-line track is OK
-  
-    const float R = std::sqrt(1 + A*A)/B; //signed radius in mm
-
-    const float pT = 0.3*R; //asssuming uniform 2T field
-    //NOTE: NOT SURE IF THE UNITS IS CORRECT FOR THIS CHECK
-    if (std::abs(pT) < pt_scale*m_cfg.minPt) { return false;
-}
-    
-  }
-    
   const float d0 = r0*(B*r0 - A);
 
   if (std::abs(d0) > m_cfg.d0Max) { return false;
 }
+
+  if (B != 0.0) {//straight-line track is OK
+  
+    const float R = std::sqrt(1 + A*A)/B; //signed radius in mm
+
+    const float pT = std::abs(0.3*R/1000); //asssuming uniform 2T field
+
+    if (pT < min_pT) { return false;
+}
+    //NOTE: NOT SURE IF THE UNITS IS CORRECT FOR THIS 
+    if (pT > 5*min_pT) {//relatively high-pT track
+
+      if (tau_ratio > 0.9*tau_ratio_cut) { return false;
+}
+
+    }
+    
+  }
+    
   
   return true;
 
