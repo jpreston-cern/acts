@@ -829,7 +829,10 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
   
   //drop the clones and split seeds if need be
 
-  for (const auto& seed : vSeedCandidates) {
+  for(const auto& ags : vArgSort) {
+
+    const auto& seed = vSeedCandidates[ags.second];
+
 
     if (std::get<1>(seed) != 0) { continue;//identified as a clone of a better candidate
 }
