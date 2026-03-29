@@ -52,7 +52,7 @@ class GraphBasedTrackSeeder {
     /// Use legacy tuning parameters.
     bool useOldTunings = false;
     /// Tau ratio cut threshold.
-    float tauRatioCut = 0.007;
+    float tauRatioCut = 0.008;
     /// Tau ratio precut threshold.
     float tauRatioPrecut = 0.009f;
     /// Eta bin width override (0 uses default from connection file).
@@ -84,6 +84,7 @@ class GraphBasedTrackSeeder {
     /// Threshold for hit sharing between seeds.
     float hitShareThreshold = 0.49;
 
+    float d0Max = 3.0;
     // GbtsDataStorage options
     /// Maximum endcap cluster width.
     float maxEndcapClusterWidth = 0.35;
@@ -220,6 +221,8 @@ class GraphBasedTrackSeeder {
                       float z0HistoCoeff) const;
 
   float estimate_curvature(const std::array<const GbtsNode*, 3>&) const;
+
+  bool validate_triplet(std::array<const GbtsNode*, 3>&, const float pt_scale) const;
 };
 
 }  // namespace Acts::Experimental

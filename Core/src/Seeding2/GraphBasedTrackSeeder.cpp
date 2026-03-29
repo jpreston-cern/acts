@@ -323,6 +323,8 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
 
         const GbtsEtaBin& B2 = *slw.bin;
 
+        const unsigned int lk2 = B2.layerId;
+
         const float deltaPhi = slw.deltaPhi;
 
         // sliding window phi1 +/- deltaPhi
@@ -500,6 +502,18 @@ std::pair<std::int32_t, std::int32_t> GraphBasedTrackSeeder::buildTheGraph(
               if (dcurv < -cutDCurvMax || dcurv > cutDCurvMax) {
                 continue;
               }
+
+              //final check: cuts on pT and d0
+
+	      if (layerId1 >= 80000 && layerId1 <= 82000 && lk2 >= 81000 && lk2 <= 84000) {//Pixel barrel
+
+                std::array<const GbtsNode*, 3> sps = {B1.vn[n1Idx], B2.vn[n2Idx], pS->n2};
+
+                if (!validate_triplet(sps, ptScale)) { continue;
+}
+		
+              }
+
 
               pS->vNei[pS->nNei] = outEdgeIdx;
               ++pS->nNei;
@@ -966,9 +980,71 @@ float GraphBasedTrackSeeder::estimate_curvature(const std::array<const GbtsNode*
 
   float B = v[1] - A*u[1];
   
-  float R = std::sqrt(1 + A*A)/B; //signed radius in mm
+  return 1000.0*B/std::sqrt(1 + A*A); //inverse meters
+  
+}
 
-  return 1000.0/R; //inverse meters
+bool GraphBasedTrackSeeder::validate_triplet(std::array<const GbtsNode*, 3>& sps, const float pt_scale) const {
+  
+  //conformal mapping with the center at the middle spacepoint
+
+  float u[2], v[2];
+
+  const float x0 = sps[1]->x;
+  const float y0 = sps[1]->y;
+
+  const float r0 = sps[1]->r;
+  
+  const float cosA = x0/r0;
+  
+  const float sinA = y0/r0;
+
+  for(unsigned int k=0;k<2;k++) {
+
+    int sp_idx = (k==1) ? 2 : k;
+    
+    const float dx = sps[sp_idx]->x - x0;
+
+    const float dy = sps[sp_idx]->y - y0;
+
+    const float r2_inv = 1.0/(dx*dx+dy*dy);
+    
+    const float xn = dx*cosA + dy*sinA;
+    
+    const float yn =-dx*sinA + dy*cosA;
+
+    u[k] = xn*r2_inv;
+    v[k] = yn*r2_inv;    
+  }
+
+  const float du = u[0] - u[1];
+
+
+  if ( du == 0.0 ) { return false;
+}
+  
+  const float A = (v[0] - v[1])/du;
+
+  const float B = v[1] - A*u[1];
+
+  if (B != 0.0) {//straight-line track is OK
+  
+    const float R = std::sqrt(1 + A*A)/B; //signed radius in mm
+
+    const float pT = 0.3*R; //asssuming uniform 2T field
+    //NOTE: NOT SURE IF THE UNITS IS CORRECT FOR THIS CHECK
+    if (std::abs(pT) < pt_scale*m_cfg.minPt) { return false;
+}
+    
+  }
+    
+  const float d0 = r0*(B*r0 - A);
+
+  if (std::abs(d0) > m_cfg.d0Max) { return false;
+}
+  
+  return true;
+
   
 }
 
