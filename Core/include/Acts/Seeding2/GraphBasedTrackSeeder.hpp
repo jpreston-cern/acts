@@ -55,12 +55,16 @@ class GraphBasedTrackSeeder {
     bool validateTriplets = true;
     /// description here
     bool useAdaptiveCuts = true;
+    ///description here
+    bool addTriplets = false;
     /// Tau ratio cut threshold.
     float tauRatioCut = 0.007;
     /// Tau ratio precut threshold.
     float tauRatioPrecut = 0.009f;
     /// description here
     float tauRatioCorr = 0.006;
+    /// description here 
+    float maxEtaAddTriplets = 1.5;
     /// Eta bin width override (0 uses default from connection file).
     // specify non-zero to override eta bin width from connection file (default
     // 0.2 in createLinkingScheme.py)
