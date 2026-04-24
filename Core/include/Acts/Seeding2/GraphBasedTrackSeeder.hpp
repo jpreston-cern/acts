@@ -51,17 +51,19 @@ class GraphBasedTrackSeeder {
     bool matchBeforeCreate = false;
     /// Use legacy tuning parameters.
     bool useOldTunings = false;
-    /// description here
+    /// optional validation for abrrel triplets
     bool validateTriplets = true;
-    /// description here
+    /// widens allowed veriation in tau ratio
+    // if layer is missed in edge connecting
     bool useAdaptiveCuts = true;
-    /// description here
+    /// optionally add 3 sp seeds within a cirtain eta range
     bool addTriplets = false;
     /// Tau ratio cut threshold.
     float tauRatioCut = 0.007;
     /// Tau ratio precut threshold.
     float tauRatioPrecut = 0.009f;
-    /// description here
+    /// correction applied to tau acceptance 
+    // if a layer is missed during edge connecting
     float tauRatioCorr = 0.006;
     /// description here
     float maxEtaAddTriplets = 1.5;
