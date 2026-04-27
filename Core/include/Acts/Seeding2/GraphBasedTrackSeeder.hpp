@@ -53,7 +53,7 @@ class GraphBasedTrackSeeder {
     bool useOldTunings = false;
     /// optional validation for abrrel triplets
     bool validateTriplets = true;
-    /// widens allowed veriation in tau ratio
+    /// widens allowed variation in tau ratio
     // if layer is missed in edge connecting
     bool useAdaptiveCuts = true;
     /// optionally add 3 sp seeds within a cirtain eta range
@@ -62,7 +62,7 @@ class GraphBasedTrackSeeder {
     float tauRatioCut = 0.007;
     /// Tau ratio precut threshold.
     float tauRatioPrecut = 0.009f;
-    /// correction applied to tau acceptance 
+    /// correction applied to tau acceptance
     // if a layer is missed during edge connecting
     float tauRatioCorr = 0.006;
     /// description here
