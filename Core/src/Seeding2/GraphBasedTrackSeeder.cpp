@@ -689,9 +689,9 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
         continue;
       }
     } else {  // eta-dependent cut
-      float edgeEta = std::abs(-std::log(pS->p[0]));
+      const float edgeAbsEta = std::abs(-std::log(pS->p[0]));
 
-      if (edgeEta > m_cfg.maxEtaAddTriplets) {
+      if (edgeAbsEta > m_cfg.maxAbsEtaAddTripelts) {
         if (pS->level < minLevel) {
           continue;
         }
@@ -737,16 +737,16 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
       continue;
     }
 
-    float seedEta = std::abs(-std::log(pS->p[0]));
+    const float seedAbsEta = std::abs(-std::log(pS->p[0]));
 
-    std::uint32_t chainLength = static_cast<std::uint32_t>(rs.vs.size());
+    const std::uint32_t chainLength = static_cast<std::uint32_t>(rs.vs.size());
 
     if (m_cfg.lrtMode || !m_cfg.addTriplets) {
       if (chainLength < minLevel) {
         continue;
       }
     } else {
-      if (seedEta > m_cfg.maxEtaAddTriplets) {
+      if (seedAbsEta > m_cfg.maxAbsEtaAddTripelts) {
         if (chainLength < minLevel) {
           continue;
         }
@@ -760,7 +760,7 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     std::vector<const GbtsNode*> vN;
 
     for (auto sIt = rs.vs.rbegin(); sIt != rs.vs.rend(); ++sIt) {
-      if (seedEta > m_cfg.edgeMaskMinEta) {
+      if (seedAbsEta > m_cfg.edgeMaskMinEta) {
         // mark as collected
         (*sIt)->level = -1;
       }
@@ -781,7 +781,7 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     const float origSeedQuality = -rs.j / origSeedSize;
 
-    std::uint32_t seedSplitFlag = (seedEta < m_cfg.maxSeedSplitEta) &&
+    std::uint32_t seedSplitFlag = (seedAbsEta < m_cfg.maxSeedSplitEta) &&
                                           (origSeedSize > 3) &&
                                           (origSeedSize <= 5)
                                       ? 1
