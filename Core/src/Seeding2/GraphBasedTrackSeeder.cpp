@@ -43,6 +43,7 @@ GraphBasedTrackSeeder::GraphBasedTrackSeeder(
 
 void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer2& spacePoints,
                                         const GbtsRoiDescriptor& roi,
+                                        const std::vector<bool>& isPixelLayer,
                                         const std::uint32_t maxLayers,
                                         const GbtsTrackingFilter& filter,
                                         const Options& options,
@@ -50,11 +51,12 @@ void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer2& spacePoints,
   const std::vector<std::vector<GbtsNode>> nodesPerLayer =
       createNodes(spacePoints, maxLayers);
 
-  createSeeds(nodesPerLayer, roi, filter, options, outputSeeds);
+  createSeeds(nodesPerLayer, isPixelLayer, roi, filter, options, outputSeeds);
 }
 
 void GraphBasedTrackSeeder::createSeeds(
     const std::vector<std::vector<GbtsNode>>& nodesPerLayer,
+    const std::vector<bool>& isPixelLayer,
     const GbtsRoiDescriptor& roi, const GbtsTrackingFilter& filter,
     const Options& options, SeedContainer2& outputSeeds) const {
   GbtsNodeStorage nodeStorage(m_geometry, m_mlLut);
@@ -72,8 +74,9 @@ void GraphBasedTrackSeeder::createSeeds(
       continue;
     }
 
-    const bool isPixel = true;
-    // placeholder for now until strip hits are added in
+    // load nodes based on if they are in pixel or strip layers.
+    const bool isPixel = isPixelLayer[l];
+  
     if (isPixel) {
       nPixelLoaded += nodeStorage.loadPixelGraphNodes(
           l, nodes, m_cfg.useMl, m_cfg.maxEndcapClusterWidth);
@@ -163,13 +166,17 @@ std::vector<std::vector<GbtsNode>> GraphBasedTrackSeeder::createNodes(
   auto layerColumn = spacePoints.column<std::uint32_t>("layerId");
   auto clusterWidthColumn = spacePoints.column<float>("clusterWidth");
   auto localPositionColumn = spacePoints.column<float>("localPositionY");
-
+  
   std::vector<std::vector<GbtsNode>> nodesPerLayer(maxLayers);
   // reserve for better efficiency
   for (auto& v : nodesPerLayer) {
     v.reserve(10000);
   }
 
+  // assumes worse case of all layers are pixel
+  std::vector<bool> pixelLayers{};
+  pixelLayers.reserve(maxLayers);
+  
   for (const auto& sp : spacePoints) {
     // for every sp in container,
     // add its variables to nodeStorage organised by layer

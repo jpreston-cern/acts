@@ -179,6 +179,16 @@ class GraphBasedTrackSeeder {
     const GbtsEtaBin* bin{};
   };
 
+  /// spacepoint information to allow nodes to be loaded in
+  struct NodeInformation{
+
+    NodeInformation(std::vector<std::vector<GbtsNode>> nodeStorage_, std::vector<bool> isPixelLayer_) : nodeStorage(std::move(nodeStorage_)), isPixelLayer(std::move(isPixelLayer_)){}
+    ///node storage
+    std::vector<std::vector<GbtsNode>> nodeStorage{};
+    /// information on which layers are strip or pixel
+    std::vector<bool> isPixelLayer{};
+  };
+
   /// @param config Configuration for the seed finder
   /// @param geometry GBTS geometry
   /// @param logger Logging instance
@@ -196,7 +206,9 @@ class GraphBasedTrackSeeder {
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
   void createSeeds(const SpacePointContainer2& spacePoints,
-                   const GbtsRoiDescriptor& roi, std::uint32_t maxLayers,
+                   const GbtsRoiDescriptor& roi, 
+                   const std::vector<bool>& isPixelLayer,
+                   std::uint32_t maxLayers,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer2& outputSeeds) const;
 
@@ -214,6 +226,7 @@ class GraphBasedTrackSeeder {
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
   void createSeeds(const std::vector<std::vector<GbtsNode>>& nodesPerLayer,
+                   const std::vector<bool>& isPixelLayer,
                    const GbtsRoiDescriptor& roi,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer2& outputSeeds) const;
