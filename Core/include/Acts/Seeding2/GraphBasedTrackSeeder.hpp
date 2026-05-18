@@ -95,10 +95,10 @@ class GraphBasedTrackSeeder {
     float cutDCurvMax = 0.001f;
     /// Minimum z0 value, set as optionl as if in pixel mode,
     /// The value is picked from the ROI 
-    std::optional<float> minZ0;
+    float minZ0;
     /// Minimum z0 value, set as optionl as if in pixel mode,
     /// The value is picked from the ROI 
-    std::optional<float> maxZ0;
+    float maxZ0;
     /// When old tunings are used, this defines the minimum phi window used
     float minDeltaPhi = 0.001f;
     /// Maximum radius of pixel detector
