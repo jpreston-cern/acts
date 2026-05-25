@@ -1,4 +1,12 @@
-//includes needed
+// This file is part of the ACTS project.
+//
+// Copyright (C) 2016 CERN for the benefit of the ACTS project
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// includes needed
 #include <cstdint>
 #include <filesystem>
 #include <istream>
@@ -6,56 +14,48 @@
 #include <vector>
 
 namespace Acts::Experimental {
-    
-struct TrackCoordinates{
 
-    float x{};
-    float y{};
-    float z{};
-    float r{};
-
+struct TrackCoordinates {
+  float x{};
+  float y{};
+  float z{};
+  float r{};
 };
 
+struct LayerDescription {
+  LayerDescription(float minR_, float maxR_, float minZ_, float maxZ_,
+                   std::int32_t gbtsId_);
 
-struct LayerDescription{
+  // r values
+  float minR{};
+  float maxR{};
 
-    LayerDescription(float minR_, float maxR_, float minZ_, float maxZ_, std::int32_t gbtsId_);
+  // z values
+  float minZ{};
+  float maxZ{};
 
-    // r values
-    float minR{};
-    float maxR{};
-
-    // z values
-    float minZ{};
-    float maxZ{};
-
-    std::int32_t gbtsId{};
-
-    
-    
+  std::int32_t gbtsId{};
 };
 
 using LayerIdPair = std::pair<std::int32_t, std::int32_t>;
 
-class GbtsTrainingTool{
+class GbtsTrainingTool {
+ public:
+  explicit GbtsTrainingTool(std::istream& inStream);
 
-    public:
+  void addTrack(const std::vector<TrackCoordinates>& Track);
 
-    explicit GbtsTrainingTool(std::istream& inStream);
+  void createConnectionTable(const std::filesystem::path& outputFileLocations,
+                             const double probThreshold) const;
 
-    void addTrack(const std::vector<TrackCoordinates>& Track);
+ private:
+  std::int32_t findGbtsIdByCoord(float r, float z) const;
 
-    void createConnectionTable(const std::filesystem::path& outputFileLocations, const double probThreshold) const;
+  std::vector<LayerDescription> m_layerGeometry{};
 
-    private:
+  std::map<LayerIdPair, std::uint32_t> m_layerPairs{};
 
-    std::int32_t findGbtsIdByCoord(float r, float z) const;
-
-    std::vector<LayerDescription> m_layerGeometry{};
-
-    std::map<LayerIdPair, std::uint32_t> m_layerPairs{};
-
-    std::uint32_t m_totalTracks = 0;
+  std::uint32_t m_totalTracks = 0;
 };
 
-}
+}  // namespace Acts::Experimental
