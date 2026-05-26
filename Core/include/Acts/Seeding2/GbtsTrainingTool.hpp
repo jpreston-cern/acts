@@ -7,6 +7,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // includes needed
+#pragma once
 #include <cstdint>
 #include <filesystem>
 #include <istream>
@@ -51,7 +52,7 @@ class GbtsTrainingTool {
  private:
   std::int32_t findGbtsIdByCoord(float r, float z) const;
 
-  std::vector<LayerDescription> m_layerGeometry{};
+  std::vector<LayerDescription> m_detectorGeometry{};
 
   std::map<LayerIdPair, std::uint32_t> m_layerPairs{};
 

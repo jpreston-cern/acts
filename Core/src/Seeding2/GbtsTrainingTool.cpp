@@ -19,7 +19,7 @@ LayerDescription::LayerDescription(float minR_, float maxR_, float minZ_,
     : minR(minR_), maxR(maxR_), minZ(minZ_), maxZ(maxZ_), gbtsId(gbtsId_) {}
 
 GbtsTrainingTool::GbtsTrainingTool(std::istream& inStream) {
-  // define how many lines there are
+  // define how many lines there are for reserving
   std::uint32_t lines{};
   std::string line{};
   while (std::getline(inStream, line)) {
@@ -28,7 +28,7 @@ GbtsTrainingTool::GbtsTrainingTool(std::istream& inStream) {
   inStream.clear();
   inStream.seekg(0);
 
-  m_layerGeometry.reserve(lines);
+  m_detectorGeometry.reserve(lines);
 
   // create geometry objects
   float minR{};
@@ -42,16 +42,16 @@ GbtsTrainingTool::GbtsTrainingTool(std::istream& inStream) {
   for (std::uint32_t l = 0; l < lines; l++) {
     inStream >> minR >> maxR >> minZ >> maxZ >> gbtsId;
 
-    m_layerGeometry.emplace_back(minR, maxR, minZ, maxZ, gbtsId);
+    m_detectorGeometry.emplace_back(minR, maxR, minZ, maxZ, gbtsId);
   }
 
   // create map linked pairs of GBTS ids with number of transitions between
   // layers
-  for (std::uint32_t i = 0; i < m_layerGeometry.size(); i++) {
-    for (std::uint32_t j = i + 1; j < m_layerGeometry.size(); j++) {
+  for (std::uint32_t i = 0; i < m_detectorGeometry.size(); i++) {
+    for (std::uint32_t j = i + 1; j < m_detectorGeometry.size(); j++) {
       LayerIdPair pair;
-      pair.first = m_layerGeometry[i].gbtsId;
-      pair.second = m_layerGeometry[j].gbtsId;
+      pair.first = m_detectorGeometry[i].gbtsId;
+      pair.second = m_detectorGeometry[j].gbtsId;
 
       // key = GBTS ids of pair, value = number of transitions
       m_layerPairs.emplace(pair, 0);
@@ -119,7 +119,7 @@ void GbtsTrainingTool::createConnectionTable(
 
 std::int32_t GbtsTrainingTool::findGbtsIdByCoord(const float r,
                                                  const float z) const {
-  for (const auto& layer : m_layerGeometry) {
+  for (const auto& layer : m_detectorGeometry) {
     if (layer.minZ < z && z < layer.maxZ) {
       if (layer.minR < r && r < layer.maxR) {
         return layer.gbtsId;
