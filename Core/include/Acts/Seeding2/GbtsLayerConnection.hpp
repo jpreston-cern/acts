@@ -63,7 +63,7 @@ struct GbtsLayerConnectionMap {
   };
 
   /// Eta bin width
-  float etaBinWidth{};
+  float etaBinWidth = 0.2;
 
   /// Map of layer groups indexed by layer
   std::map<std::int32_t, std::vector<LayerGroup>> layerGroups;

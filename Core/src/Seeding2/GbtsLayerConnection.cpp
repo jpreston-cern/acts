@@ -21,33 +21,29 @@ namespace Acts::Experimental {
 
 GbtsLayerConnectionMap GbtsLayerConnectionMap::fromStream(
     std::istream& inStream, bool lrtMode) {
+
   GbtsLayerConnectionMap connectionMap;
 
-  std::uint32_t nLinks{};
+  std::uint32_t nLinks = 0;
+  std::string line;
+  while (std::getline(inStream, line)) {
+    nLinks++;
+  }
 
-  inStream >> nLinks >> connectionMap.etaBinWidth;
-
+  inStream.clear();
+  inStream.seekg(0);
+  
+  // std::cout <<"Jasper: after the nlink finding" << std::endl;
+  // std::cout << "Jasper: number of linke is: " << nLinks << std::endl;
   for (std::uint32_t l = 0; l < nLinks; l++) {
-    std::uint32_t stage{};
-    std::uint32_t lIdx{};
+    std::uint32_t stage = l;
     std::uint32_t src{};
     std::uint32_t dst{};
-    std::uint32_t nEntries{};
-    std::uint32_t height{};
-    std::uint32_t width{};
-
-    inStream >> lIdx >> stage >> src >> dst >> height >> width >> nEntries;
-
+    
+    inStream >> dst >> src;
+    // std::cout << src << " " << dst << std::endl;
     auto pC = std::make_unique<GbtsLayerConnection>(src, dst);
-
-    std::uint32_t dummy{};
-
-    for (std::uint32_t i = 0; i < height; ++i) {
-      for (std::uint32_t j = 0; j < width; ++j) {
-        inStream >> dummy;
-      }
-    }
-
+    
     std::uint32_t srcvol_id = src / 1000;
     std::uint32_t dstvol_id = dst / 1000;
 

@@ -9,18 +9,17 @@
 // includes needed
 #pragma once
 #include <cstdint>
-#include <filesystem>
-#include <istream>
-#include <map>
+#include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Acts::Experimental {
 
 struct TrackCoordinates {
-  float x{};
-  float y{};
-  float z{};
+
   float r{};
+  float z{};
 };
 
 struct LayerDescription {
@@ -40,21 +39,31 @@ struct LayerDescription {
 
 using LayerIdPair = std::pair<std::int32_t, std::int32_t>;
 
+struct LayerIdPairHash {
+  std::size_t operator()(const LayerIdPair& pair) const noexcept {
+    const auto h1 = std::hash<std::int32_t>{}(pair.first);
+    const auto h2 = std::hash<std::int32_t>{}(pair.second);
+
+    return h1 ^ (h2 << 1);
+  }
+};
+
 class GbtsTrainingTool {
  public:
-  explicit GbtsTrainingTool(std::istream& inStream);
+  explicit GbtsTrainingTool(std::string& geometryInformation);
 
   void addTrack(const std::vector<TrackCoordinates>& Track);
 
-  void createConnectionTable(const std::filesystem::path& outputFileLocations,
+  void createConnectionTable(const std::string& outputFileLocations,
                              const double probThreshold) const;
+  
+ std::optional<std::int32_t> findGbtsIdByCoord(float r, float z) const;
 
  private:
-  std::int32_t findGbtsIdByCoord(float r, float z) const;
-
+  
   std::vector<LayerDescription> m_detectorGeometry{};
 
-  std::map<LayerIdPair, std::uint32_t> m_layerPairs{};
+  std::unordered_map<LayerIdPair, std::uint32_t, LayerIdPairHash> m_layerPairs{};
 
   std::uint32_t m_totalTracks = 0;
 };

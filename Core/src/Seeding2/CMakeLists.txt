@@ -16,4 +16,5 @@ target_sources(
         GbtsLayerConnection.cpp
         GbtsRoiDescriptor.cpp
         HoughAccumulatorSection.cpp
+        GbtsTrainingTool.cpp
 )
