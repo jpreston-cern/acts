@@ -25,4 +25,5 @@ target_sources(
         GbtsRoiDescriptor.cpp
         GbtsLayerConnectionTool.cpp
         HoughAccumulatorSection.cpp
+        DisplacedGbtsGraph.hpp
 )
