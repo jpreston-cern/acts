@@ -64,6 +64,9 @@ namespace Acts::Experimental{
       /// Maximum z0 value. In pixel mode the value is picked from the RoI.
       float maxZ0 = 600.0f;
 
+      /// Maximum d0 impact parameter when validating an edge-connection triplet.
+      float d0Max = 3.0f * Acts::UnitConstants::mm;
+
       /// pT at which the default cut coefficients were tuned; they scale by
       /// `tuningPt / minPt`.
       float tuningPt = 0.9f * Acts::UnitConstants::GeV;
