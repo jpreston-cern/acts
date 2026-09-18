@@ -132,7 +132,7 @@ struct SlidingWindow {
     // and the tau correction (which should be used)
     const bool isPixelBarrel1 = barrelOrder1 >= 0;
     
-    // this should be kept, but we shouldnt "isConnected" and "zbitmask"
+    // this should be kept, but we shouldnt use "isConnected" and "zbitmask"
     // due to them not making much sense on a min level = 2 graph
     const bool useMatchBeforeCreate =
         m_cfg.matchBeforeCreate && barrelOrder1 >= 0 &&
@@ -160,14 +160,32 @@ struct SlidingWindow {
 
       // override the default window width
       if (m_cfg.useEtaBinning) {
+        
         const float absDr = std::fabs(rb2 - rb1);
+        const float maxD0 = m_cfg.d0Max;
         // the general equations for this need to change
+        auto phiWindow = [&rb1, &rb2, &maxD0, ptScale](const float& phiWindowOffset, const float& phiWindowSlope){
+                                   const float maxD0Square = maxD0*maxD0;
+                                   const float rb1Square = rb1*rb1;
+                                   const float rb2Square = rb2*rb2;
+
+                                   const float frac1 = maxD0/rb1;
+                                   const float frac2 = maxD0/rb2;
+                                   const float displacmentTerm = std::acos(frac2) - std::acos(frac1);
+
+                                   const float corr1 = std::sqrt(rb1Square - maxD0Square);
+                                   const float corr2 = std::sqrt(rb2Square - maxD0Square); 
+                                   
+                                   const float curvatureTerm = (corr2 - corr1)*phiWindowSlope*ptScale;
+
+                                   const float absPhiWindow = phiWindowOffset + std::abs(displacmentTerm - curvatureTerm);
+
+                                   return absPhiWindow;
+                                   };
         if (absDr < m_cfg.phiWindowSplitDeltaRadius) {
-          deltaPhi = m_cfg.phiWindowNearOffset +
-                     m_cfg.phiWindowNearSlope * ptScale * absDr;
+          deltaPhi = phiWindow(m_cfg.phiWindowNearOffset, m_cfg.phiWindowNearSlope);
         } else {
-          deltaPhi = m_cfg.phiWindowFarOffset +
-                     m_cfg.phiWindowFarSlope * ptScale * absDr;
+          deltaPhi = phiWindow(m_cfg.phiWindowFarOffset, m_cfg.phiWindowFarSlope);
         }
       }
 
