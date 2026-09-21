@@ -47,6 +47,15 @@ struct GbtsLayerDescription final {
   /// -1 for every other layer. Derived from `refCoord` when left unset; set it
   /// on every pixel barrel layer or on none of them.
   std::int32_t barrelOrder{-1};
+  /// How deep the layer sits in the barrel, counting outwards from zero at the
+  /// innermost barrel layer the geometry was given, -1 for an endcap.
+  ///
+  /// Counted over every barrel layer whatever its technology, which is what
+  /// separates it from `barrelOrder`: that numbers the pixel barrel alone and
+  /// so is -1 throughout a detector whose inner layers are strips. Derived
+  /// from `refCoord` when left unset; set it on every barrel layer or on none
+  /// of them.
+  std::int32_t depth{-1};
 };
 
 }  // namespace Acts::Experimental

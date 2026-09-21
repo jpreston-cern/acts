@@ -361,7 +361,8 @@ struct SeederSetup {
 };
 
 SeederSetup makeSeeder(const ToyDetector& detector,
-                       const bool calibrateStrips = true) {
+                       const bool calibrateStrips = true,
+                       const bool matchBeforeCreate = false) {
   auto geometry = makeGeometry(detector);
 
   const auto makeLogger = []() -> std::unique_ptr<const Logger> {
@@ -379,6 +380,7 @@ SeederSetup makeSeeder(const ToyDetector& detector,
   graphConfig.maxZ0 = kZ0Max;
   graphConfig.maxOuterRadius = kMaxOuterRadius;
   graphConfig.calibrateStrips = calibrateStrips;
+  graphConfig.matchBeforeCreate = matchBeforeCreate;
   // a link here already cost a triplet fit, so three nodes are a seed
   graphConfig.minSeedLevel = 2;
 
@@ -692,6 +694,63 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeWithTheTurnPrecutActive) {
     BOOST_TEST_MESSAGE("missing:\n" << result.report);
   }
 
+  BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
+  BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
+}
+
+// Every barrel layer is given a depth counting outwards from the innermost,
+// whatever it is made of. `barrelOrder` cannot serve: it numbers the pixel
+// barrel alone, so on this detector it is -1 throughout and anything keyed on
+// it never fires.
+BOOST_AUTO_TEST_CASE(BarrelLayersAreGivenADepth) {
+  const ToyDetector detector = stripBarrelDetector();
+  const auto geometry = makeGeometry(detector);
+
+  BOOST_REQUIRE_EQUAL(geometry->numLayers(), detector.layers.size());
+
+  for (Experimental::GbtsLayerIndex i = 0; i < geometry->numLayers(); ++i) {
+    const Experimental::GbtsLayerDescription& layer =
+        geometry->layerDescription(i);
+
+    // the toy layers are handed over innermost first, so depth follows
+    BOOST_CHECK_EQUAL(layer.depth, static_cast<std::int32_t>(i));
+    // and the thing it replaces is blind to them
+    BOOST_CHECK_EQUAL(layer.barrelOrder, -1);
+  }
+}
+
+// With a depth to key on, matchBeforeCreate reaches this detector at all. It
+// is a filter on edge creation, so the tracks have to survive it whole.
+//
+// The dense fixture, since it only filters a node carrying more than
+// `matchBeforeCreateMaxEdges` outgoing edges and well separated tracks never
+// give one that many.
+BOOST_AUTO_TEST_CASE(MatchBeforeCreateKeepsEveryEdge) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeederSetup off = makeSeeder(detector, true, /*matchBeforeCreate=*/false);
+  const SeederSetup on = makeSeeder(detector, true, /*matchBeforeCreate=*/true);
+
+  const GraphRun without = buildGraph(off, spacePoints);
+  const GraphRun with = buildGraph(on, spacePoints);
+
+  BOOST_TEST_MESSAGE("matchBeforeCreate off: " << without.nEdges << " edges, "
+                                               << without.nConnections
+                                               << " connections");
+  BOOST_TEST_MESSAGE("matchBeforeCreate on : " << with.nEdges << " edges, "
+                                               << with.nConnections
+                                               << " connections");
+
+  // it has to actually engage, or the test below proves nothing
+  BOOST_CHECK_LT(with.nEdges, without.nEdges);
+
+  // and every edge and connection the tracks owe is still there
+  const Completeness result = checkCompleteness(with, spacePoints, tracks);
+  if (!result.report.empty()) {
+    BOOST_TEST_MESSAGE("missing:\n" << result.report);
+  }
   BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
   BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
 }

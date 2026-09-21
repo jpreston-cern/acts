@@ -137,9 +137,13 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
     const bool useZ0Histogram =
         barrelOrder1 >= 0 && barrelOrder1 <= m_cfg.z0HistogramMaxBarrelOrder;
-    const bool useMatchBeforeCreate =
-        m_cfg.matchBeforeCreate && barrelOrder1 >= 0 &&
-        barrelOrder1 <= m_cfg.matchBeforeCreateMaxBarrelOrder;
+    // How deep this bin's layer sits in the barrel, counting every barrel
+    // layer rather than the pixel ones alone, so that this reaches the
+    // innermost layers of a detector whatever they are made of.
+    const std::int32_t depth1 = B1.depth;
+
+    const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
+                                      depth1 <= m_cfg.matchBeforeCreateMaxDepth;
 
     // prepare a sliding window for each non-empty bin2 in the group
 

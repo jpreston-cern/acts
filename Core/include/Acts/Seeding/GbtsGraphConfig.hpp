@@ -142,10 +142,16 @@ struct GbtsGraphConfig {
   /// @note Prompt only. A displaced track has no z0 worth histogramming.
   std::int32_t z0HistogramMaxBarrelOrder = 0;
 
-  /// Highest pixel barrel layer, counted inside out, to which
-  /// `matchBeforeCreate` applies when it is enabled. A negative value
-  /// disables it.
-  std::int32_t matchBeforeCreateMaxBarrelOrder = 1;
+  /// Deepest barrel layer, counting outwards from zero at the innermost the
+  /// geometry holds, to which `matchBeforeCreate` applies when it is enabled.
+  /// A negative value disables it, and an endcap layer is never included.
+  ///
+  /// Counted over every barrel layer whatever its technology, so it selects
+  /// the same layers on a detector whose innermost are strips as on one whose
+  /// innermost are pixels. That is what it is for: keyed on `barrelOrder`
+  /// instead, which numbers the pixel barrel alone, `matchBeforeCreate` was
+  /// unreachable on any detector without pixels at the bottom.
+  std::int32_t matchBeforeCreateMaxDepth = 1;
 
   /// Half-width of the z0 window against which a node is matched in the
   /// histogram.

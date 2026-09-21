@@ -177,9 +177,14 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
     // asks about
     const bool isPixelBarrel1 = barrelOrder1 >= 0;
 
-    const bool useMatchBeforeCreate =
-        m_cfg.matchBeforeCreate && barrelOrder1 >= 0 &&
-        barrelOrder1 <= m_cfg.matchBeforeCreateMaxBarrelOrder;
+    // How deep this bin's layer sits in the barrel, counting every barrel
+    // layer rather than the pixel ones alone. On an all strip detector
+    // `barrelOrder` is -1 throughout, which is what kept matchBeforeCreate
+    // from ever firing here.
+    const std::int32_t depth1 = B1.depth;
+
+    const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
+                                      depth1 <= m_cfg.matchBeforeCreateMaxDepth;
 
     // prepare a sliding window for each non-empty bin2 in the group
 
