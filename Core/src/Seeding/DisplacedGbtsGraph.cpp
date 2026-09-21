@@ -86,10 +86,11 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   const float curvatureCutHighEta = m_cfg.maxCurvatureHighEta * ptScale;
   const float curvatureCutLowEta = m_cfg.maxCurvatureLowEta * ptScale;
 
-  // the looser of the two, for the precut that runs before the fitted tau
+  // the looser of the two, for the precuts that run before the fitted tau
   // exists to say which of them applies
   const float curvatureCutLoosest =
       std::max(curvatureCutLowEta, curvatureCutHighEta);
+
 
   // the loosest tau ratio threshold the triplet matching can apply
   const float maxTauRatioCut =
@@ -398,8 +399,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
             }
           }
 
+          // The inner edge's own chord direction, which every candidate below
+          // is measured against and which its own edge then carries for the
+          // triplets it will be the outer edge of. The chord is already here,
+          // so the unit vector costs a reciprocal.
+          const float invChord = 1.0f / chord;
+          const float cosAlpha12 = dx * invChord;
+          const float sinAlpha12 = dy * invChord;
+
           if (nEdges < m_cfg.nMaxEdges) {
-            edgeStorage.emplace_back(n1Idx, n2Idx, expEta, barrelOrder2);
+            edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
+                                     sinAlpha12, barrelOrder2);
 
             ++numCreatedEdges;
 
@@ -434,10 +444,6 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 continue;
               }
 
-              const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
-
-              const bool isPixelBarrel3 = barrelOrder3 >= 0;
-
               // The three nodes of the candidate triplet, inside out. The
               // doublet stage could not fix a circle, so everything the prompt
               // graph read off a single doublet -- curvature, the tangent
@@ -451,6 +457,51 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               const std::array<bool, 3> isStrip{
                   !isPixel1, !isPixel2,
                   nodeView.strip(tripletNodes[2]) != nullptr};
+
+              // A strip end has still to slide along its strip, and in the
+              // endcap that slide is largely radial, so it moves the chords
+              // the two geometric cuts below are reading. Where they cannot be
+              // sure they do not cut: rejecting a candidate the fit would have
+              // kept is the one thing they must not do.
+              const bool endsWillMove =
+                  calibrate && (isStrip[0] || isStrip[1] || isStrip[2]);
+
+              // The turn from the inner edge to this one, which is
+              // asin(curvature * L13) and so falls with pT. Both directions
+              // were taken once, each when its own edge was made, so the turn
+              // comes out of a dot and a cross of two cached unit vectors and
+              // the cut never forms the angle at all.
+              //
+              // L13 is not measured here; the two chords bound it, since
+              // L13 <= L12 + L23. That bound is this pair's own rather than
+              // the detector's, which is the difference between a cut that
+              // fires and one that does not: the widest turn the curvature
+              // limit allows runs from about three degrees between adjacent
+              // pixel layers to ten across the strips.
+              if (!endsWillMove) {
+                const float sinDelta =
+                    cosAlpha12 * pS->sinAlpha - sinAlpha12 * pS->cosAlpha;
+                const float cosDelta =
+                    cosAlpha12 * pS->cosAlpha + sinAlpha12 * pS->sinAlpha;
+
+                // Turning by a quarter circle between two layers puts the
+                // triplet's own ends half a circle apart, which is orders
+                // below any pT worth seeding. It also puts the turn past where
+                // its sine still grows with curvature, so the test below would
+                // stop meaning anything.
+                if (cosDelta <= 0.0f) {
+                  continue;
+                }
+
+                if (std::abs(sinDelta) >
+                    curvatureCutLoosest * (chord + pS->chord)) {
+                  continue;
+                }
+              }
+
+              const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
+
+              const bool isPixelBarrel3 = barrelOrder3 >= 0;
 
               float addTauRatioCorr = 0;
 
@@ -495,58 +546,6 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               std::array<std::array<float, 3>, 3> points{
                   nodePoint(tripletNodes[0]), nodePoint(tripletNodes[1]),
                   nodePoint(tripletNodes[2])};
-
-              // The curvature these three points imply, before any fitting.
-              // A chord bisects the tangents at its ends, so the turn from
-              // chord (n1,n2) to chord (n2,n3) is asin(curvature * L13): it
-              // grows with curvature and so falls with pT, which is the whole
-              // reason a wide turn is not worth fitting. Inverting that gives
-              // curvature = sin(turn) / L13, and the circumradius of a
-              // triangle, R = abc / (4 * area), is the same statement without
-              // the trigonometry -- the two chords and the cross product
-              // between them are all it needs.
-              //
-              // Being exact rather than a bound, it cuts each candidate on its
-              // own L13 instead of the widest in the set, and needs no
-              // ordering to do it.
-              const float dx12 = points[1][0] - points[0][0];
-              const float dy12 = points[1][1] - points[0][1];
-              const float dx23 = points[2][0] - points[1][0];
-              const float dy23 = points[2][1] - points[1][1];
-              const float dx13 = points[2][0] - points[0][0];
-              const float dy13 = points[2][1] - points[0][1];
-
-              // twice the area of the triangle, signed the way the fit signs
-              // its curvature
-              const float cross = dx12 * dy23 - dy12 * dx23;
-
-              const float chordProduct = fastHypot(dx12, dy12) *
-                                         fastHypot(dx23, dy23) *
-                                         fastHypot(dx13, dy13);
-
-              if (chordProduct == 0.0f) {
-                continue;
-              }
-
-              // in the prompt graph's dphi/dr convention, half the geometric
-              // 1/R, which is what the cut values are written in
-              const float nominalCurv = cross / chordProduct;
-
-              // Only where the ends are already where the fit will see them. A
-              // strip end still has to slide along its strip, and in the
-              // endcap that slide is largely radial, so it moves the
-              // transverse position by enough to change this number. Rejecting
-              // here something the fit would have kept is the one thing this
-              // must not do, so where it cannot be sure it does not cut. The
-              // threshold is the looser of the two eta-dependent ones for the
-              // same reason: which applies depends on a tau that does not
-              // exist yet.
-              const bool endsWillMove =
-                  calibrate && (isStrip[0] || isStrip[1] || isStrip[2]);
-
-              if (!endsWillMove && std::abs(nominalCurv) > curvatureCutLoosest) {
-                continue;
-              }
 
               std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
 
