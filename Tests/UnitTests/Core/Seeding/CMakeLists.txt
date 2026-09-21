@@ -5,6 +5,7 @@ add_unittest(AdaptiveHoughTransformTest HoughAccumulatorSectionTest.cpp)
 add_unittest(StrawLineResiduals StrawLineResidualTest.cpp)
 add_unittest(SphericalSpacePointGrid SphericalSpacePointGridTests.cpp)
 add_unittest(GbtsSeeding GbtsSeedingTests.cpp)
+add_unittest(DisplacedGbtsSeeding DisplacedGbtsSeedingTests.cpp)
 add_unittest(SpacePointGridPhiBinning SpacePointGridPhiBinningTests.cpp)
 
 if(ACTS_BUILD_PLUGIN_ROOT)
