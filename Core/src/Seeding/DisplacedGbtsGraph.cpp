@@ -32,8 +32,6 @@ struct SlidingWindow {
   float deltaPhi{};
   /// Inside-out pixel barrel ordinal of the bin's layer, -1 for the rest.
   std::int32_t barrelOrder{-1};
-  /// Type of the bin's layer.
-  GbtsLayerType type{};
   /// Technology of the bin's layer.
   GbtsLayerTechnology technology{};
 };
@@ -91,11 +89,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   const float curvatureCutLoosest =
       std::max(curvatureCutLowEta, curvatureCutHighEta);
 
-
   // the loosest tau ratio threshold the triplet matching can apply
   const float maxTauRatioCut =
       m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
       (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStrip : 0.0f);
+
+  // The z0 band a doublet spans as d0 runs over [0, d0Max]. Everything in it
+  // that no pair affects is taken here, since the square roots would otherwise
+  // be worked out again for every candidate pair in the event.
+  const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
+  const float rOut = m_cfg.maxOuterRadius;
+  const float sOutMin = std::sqrt(std::max(0.f, rOut * rOut - d0MaxSquare));
 
   // the default sliding window along phi. Taken from the node storage so that
   // the windows and the phi indexing they slide over cannot disagree.
@@ -151,17 +155,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
     // used for the phi window width creation
     const float rb1 = B1.minRadius;
-    // still aplicacable but will be for strips this time
+    // Only a pixel barrel layer is given one of these, so an all strip
+    // detector leaves every one of them at -1 and the adaptive tau correction
+    // below never fires.
     const std::int32_t barrelOrder1 = B1.barrelOrder;
 
     // used to define whether a node in this bin needs calibrating due to low stip resoution in the r/ plane
     const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
-    // defines whether we are a pixel barrel layer, used for triplet validation (not needed),
-    // and the tau correction (which should be used)
+    // whether this is a pixel barrel layer, which the adaptive tau correction
+    // asks about
     const bool isPixelBarrel1 = barrelOrder1 >= 0;
-    
-    // this should be kept, but we shouldnt use "isConnected" and "zbitmask"
-    // due to them not making much sense on a min level = 2 graph
+
     const bool useMatchBeforeCreate =
         m_cfg.matchBeforeCreate && barrelOrder1 >= 0 &&
         barrelOrder1 <= m_cfg.matchBeforeCreateMaxBarrelOrder;
@@ -170,9 +174,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
     phiSlidingWindow.clear();
 
-    // ready for loop over outer bins 
-    // loop over bin groups
-  // loop over n2 eta-bins in L2 layers
+    // loop over n2 eta-bins in L2 layers
     for (const std::uint32_t b2Idx : bg.links) {
       // outer most bin 
       const detail::GbtsEtaBinInfo& B2 = nodeStorage.etaBin(b2Idx);
@@ -238,18 +240,13 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
-      // again this is problamatic ( think i need to implement a layer first approach here)
-      // maybe keep for now and let claude do it once you have 
       window.barrelOrder = B2.barrelOrder;
-      window.type = B2.type;
       window.technology = B2.technology;
     }
 
     // in GBTSv3 the outer loop goes over n1 nodes in the Layer 1 bin (inner most node first)
     for (SpacePointIndex n1Idx = B1.nodes.first; n1Idx < B1.nodes.second;
          ++n1Idx) {
-      
-      // put inside loop here where things are going to get more complicated 
       // initialization using the top watermark of the edge storage
       edgeInfo[n1Idx].firstEdge = nEdges;
 
@@ -263,10 +260,20 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       const float r1 = n1pars.r;
       const float z1 = n1pars.z;
 
-      // the chord of a pair, both paths need it now
       const std::array<float, 4>& position = nodeView.positions[n1Idx];
-      float x1 = position[0];
-      float y1 = position[1];
+      const float x1 = position[0];
+      const float y1 = position[1];
+
+      // this node as the triplet fit wants it, before any strip resolution
+      const std::array<float, 3> point1{x1, y1, z1};
+
+      // The transverse path from the perigee to this node at the two ends of
+      // the d0 range, and from there the lever arm out to the detector edge.
+      // Both ends of the band are linear in the pair's tau, so the pair has
+      // only a multiply left to do.
+      const float s1Min = std::sqrt(std::max(0.f, r1 * r1 - d0MaxSquare));
+      const float outerLeverZeroD0 = rOut - r1;
+      const float outerLeverMaxD0 = sOutMin - s1Min;
       
       // the intermediate loop over sliding windows. these are associated with the nodes in the outer bin
       for (auto& slw : phiSlidingWindow) {
@@ -275,10 +282,20 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
         const bool isPixelBarrel2 = barrelOrder2 >= 0;
 
+        // Whether the inner two nodes of every triplet from this window have
+        // an end still to slide along a strip. When they do, the geometric
+        // cut below is off whatever the third node turns out to be, and when
+        // the calibration is off nothing moves at all -- either way the
+        // third node need not be looked at to know.
+        const bool innerEndsMove = calibrate && (!isPixel1 || !isPixel2);
+
         const float deltaPhi = slw.deltaPhi;
 
-        // sliding window phi1 +/- deltaPhi
-        // need to check if the equation i derived is the half width or full phi window
+        // Sliding window phi1 +/- deltaPhi, so deltaPhi is the half width.
+        // That is what the terms above give: a track displaced to +d0Max walks
+        // the displacement term one way round and one at -d0Max walks it the
+        // other, and the same for the two charges, so the full span is
+        // symmetric about phi1 and each term is already its half.
         const float minPhi = phi1 - deltaPhi;
         const float maxPhi = phi1 + deltaPhi;
 
@@ -318,8 +335,9 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           // On the nominal radii, so an endcap pair the slide would have
           // opened up is lost here. The cheap reject is worth more.
 
-          // we should work out the chord here i think for each pair and then cut on a minimum chord length 
-          // set to same value i think for now as they serve similar purposes (can tune later)
+          // Shares `minDeltaRadius` with the prompt graph's radial separation
+          // cut since the two serve the same purpose, though a chord and a
+          // radial step are not the same thing and this can be tuned apart.
           if (chord < m_cfg.minDeltaRadius) {
             continue;
           }
@@ -345,30 +363,20 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           // doublet stage -- two transverse points do not fix a circle -- so z0
           // is a band spanned by d0 in [0, d0Max]. S1 is monotonic in d0, so
           // the two endpoints bracket the band.
-          const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
-
-          const float s1Max = r1;  // d0 = 0
-          const float s1Min = std::sqrt(std::max(0.f, r1 * r1 - d0MaxSquare));
-
-          const float z0A = z1 - s1Max * tau;
-          const float z0B = z1 - s1Min * tau;
-          const float z0Lo = std::min(z0A, z0B);
-          const float z0Hi = std::max(z0A, z0B);
-
           if (m_cfg.doubletFilterRZ) {
+            const float z0A = z1 - r1 * tau;     // d0 = 0
+            const float z0B = z1 - s1Min * tau;  // d0 = d0Max
+
             // the band has to overlap the allowed range, not sit inside it
-            if (z0Hi < m_cfg.minZ0 || z0Lo > m_cfg.maxZ0) {
+            if (std::max(z0A, z0B) < m_cfg.minZ0 ||
+                std::min(z0A, z0B) > m_cfg.maxZ0) {
               continue;
             }
 
             // z(rOut) = z1 + (sOut - S1) * tau, and (sOut - S1) also grows
             // monotonically with d0, so the endpoints bracket this band too.
-            const float rOut = m_cfg.maxOuterRadius;
-            const float sOutMin =
-                std::sqrt(std::max(0.f, rOut * rOut - d0MaxSquare));
-
-            const float zOutA = z1 + (rOut - s1Max) * tau;
-            const float zOutB = z1 + (sOutMin - s1Min) * tau;
+            const float zOutA = z1 + outerLeverZeroD0 * tau;
+            const float zOutB = z1 + outerLeverMaxD0 * tau;
 
             // NOTE: the two bands are tested separately although they share the
             // same d0, so a pair can pass the two on different d0 values. That
@@ -388,20 +396,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           const float invExpEta = hypotTau + tau;
 
           // match edge candidate against edges incoming to n2
-          // can keep this i think 
           if (useMatchBeforeCreate) {
             // we must have enough incoming edges to decide
             bool isGood = n2NumEdges <= m_cfg.matchBeforeCreateMaxEdges;
 
             if (!isGood) {
-              const float uat1 = invExpEta;
-
               for (std::uint32_t n2InIdx = n2FirstEdge; n2InIdx < n2LastEdge;
                    ++n2InIdx) {
                 // the doublet's own tau: a displaced edge has no fit
                 // parameters of its own until a triplet gives it some
                 const float tau2 = edgeStorage[n2InIdx].expEta;
-                const float tauRatio = tau2 * uat1 - 1.0f;
+                const float tauRatio = tau2 * invExpEta - 1.0f;
 
                 if (std::abs(tauRatio) > m_cfg.tauRatioPrecut) {  // bad match
                   continue;
@@ -424,6 +429,10 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           const float cosAlpha12 = dx * invChord;
           const float sinAlpha12 = dy * invChord;
 
+          // the middle node of every triplet the loop below tries, which does
+          // not depend on which outer edge it pairs with
+          const std::array<float, 3> point2{position2[0], position2[1], z2};
+
           if (nEdges < m_cfg.nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
                                      sinAlpha12, barrelOrder2);
@@ -431,28 +440,30 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
             ++numCreatedEdges;
 
             const std::uint32_t outEdgeIdx = nEdges;
+
+            // the edge just made, which the loop below records its triplets
+            // on. Nothing reallocates the storage, since it was reserved to
+            // nMaxEdges and never grows past it.
+            detail::DisplacedGbtsEdge& newEdge = edgeStorage[outEdgeIdx];
             
-            const float uat2 = invExpEta;
-          
-            // looking for neighbours of the new edge using outer node 
+            // looking for neighbours of the new edge using outer node
             for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
                  ++inEdgeIdx) {
 
               // The new edge can only record so many triplets, and a triplet
               // it did not record is one a later match cannot see, so there is
               // nothing to gain from looking further.
-              if (edgeStorage[outEdgeIdx].properties.size() >=
-                  detail::kGbtsMaxEdgeNeighbours) {
+              if (newEdge.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
                 break;
               }
 
-              // i think i need to add the triplet stuff here already such that everything can be calibrated properly before (maybe)
               detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
 
-              const float absTauRatio = std::abs(pS->expEta * uat2 - 1.0f);
+              const float absTauRatio =
+                  std::abs(pS->expEta * invExpEta - 1.0f);
 
-              // rejects most candidates before the layer bookkeeping below
-              // this can stay as we want the tau ratio still 
+              // the loosest form of the tau ratio, which rejects most
+              // candidates before anything below has to run
               if (absTauRatio > maxTauRatioCut) {
                 continue;
               }
@@ -461,27 +472,18 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 continue;
               }
 
-              // The three nodes of the candidate triplet, inside out. The
-              // doublet stage could not fix a circle, so everything the prompt
-              // graph read off a single doublet -- curvature, the tangent
-              // azimuth, d0, pT -- is found here instead.
-              const std::array<SpacePointIndex, 3> tripletNodes{n1Idx, n2Idx,
-                                                                pS->n2};
-
-              // Whether each node has an along-strip coordinate sitting in the
-              // tau it contributes. The inner two go by their bin, the third
-              // by whether it carries a stereo pair.
-              const std::array<bool, 3> isStrip{
-                  !isPixel1, !isPixel2,
-                  nodeView.strip(tripletNodes[2]) != nullptr};
-
               // A strip end has still to slide along its strip, and in the
               // endcap that slide is largely radial, so it moves the chords
-              // the two geometric cuts below are reading. Where they cannot be
-              // sure they do not cut: rejecting a candidate the fit would have
-              // kept is the one thing they must not do.
+              // the geometric cut below is reading. Where it cannot be sure it
+              // does not cut: rejecting a candidate the fit would have kept is
+              // the one thing it must not do.
+              //
+              // The third node is only worth asking about when the inner two
+              // have settled it either way, which keeps the lookup off the
+              // path of every candidate the turn is about to reject.
               const bool endsWillMove =
-                  calibrate && (isStrip[0] || isStrip[1] || isStrip[2]);
+                  innerEndsMove ||
+                  (calibrate && nodeView.strip(pS->n2) != nullptr);
 
               // The turn from the inner edge to this one, which is
               // asin(curvature * L13) and so falls with pT. Both directions
@@ -515,6 +517,20 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                   continue;
                 }
               }
+
+              // The three nodes of the candidate triplet, inside out. The
+              // doublet stage could not fix a circle, so everything the prompt
+              // graph read off a single doublet -- curvature, the tangent
+              // azimuth, d0, pT -- is found here instead.
+              const std::array<SpacePointIndex, 3> tripletNodes{n1Idx, n2Idx,
+                                                                pS->n2};
+
+              // Whether each node has an along-strip coordinate sitting in the
+              // tau it contributes. The inner two go by their bin, the third
+              // by whether it carries a stereo pair.
+              const std::array<bool, 3> isStrip{
+                  !isPixel1, !isPixel2,
+                  nodeView.strip(tripletNodes[2]) != nullptr};
 
               const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
 
@@ -561,8 +577,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               }
 
               std::array<std::array<float, 3>, 3> points{
-                  nodePoint(tripletNodes[0]), nodePoint(tripletNodes[1]),
-                  nodePoint(tripletNodes[2])};
+                  point1, point2, nodePoint(tripletNodes[2])};
 
               std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
 
@@ -705,14 +720,16 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               // doublet does not have. An outer edge that is not yet in any
               // triplet is the outermost pair of a chain and has nothing to
               // disagree with, so it passes.
-              if (!pS->properties.empty()) {
+              if (pS->nProperties > 0) {
                 // node 1 of this triplet is the inner node of the shared
                 // doublet, which is where the recorded tangents were taken
                 const float phiShared = circle->tangentPhi(1);
 
                 bool matched = false;
 
-                for (const detail::TripletProperties& prev : pS->properties) {
+                for (std::uint8_t p = 0; p < pS->nProperties; ++p) {
+                  const detail::TripletProperties& prev = pS->properties[p];
+
                   float dPhi = phiShared - prev.phi;
 
                   if (dPhi < -std::numbers::pi_v<float>) {
@@ -751,11 +768,12 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               // The new edge is the inner edge of this triplet, so what a
               // later triplet through (n1, n2) will be matched against is the
               // tangent at n1, node 0.
-              edgeStorage[outEdgeIdx].properties.emplace_back(
-                  circle->expEta, tripletCurv, circle->tangentPhi(0));
+              newEdge.properties[newEdge.nProperties] =
+                  detail::TripletProperties{circle->expEta, tripletCurv,
+                                            circle->tangentPhi(0)};
+              ++newEdge.nProperties;
 
-              if (edgeStorage[outEdgeIdx].properties.size() ==
-                  detail::kGbtsMaxEdgeNeighbours) {
+              if (newEdge.nProperties == detail::kGbtsMaxEdgeNeighbours) {
                 ++nSaturatedProperties;
               }
 

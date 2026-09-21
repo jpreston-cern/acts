@@ -7,7 +7,6 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <vector>
 
 namespace Acts::Experimental::detail{
 
@@ -22,6 +21,8 @@ namespace Acts::Experimental::detail{
   /// of the doublet they share, which is the only point the two triplets
   /// agree on by construction.
   struct TripletProperties{
+
+    TripletProperties() = default;
 
     /// Constructor
     /// @param expEta_ exp(eta) of the triplet
@@ -116,11 +117,7 @@ namespace Acts::Experimental::detail{
         chord(chord_),
         cosAlpha(cosAlpha_),
         sinAlpha(sinAlpha_),
-        n2BarrelOrder{n2BarrelOrder_} {
-
-          properties.reserve(kGbtsMaxEdgeNeighbours);
-          
-        }
+        n2BarrelOrder{n2BarrelOrder_} {}
 
   /// Inner node of the edge
   SpacePointIndex n1{kSpacePointIndexInvalid};
@@ -154,10 +151,18 @@ namespace Acts::Experimental::detail{
   /// @copydoc cosAlpha
   float sinAlpha{};
 
+  /// How many of @ref properties are filled. Zero while the edge is the
+  /// outermost pair of every chain it could start.
+  std::uint8_t nProperties{0};
+
   /// One entry per triplet this edge is the inner edge of, at most
-  /// @c kGbtsMaxEdgeNeighbours of them. Empty while the edge is the outermost
-  /// pair of every chain it could start.
-  std::vector<TripletProperties> properties{};
+  /// @c kGbtsMaxEdgeNeighbours of them.
+  ///
+  /// Held inline and counted, exactly as @ref vNei is, and for the same
+  /// reason: the cap is a small constant, so a vector here would be a heap
+  /// allocation for every edge in the graph and a pointer chase to read one
+  /// back.
+  std::array<TripletProperties, kGbtsMaxEdgeNeighbours> properties{};
 
   /// Inside-out pixel barrel ordinal of the outer node's layer, -1 for the
   /// rest. It is also the only thing the innermost neighbour loop asks about
