@@ -135,12 +135,13 @@ struct GbtsGraphConfig {
   /// Incoming edge count below which a node is accepted without a tau match.
   std::uint32_t matchBeforeCreateMaxEdges = 2;
 
-  /// Highest pixel barrel layer, counted inside out, whose nodes are cut
-  /// against the z0 histogram of their outer neighbourhood and whose isolated
-  /// nodes are skipped. A negative value disables the cut.
+  /// Deepest barrel layer, counting outwards from zero at the innermost the
+  /// geometry holds, whose nodes are cut against the z0 histogram of their
+  /// outer neighbourhood and whose isolated nodes are skipped. A negative
+  /// value disables the cut.
   ///
   /// @note Prompt only. A displaced track has no z0 worth histogramming.
-  std::int32_t z0HistogramMaxBarrelOrder = 0;
+  std::int32_t z0HistogramMaxDepth = 0;
 
   /// Deepest barrel layer, counting outwards from zero at the innermost the
   /// geometry holds, to which `matchBeforeCreate` applies when it is enabled.
@@ -148,9 +149,7 @@ struct GbtsGraphConfig {
   ///
   /// Counted over every barrel layer whatever its technology, so it selects
   /// the same layers on a detector whose innermost are strips as on one whose
-  /// innermost are pixels. That is what it is for: keyed on `barrelOrder`
-  /// instead, which numbers the pixel barrel alone, `matchBeforeCreate` was
-  /// unreachable on any detector without pixels at the bottom.
+  /// innermost are pixels.
   std::int32_t matchBeforeCreateMaxDepth = 1;
 
   /// Half-width of the z0 window against which a node is matched in the

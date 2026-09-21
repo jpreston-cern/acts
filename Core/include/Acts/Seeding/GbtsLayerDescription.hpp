@@ -43,18 +43,15 @@ struct GbtsLayerDescription final {
   float minBound{};
   /// Maximum boundary coordinate.
   float maxBound{};
-  /// Position of the layer in the inside-out ordering of the pixel barrel,
-  /// -1 for every other layer. Derived from `refCoord` when left unset; set it
-  /// on every pixel barrel layer or on none of them.
-  std::int32_t barrelOrder{-1};
   /// How deep the layer sits in the barrel, counting outwards from zero at the
   /// innermost barrel layer the geometry was given, -1 for an endcap.
   ///
-  /// Counted over every barrel layer whatever its technology, which is what
-  /// separates it from `barrelOrder`: that numbers the pixel barrel alone and
-  /// so is -1 throughout a detector whose inner layers are strips. Derived
-  /// from `refCoord` when left unset; set it on every barrel layer or on none
-  /// of them.
+  /// Counted over every barrel layer whatever its technology, so that the
+  /// layers it picks out are the same on a detector whose innermost are strips
+  /// as on one whose innermost are pixels. Where a cut wants pixels
+  /// specifically it asks `technology`, and where it wants to count layers it
+  /// asks this. Derived from `refCoord` when left unset; set it on every
+  /// barrel layer or on none of them.
   std::int32_t depth{-1};
 };
 

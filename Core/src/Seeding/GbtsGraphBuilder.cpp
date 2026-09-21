@@ -37,8 +37,8 @@ struct SlidingWindow {
   std::uint32_t firstIt{};
   /// window half-width;
   float deltaPhi{};
-  /// Inside-out pixel barrel ordinal of the bin's layer, -1 for the rest.
-  std::int32_t barrelOrder{-1};
+  /// How deep the bin's layer sits in the barrel, -1 for an endcap.
+  std::int32_t depth{-1};
   /// Type of the bin's layer.
   GbtsLayerType type{};
   /// Technology of the bin's layer.
@@ -130,18 +130,17 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
     const float rb1 = B1.minRadius;
 
-    const std::int32_t barrelOrder1 = B1.barrelOrder;
-
-    const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
-    const bool isPixelBarrel1 = barrelOrder1 >= 0;
-
-    const bool useZ0Histogram =
-        barrelOrder1 >= 0 && barrelOrder1 <= m_cfg.z0HistogramMaxBarrelOrder;
     // How deep this bin's layer sits in the barrel, counting every barrel
-    // layer rather than the pixel ones alone, so that this reaches the
-    // innermost layers of a detector whatever they are made of.
+    // layer whatever it is made of. The tau widening, the z0 histogram and
+    // matchBeforeCreate all key on it; where a cut wants pixels specifically
+    // it asks the technology as well.
     const std::int32_t depth1 = B1.depth;
 
+    const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
+    const bool isPixelBarrel1 = depth1 >= 0 && isPixel1;
+
+    const bool useZ0Histogram =
+        depth1 >= 0 && depth1 <= m_cfg.z0HistogramMaxDepth;
     const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
                                       depth1 <= m_cfg.matchBeforeCreateMaxDepth;
 
@@ -177,7 +176,7 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
-      window.barrelOrder = B2.barrelOrder;
+      window.depth = B2.depth;
       window.type = B2.type;
       window.technology = B2.technology;
     }
@@ -212,10 +211,10 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
       // the intermediate loop over sliding windows
       for (auto& slw : phiSlidingWindow) {
-        const std::int32_t barrelOrder2 = slw.barrelOrder;
+        const std::int32_t depth2 = slw.depth;
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
-        const bool isPixelBarrel2 = barrelOrder2 >= 0;
+        const bool isPixelBarrel2 = depth2 >= 0 && isPixel2;
 
         const bool stripPair = calibrate && (!isPixel1 || !isPixel2);
 
@@ -391,8 +390,8 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const float dPhi1 = curv * r1c;
 
           if (nEdges < m_cfg.nMaxEdges) {
-            edgeStorage.emplace_back(n1Idx, n2Idx, barrelOrder2, expEta, curv,
-                                     phi1 + dPhi1);
+            edgeStorage.emplace_back(n1Idx, n2Idx, depth2, isPixel2, expEta,
+                                     curv, phi1 + dPhi1);
 
             ++numCreatedEdges;
 
@@ -418,28 +417,31 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                 continue;
               }
 
-              const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
+              const std::int32_t depth3 = pS->n2Depth;
 
-              const bool isPixelBarrel3 = barrelOrder3 >= 0;
+              const bool isPixelBarrel3 = depth3 >= 0 && pS->n2IsPixel;
 
               float addTauRatioCorr = 0;
 
-              if (m_cfg.useAdaptiveCuts) {
-                if (isPixelBarrel1 && isPixelBarrel2 && isPixelBarrel3) {
+              // How much material the triplet crossed, which is what the tau
+              // widening is really asking about, so it counts every barrel
+              // layer rather than the pixel ones alone: a strip layer between
+              // two pixel layers is material the triplet scattered in, and
+              // numbering the pixels alone would call them adjacent.
+              if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
+                if (depth3 >= 0) {
                   // three radially consecutive layers, none skipped
-                  const bool noGap = (barrelOrder2 - barrelOrder1) == 1 &&
-                                     (barrelOrder3 - barrelOrder2) == 1;
+                  const bool noGap =
+                      (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
 
                   // assume more scattering due to the layer in between
                   if (!noGap) {
                     addTauRatioCorr = m_cfg.tauRatioCorr;
                   }
                 } else {
-                  bool mixedTriplet =
-                      isPixelBarrel1 && isPixelBarrel2 && !isPixelBarrel3;
-                  if (mixedTriplet) {
-                    addTauRatioCorr = m_cfg.tauRatioCorr;
-                  }
+                  // the third node left the barrel, so there is no counting
+                  // the layers between and a gap has to be assumed
+                  addTauRatioCorr = m_cfg.tauRatioCorr;
                 }
               }
               // The two doublets sharing a strip node resolved it separately,

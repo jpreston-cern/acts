@@ -30,8 +30,8 @@ struct SlidingWindow {
   std::uint32_t firstIt{};
   /// window half-width;
   float deltaPhi{};
-  /// Inside-out pixel barrel ordinal of the bin's layer, -1 for the rest.
-  std::int32_t barrelOrder{-1};
+  /// How deep the bin's layer sits in the barrel, -1 for an endcap.
+  std::int32_t depth{-1};
   /// Technology of the bin's layer.
   GbtsLayerTechnology technology{};
 };
@@ -166,21 +166,13 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
     // used for the phi window width creation
     const float rb1 = B1.minRadius;
-    // Only a pixel barrel layer is given one of these, so an all strip
-    // detector leaves every one of them at -1 and the adaptive tau correction
-    // below never fires.
-    const std::int32_t barrelOrder1 = B1.barrelOrder;
+
 
     // used to define whether a node in this bin needs calibrating due to low stip resoution in the r/ plane
     const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
-    // whether this is a pixel barrel layer, which the adaptive tau correction
-    // asks about
-    const bool isPixelBarrel1 = barrelOrder1 >= 0;
-
     // How deep this bin's layer sits in the barrel, counting every barrel
-    // layer rather than the pixel ones alone. On an all strip detector
-    // `barrelOrder` is -1 throughout, which is what kept matchBeforeCreate
-    // from ever firing here.
+    // layer whatever it is made of. Both the tau widening below and
+    // matchBeforeCreate key on it.
     const std::int32_t depth1 = B1.depth;
 
     const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
@@ -256,7 +248,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
-      window.barrelOrder = B2.barrelOrder;
+      window.depth = B2.depth;
       window.technology = B2.technology;
     }
 
@@ -293,10 +285,9 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       
       // the intermediate loop over sliding windows. these are associated with the nodes in the outer bin
       for (auto& slw : phiSlidingWindow) {
-        const std::int32_t barrelOrder2 = slw.barrelOrder;
+        const std::int32_t depth2 = slw.depth;
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
-        const bool isPixelBarrel2 = barrelOrder2 >= 0;
 
         // Whether the inner two nodes of every triplet from this window have
         // an end still to slide along a strip. When they do, the geometric
@@ -451,7 +442,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
           if (nEdges < m_cfg.nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
-                                     sinAlpha12, barrelOrder2);
+                                     sinAlpha12, depth2);
             edgeExpEta.push_back(expEta);
 
             ++numCreatedEdges;
@@ -551,28 +542,29 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                   !isPixel1, !isPixel2,
                   nodeView.strip(tripletNodes[2]) != nullptr};
 
-              const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
-
-              const bool isPixelBarrel3 = barrelOrder3 >= 0;
+              const std::int32_t depth3 = pS->n2Depth;
 
               float addTauRatioCorr = 0;
 
-              if (m_cfg.useAdaptiveCuts) {
-                if (isPixelBarrel1 && isPixelBarrel2 && isPixelBarrel3) {
+              // How much material the triplet crossed, which is what the tau
+              // widening is really asking about, so it counts every barrel
+              // layer rather than the pixel ones alone: a strip layer between
+              // two pixel layers is material the triplet scattered in, and
+              // numbering the pixels alone would call them adjacent.
+              if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
+                if (depth3 >= 0) {
                   // three radially consecutive layers, none skipped
-                  const bool noGap = (barrelOrder2 - barrelOrder1) == 1 &&
-                                     (barrelOrder3 - barrelOrder2) == 1;
+                  const bool noGap =
+                      (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
 
                   // assume more scattering due to the layer in between
                   if (!noGap) {
                     addTauRatioCorr = m_cfg.tauRatioCorr;
                   }
                 } else {
-                  bool mixedTriplet =
-                      isPixelBarrel1 && isPixelBarrel2 && !isPixelBarrel3;
-                  if (mixedTriplet) {
-                    addTauRatioCorr = m_cfg.tauRatioCorr;
-                  }
+                  // the third node left the barrel, so there is no counting
+                  // the layers between and a gap has to be assumed
+                  addTauRatioCorr = m_cfg.tauRatioCorr;
                 }
               }
               // The two doublets sharing a strip node resolved it separately,

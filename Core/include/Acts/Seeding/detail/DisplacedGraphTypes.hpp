@@ -105,10 +105,10 @@ namespace Acts::Experimental::detail{
   /// @param chord_ Transverse length of the edge's own chord
   /// @param cosAlpha_ Cosine of the azimuth of that chord
   /// @param sinAlpha_ Sine of the azimuth of that chord
-  /// @param n2BarrelOrder_ Pixel barrel ordinal of the outer node's layer
+  /// @param n2Depth_ Barrel depth of the outer node's layer
   DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_,
            float chord_, float cosAlpha_, float sinAlpha_,
-           std::int32_t n2BarrelOrder_)
+           std::int32_t n2Depth_)
       : n1{n1_},
         n2{n2_},
         level{1},
@@ -117,7 +117,7 @@ namespace Acts::Experimental::detail{
         chord(chord_),
         cosAlpha(cosAlpha_),
         sinAlpha(sinAlpha_),
-        n2BarrelOrder{n2BarrelOrder_} {}
+        n2Depth{n2Depth_} {}
 
   /// Inner node of the edge
   SpacePointIndex n1{kSpacePointIndexInvalid};
@@ -155,11 +155,11 @@ namespace Acts::Experimental::detail{
   /// @copydoc cosAlpha
   float sinAlpha{};
 
-  /// Inside-out pixel barrel ordinal of the outer node's layer, -1 for the
-  /// rest. It is also the only thing the innermost neighbour loop asks about
-  /// the outer node's layer, so it is cached next to the fit parameters rather
-  /// than chased through the node's bin.
-  std::int32_t n2BarrelOrder{-1};
+  /// How deep the outer node's layer sits in the barrel, -1 for an endcap.
+  /// It is also all the innermost neighbour loop asks about the outer node's
+  /// layer, so it is cached beside the rest rather than chased through the
+  /// node's bin.
+  std::int32_t n2Depth{-1};
 
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 

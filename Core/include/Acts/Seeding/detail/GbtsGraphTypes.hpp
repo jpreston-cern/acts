@@ -94,8 +94,6 @@ struct GbtsEtaBinInfo final {
 
   float minRadius{};
   float maxRadius{};
-  /// Inside-out pixel barrel ordinal of the bin's layer, -1 for the rest.
-  std::int32_t barrelOrder{-1};
   /// How deep the bin's layer sits in the barrel, -1 for an endcap.
   std::int32_t depth{-1};
 
@@ -193,18 +191,20 @@ struct GbtsEdge final {
   /// Constructor
   /// @param n1_ Inner node index
   /// @param n2_ Outer node index
-  /// @param n2BarrelOrder_ Pixel barrel ordinal of the outer node's layer
+  /// @param n2Depth_ Barrel depth of the outer node's layer
+  /// @param n2IsPixel_ Whether the outer node's layer is pixel
   /// @param p1_ First fit parameter
   /// @param p2_ Second fit parameter
   /// @param p3_ Third fit parameter
-  GbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_,
-           std::int32_t n2BarrelOrder_, float p1_, float p2_, float p3_)
+  GbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, std::int32_t n2Depth_,
+           bool n2IsPixel_, float p1_, float p2_, float p3_)
       : n1{n1_},
         n2{n2_},
         level{1},
         next{1},
+        n2IsPixel{n2IsPixel_},
         p{p1_, p2_, p3_},
-        n2BarrelOrder{n2BarrelOrder_} {}
+        n2Depth{n2Depth_} {}
 
   /// Inner node of the edge
   SpacePointIndex n1{kSpacePointIndexInvalid};
@@ -216,13 +216,18 @@ struct GbtsEdge final {
 
   std::uint8_t nNei{0};
 
+  /// Whether the outer node's layer is pixel. Only meaningful together with
+  /// @ref n2Depth, which says whether it is in the barrel at all. Sits here
+  /// because the byte is padding either way.
+  bool n2IsPixel{false};
+
   std::array<float, 3> p{};
 
-  /// Inside-out pixel barrel ordinal of the outer node's layer, -1 for the
-  /// rest. It is also the only thing the innermost neighbour loop asks about
-  /// the outer node's layer, so it is cached next to the fit parameters rather
-  /// than chased through the node's bin.
-  std::int32_t n2BarrelOrder{-1};
+  /// How deep the outer node's layer sits in the barrel, -1 for an endcap.
+  /// It is also all the innermost neighbour loop asks about the outer node's
+  /// layer, so it is cached next to the fit parameters rather than chased
+  /// through the node's bin.
+  std::int32_t n2Depth{-1};
 
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 };
