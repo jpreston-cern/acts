@@ -20,6 +20,7 @@ namespace Acts::Experimental::detail{
   /// and the ones matched against them describe the circle at the inner node
   /// of the doublet they share, which is the only point the two triplets
   /// agree on by construction.
+//! [displaced triplet properties]
   struct TripletProperties{
 
     TripletProperties() = default;
@@ -95,6 +96,9 @@ namespace Acts::Experimental::detail{
     }
   };
 
+//! [displaced triplet properties]
+
+//! [displaced edge]
   struct DisplacedGbtsEdge final {
   DisplacedGbtsEdge() = default;
 
@@ -176,6 +180,8 @@ namespace Acts::Experimental::detail{
   /// into a single cache line.
   std::array<TripletProperties, kGbtsMaxEdgeNeighbours> properties{};
 };
+
+//! [displaced edge]
 
 /// exp(eta) of an edge, which the displaced edge keeps in a field of its own
 /// because a displaced doublet has no fit parameters to put it among.
