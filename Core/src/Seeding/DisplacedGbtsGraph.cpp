@@ -191,22 +191,39 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
         
         const float absDr = std::fabs(rb2 - rb1);
         const float maxD0 = m_cfg.d0Max;
-        // the general equations for this need to change
         auto phiWindow = [&rb1, &rb2, &maxD0, ptScale](const float& phiWindowOffset, const float& phiWindowSlope){
                                    const float maxD0Square = maxD0*maxD0;
-                                   const float rb1Square = rb1*rb1;
-                                   const float rb2Square = rb2*rb2;
 
-                                   const float frac1 = maxD0/rb1;
-                                   const float frac2 = maxD0/rb2;
+                                   // How far round the beamline a displaced
+                                   // track walks between the two radii. A
+                                   // straight track of impact parameter d0
+                                   // sits at azimuth acos(d0 / r), which is
+                                   // exact and not a small angle expansion.
+                                   //
+                                   // A track only reaches radius r if its |d0|
+                                   // is below r, so a bin inside the d0 limit
+                                   // takes the limit down to its own radius.
+                                   // Without that the ratio passes one and the
+                                   // arc cosine returns a NaN, which would
+                                   // leave every phi comparison false and so
+                                   // the sliding window neither closing nor
+                                   // advancing.
+                                   const float frac1 = std::min(1.0f, maxD0/rb1);
+                                   const float frac2 = std::min(1.0f, maxD0/rb2);
                                    const float displacmentTerm = std::acos(frac2) - std::acos(frac1);
 
-                                   const float corr1 = std::sqrt(rb1Square - maxD0Square);
-                                   const float corr2 = std::sqrt(rb2Square - maxD0Square); 
-                                   
+                                   const float corr1 = std::sqrt(std::max(0.0f, rb1*rb1 - maxD0Square));
+                                   const float corr2 = std::sqrt(std::max(0.0f, rb2*rb2 - maxD0Square));
+
                                    const float curvatureTerm = (corr2 - corr1)*phiWindowSlope*ptScale;
 
-                                   const float absPhiWindow = phiWindowOffset + std::abs(displacmentTerm - curvatureTerm);
+                                   // The two add. Where the track started and
+                                   // which way it bends are independent, so a
+                                   // track displaced to one side and bending
+                                   // the same way walks the sum of them, and a
+                                   // window that took the difference would be
+                                   // covering only the case where they cancel.
+                                   const float absPhiWindow = phiWindowOffset + std::abs(displacmentTerm) + std::abs(curvatureTerm);
 
                                    return absPhiWindow;
                                    };
