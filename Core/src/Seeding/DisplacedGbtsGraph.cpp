@@ -241,6 +241,14 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
   std::uint32_t nConnections = 0;
 
+  // edges that filled their neighbour array, each one a connection the graph
+  // could have gone on to make and now cannot
+  std::uint32_t nSaturatedNeighbours = 0;
+
+  // edges that filled their triplet property store, which leaves them unable
+  // to record what a later edge would have been matched against
+  std::uint32_t nSaturatedProperties = 0;
+
   edgeStorage.reserve(m_cfg.nMaxEdges);
   
   // number of edges acepted into the storage, 
@@ -817,8 +825,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               edgeStorage[outEdgeIdx].properties.emplace_back(
                   circle->expEta, tripletCurv, circle->tangentPhi(0));
 
+              if (edgeStorage[outEdgeIdx].properties.size() ==
+                  detail::kGbtsMaxEdgeNeighbours) {
+                ++nSaturatedProperties;
+              }
+
               pS->vNei[pS->nNei] = outEdgeIdx;
               ++pS->nNei;
+
+              if (pS->nNei == detail::kGbtsMaxEdgeNeighbours) {
+                ++nSaturatedNeighbours;
+              }
 
               nConnections++;
             } // inEdgeIdx
@@ -838,6 +855,20 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
     ACTS_WARNING(
         "Maximum number of graph edges exceeded - possible efficiency loss "
         << nEdges);
+  }
+
+  if (nSaturatedNeighbours > 0) {
+    ACTS_WARNING("Maximum number of edge connections ("
+                 << detail::kGbtsMaxEdgeNeighbours << ") reached on "
+                 << nSaturatedNeighbours << " of " << nEdges
+                 << " edges - possible efficiency loss");
+  }
+
+  if (nSaturatedProperties > 0) {
+    ACTS_WARNING("Maximum number of recorded triplets ("
+                 << detail::kGbtsMaxEdgeNeighbours << ") reached on "
+                 << nSaturatedProperties << " of " << nEdges
+                 << " edges - possible efficiency loss");
   }
 
   return std::make_pair(nEdges, nConnections);
