@@ -28,6 +28,11 @@ namespace Acts::Experimental{
       /// Match seeds before creating them.
       bool matchBeforeCreate = false;
 
+      /// Cut a triplet on the pT and d0 of its own fit. The fit itself runs
+      /// either way, since the curvature properties an edge carries only
+      /// exist once three nodes have fixed the circle.
+      bool validateTriplets = true;
+
       /// Widens allowed variation in tau ratio if a layer is missed in edge
       /// connecting.
       bool useAdaptiveCuts = true;
@@ -80,6 +85,14 @@ namespace Acts::Experimental{
 
       /// Maximum d0 impact parameter when validating an edge-connection triplet.
       float d0Max = 3.0f * Acts::UnitConstants::mm;
+
+      /// Maximum difference in allowed tangent between candidate edge
+      /// connections. Displaced, the two tangents being compared are the ones
+      /// the two triplet fits put at the shared doublet's inner node.
+      float cutDPhiMax = 0.012f;
+
+      /// Maximum allowed curvature tolerance for candidate edge connections.
+      float cutDCurvMax = 0.001f;
 
       /// pT at which the default cut coefficients were tuned; they scale by
       /// `tuningPt / minPt`.
