@@ -6,7 +6,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
+#include "Acts/Seeding/GbtsGraphConfig.hpp"
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
 #include "ActsExamples/TrackFinding/AdaptiveHoughTransformSeeder.hpp"
 #include "ActsExamples/TrackFinding/GraphBasedSeedingAlgorithm.hpp"
@@ -91,21 +91,25 @@ void addTrackFinding(py::module& mex) {
   }
 
   {
-    using Config = Acts::Experimental::GbtsGraphBuilder::Config;
+    // One configuration serves both graphs, so this binds the prompt and the
+    // displaced mode alike.
+    using Config = Acts::Experimental::GbtsGraphConfig;
     auto c =
         py::class_<Config>(mex, "GbtsGraphBuilderConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(c, minPt, minSeedLevel, addTriplets,
                        maxAbsEtaAddTriplets, nMaxEdges, minDeltaRadius,
                        doubletFilterRZ, matchBeforeCreate, validateTriplets,
-                       useAdaptiveCuts, calibrateStrips, maxOuterRadius);
+                       useAdaptiveCuts, calibrateStrips, maxOuterRadius, d0Max,
+                       cutDPhiMax, cutDCurvMax, tauRatioCut, ccaMaxIterations);
     patchKwargsConstructor(c);
   }
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
       GraphBasedSeedingAlgorithm, mex, "GraphBasedSeedingAlgorithm",
       inputSpacePoints, outputSeeds, seedFinderConfig, graphConfig,
-      useStripConnections, layerMappingFile, connectorInputFile, lutInputFile,
-      trackingGeometry, fillModuleCsv, inputClusters);
+      useDisplacedGraph, useStripConnections, layerMappingFile,
+      connectorInputFile, lutInputFile, trackingGeometry, fillModuleCsv,
+      inputClusters);
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
       HoughTransformSeeder, mex, "HoughTransformSeeder", inputSpacePoints,

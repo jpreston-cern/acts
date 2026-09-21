@@ -13,6 +13,7 @@
 #include "Acts/EventData/SpacePointContainer.hpp"
 #include "Acts/Geometry/TrackingGeometry.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
 #include "Acts/Seeding/GbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
@@ -74,8 +75,17 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
     Acts::Experimental::GbtsTrackingFilter::Config trackingFilterConfig;
 
     /// steers doublet creation, edge linking and chain selection. `minZ0` and
-    /// `maxZ0` are overridden from the region of interest.
-    Acts::Experimental::GbtsGraphBuilder::Config graphConfig;
+    /// `maxZ0` are overridden from the region of interest. The same settings
+    /// serve either graph, so this does not change with `useDisplacedGraph`.
+    Acts::Experimental::GbtsGraphConfig graphConfig;
+
+    /// Build the large radius graph instead of the prompt one.
+    ///
+    /// The displaced graph drops the beamline as a third point, so a doublet
+    /// no longer fixes a circle and the curvature cuts move to a triplet fit.
+    /// It finds tracks from a displaced vertex at the cost of combinatorics,
+    /// which `graphConfig.d0Max` sets the scale of.
+    bool useDisplacedGraph = false;
 
     /// the connection table (parsed from csv file) used to make geoemetry cuts
     /// be GBTS
@@ -123,8 +133,12 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
   std::optional<Acts::Experimental::GraphBasedTrackSeeder> m_finder;
 
   /// graph used in creating and extracting edges, edge connections
-  /// and valid chains
+  /// and valid chains. Exactly one of the two is engaged, by
+  /// `Config::useDisplacedGraph`.
   std::optional<Acts::Experimental::GbtsGraphBuilder> m_gbtsGraphBuilder;
+
+  /// the large radius graph, engaged in place of `m_gbtsGraphBuilder`
+  std::optional<Acts::Experimental::DisplacedGbtsGraph> m_displacedGraph;
 
   /// filter used to extract seed candidates from graph
   std::optional<Acts::Experimental::GbtsTrackingFilter> m_filter;

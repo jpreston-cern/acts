@@ -189,9 +189,15 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   m_cfg.graphConfig.maxZ0 = m_internalRoi->zMax();
   m_cfg.graphConfig.minZ0 = m_internalRoi->zMin();
 
-  m_gbtsGraphBuilder.emplace(
-      m_cfg.graphConfig, geometry,
-      this->logger().cloneWithSuffix("GbtsGraphBuilder"));
+  if (m_cfg.useDisplacedGraph) {
+    m_displacedGraph.emplace(
+        m_cfg.graphConfig, geometry,
+        this->logger().cloneWithSuffix("DisplacedGbtsGraph"));
+  } else {
+    m_gbtsGraphBuilder.emplace(
+        m_cfg.graphConfig, geometry,
+        this->logger().cloneWithSuffix("GbtsGraphBuilder"));
+  }
 
   m_finder.emplace(Acts::Experimental::GraphBasedTrackSeeder::DerivedConfig(
                        m_cfg.seedFinderConfig),
@@ -243,8 +249,15 @@ ProcessCode GraphBasedSeedingAlgorithm::execute(
 
   // create the seeds
 
-  m_finder->createSeeds(nodeStorage, m_internalRoi.value(), *m_gbtsGraphBuilder,
-                        *m_filter, options, seeds);
+  // the seeder is written once over the graph builder, so the mode is just
+  // which of the two it is handed
+  if (m_displacedGraph.has_value()) {
+    m_finder->createSeeds(nodeStorage, m_internalRoi.value(), *m_displacedGraph,
+                          *m_filter, options, seeds);
+  } else {
+    m_finder->createSeeds(nodeStorage, m_internalRoi.value(),
+                          *m_gbtsGraphBuilder, *m_filter, options, seeds);
+  }
 
   m_outputSeeds(ctx, std::move(seeds));
 
@@ -521,6 +534,7 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("lutInputFile: " << m_cfg.lutInputFile);
   ACTS_DEBUG("etaBinWidthOverride: " << m_cfg.etaBinWidthOverride);
   ACTS_DEBUG("useStripConnections: " << m_cfg.useStripConnections);
+  ACTS_DEBUG("useDisplacedGraph: " << m_cfg.useDisplacedGraph);
   ACTS_DEBUG("===== GraphBasedTrackSeeder =====");
   const auto &cfg1 = m_cfg.seedFinderConfig;
   ACTS_DEBUG("nMaxPhiSlice: " << cfg1.nMaxPhiSlice);
@@ -530,7 +544,8 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("maxEndcapClusterWidth: " << cfg1.maxEndcapClusterWidth);
   ACTS_DEBUG("maxSeedSplitEta: " << cfg1.maxSeedSplitEta);
   ACTS_DEBUG("maxInvRadDiff: " << cfg1.maxInvRadDiff);
-  ACTS_DEBUG("=====GbtsGraphBuilder=====");
+  ACTS_DEBUG((m_cfg.useDisplacedGraph ? "=====DisplacedGbtsGraph====="
+                                      : "=====GbtsGraphBuilder====="));
   const auto &cfg2 = m_cfg.graphConfig;
   ACTS_DEBUG("matchBeforeCreate: " << cfg2.matchBeforeCreate);
   ACTS_DEBUG("tauRatioCut: " << cfg2.tauRatioCut);
