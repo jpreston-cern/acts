@@ -129,6 +129,10 @@ namespace Acts::Experimental::detail{
 
   std::uint8_t nNei{0};
 
+  /// How many of @ref properties are filled. Zero while the edge is the
+  /// outermost pair of every chain it could start.
+  std::uint8_t nProperties{0};
+
   /// exp(eta) of the doublet, from the chord between its two nodes. All a
   /// displaced edge knows about itself before a triplet fit.
   float expEta{};
@@ -151,9 +155,13 @@ namespace Acts::Experimental::detail{
   /// @copydoc cosAlpha
   float sinAlpha{};
 
-  /// How many of @ref properties are filled. Zero while the edge is the
-  /// outermost pair of every chain it could start.
-  std::uint8_t nProperties{0};
+  /// Inside-out pixel barrel ordinal of the outer node's layer, -1 for the
+  /// rest. It is also the only thing the innermost neighbour loop asks about
+  /// the outer node's layer, so it is cached next to the fit parameters rather
+  /// than chased through the node's bin.
+  std::int32_t n2BarrelOrder{-1};
+
+  std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 
   /// One entry per triplet this edge is the inner edge of, at most
   /// @c kGbtsMaxEdgeNeighbours of them.
@@ -162,15 +170,11 @@ namespace Acts::Experimental::detail{
   /// reason: the cap is a small constant, so a vector here would be a heap
   /// allocation for every edge in the graph and a pointer chase to read one
   /// back.
+  ///
+  /// Last, and on purpose. It is over half the edge and only a triplet ever
+  /// reads it, so everything the innermost loop wants is packed ahead of it
+  /// into a single cache line.
   std::array<TripletProperties, kGbtsMaxEdgeNeighbours> properties{};
-
-  /// Inside-out pixel barrel ordinal of the outer node's layer, -1 for the
-  /// rest. It is also the only thing the innermost neighbour loop asks about
-  /// the outer node's layer, so it is cached next to the fit parameters rather
-  /// than chased through the node's bin.
-  std::int32_t n2BarrelOrder{-1};
-
-  std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 };
 
 /// exp(eta) of an edge, which the displaced edge keeps in a field of its own
