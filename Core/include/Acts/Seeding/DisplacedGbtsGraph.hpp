@@ -151,6 +151,30 @@ namespace Acts::Experimental{
       /// multiple of the strip half-length, so 1 is the strip itself. This is the
       /// same quantity as `TripletSeedFinder::Config::toleranceParam`.
       float maxStripLengthFraction = 1.1f;
+
+      /// Maximum number of connected-component iterations.
+      std::uint32_t ccaMaxIterations = 15;
+
+      // Chain selection options, shared with the seed extraction that reads the
+      // chains back out of the graph.
+
+      /// Chain length a seed candidate must reach. Two, where the prompt graph
+      /// asks for three: a link here already cost a triplet fit, so two edges
+      /// are three nodes that were fitted and cut on rather than three that
+      /// merely agreed on tau.
+      std::uint32_t minSeedLevel = 2;
+
+      /// optionally add 3 sp seeds within a certain eta range
+      ///
+      /// @note This accepts a chain one level short, so at the `minSeedLevel`
+      ///       of two above it reaches down to a single edge: two nodes, no
+      ///       fit, nothing this graph stands for. Raise `minSeedLevel` to
+      ///       three before turning it on.
+      bool addTriplets = false;
+
+      /// the maximum allowed eta value in which
+      /// three spacepoint seeds are passed through
+      float maxAbsEtaAddTriplets = 1.5;
     };
 
     // we should give the same kind of objects in, just different configurations
@@ -165,9 +189,22 @@ namespace Acts::Experimental{
                                                           std::vector<detail::DisplacedGbtsEdge>& edgeStorage, 
                                                           float bFieldInZ) const;
             
-    std::uint32_t runCCA(std::uint32_t nEdges, std::vector<detail::GbtsEdge>& edgeStorage) const;
-    
-    std::vector<detail::GbtsEdge*> extractChainHeads(std::vector<detail::GbtsEdge>& edgeStorage, std::uint32_t nEdges) const;
+    /// Run connected component analysis on the graph.
+    /// @param nEdges Number of edges in the graph
+    /// @param edgeStorage Storage containing graph edges
+    /// @return The highest chain level any edge reached
+    std::uint32_t runCCA(
+        std::uint32_t nEdges,
+        std::vector<detail::DisplacedGbtsEdge>& edgeStorage) const;
+
+    /// extract edges that start a chain
+    /// @param edgeStorage Storage containing graph edges
+    /// @param nEdges Number of edges in the graph
+    /// @return The edges that start chains, ordered by length of chain, empty
+    ///         if no chain reached the required level
+    std::vector<detail::DisplacedGbtsEdge*> extractChainHeads(
+        std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
+        std::uint32_t nEdges) const;
 
     private:
 
