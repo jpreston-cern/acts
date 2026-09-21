@@ -23,6 +23,10 @@ namespace Acts::Experimental{
 
     public:
 
+    /// The edge this graph builds, so that the seeder and the filter can
+    /// follow a graph to its edge type rather than being told both.
+    using EdgeType = detail::DisplacedGbtsEdge;
+
     struct Config{
       // going to fill as i go with this
 

@@ -78,18 +78,21 @@ class GbtsTrackingFilter final {
   // Only the seeder walks the edge graph.
   friend class GraphBasedTrackSeeder;
 
-  using State = detail::GbtsFilterState;
+  template <typename edge_t>
+  using State = detail::GbtsFilterState<edge_t>;
 
   /// Follow track starting from edge
+  /// @tparam edge_t The graph edge being followed, prompt or displaced
   /// @param state Tracking filter state
   /// @param nodeView View of the node positions and layers
   /// @param sb Edge storage
   /// @param pS Starting edge
   /// @return Final edge state after following the track
-  detail::GbtsEdgeState followTrack(State& state,
-                                    const detail::GbtsNodeView& nodeView,
-                                    std::vector<detail::GbtsEdge>& sb,
-                                    detail::GbtsEdge& pS) const;
+  template <typename edge_t>
+  detail::GbtsEdgeState<edge_t> followTrack(State<edge_t>& state,
+                                            const detail::GbtsNodeView& nodeView,
+                                            std::vector<edge_t>& sb,
+                                            edge_t& pS) const;
 
   /// Configuration for the tracking filter.
   Config m_cfg{};
@@ -105,22 +108,26 @@ class GbtsTrackingFilter final {
   const Logger& logger() const { return *m_logger; }
 
   /// Propagate edge state
+  /// @tparam edge_t The graph edge being followed
   /// @param state Tracking filter state
   /// @param nodeView View of the node positions and layers
   /// @param sb Edge storage
   /// @param pS Edge to propagate from
   /// @param ts Edge state to update
-  void propagate(State& state, const detail::GbtsNodeView& nodeView,
-                 std::vector<detail::GbtsEdge>& sb, detail::GbtsEdge& pS,
-                 detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  void propagate(State<edge_t>& state, const detail::GbtsNodeView& nodeView,
+                 std::vector<edge_t>& sb, edge_t& pS,
+                 detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Update edge state with edge
+  /// @tparam edge_t The graph edge being followed
   /// @param nodeView View of the node positions and layers
   /// @param pS Edge to update with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool update(const detail::GbtsNodeView& nodeView, const detail::GbtsEdge& pS,
-              detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool update(const detail::GbtsNodeView& nodeView, const edge_t& pS,
+              detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Get layer type from layer index
   /// @param layerIndex Layer index

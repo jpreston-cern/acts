@@ -8,6 +8,7 @@
 
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
 
+#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
 #include "Acts/Seeding/GbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 
@@ -19,6 +20,8 @@
 #include <numbers>
 #include <span>
 #include <stdexcept>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -61,9 +64,10 @@ GbtsNodeStorage GraphBasedTrackSeeder::makeNodeStorage() const {
   return GbtsNodeStorage(config, m_geometry, m_cfg.tauLookupTable);
 }
 
+template <typename graph_builder_t>
 void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
                                         const GbtsRoiDescriptor& roi,
-                                        const GbtsGraphBuilder& graphBuilder,
+                                        const graph_builder_t& graphBuilder,
                                         const GbtsTrackingFilter& filter,
                                         const Options& options,
                                         SeedContainer& outputSeeds) const {
@@ -81,16 +85,36 @@ void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
   createSeeds(nodeStorage, roi, graphBuilder, filter, options, outputSeeds);
 }
 
+template <typename graph_builder_t>
 void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
                                         const GbtsRoiDescriptor& roi,
-                                        const GbtsGraphBuilder& graphBuilder,
+                                        const graph_builder_t& graphBuilder,
                                         const GbtsTrackingFilter& filter,
                                         const Options& options,
                                         SeedContainer& outputSeeds) const {
   ACTS_DEBUG("Loaded " << nodeStorage.numberOfNodes() << " graph nodes");
 
-  GbtsGraph graph =
-      graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
+  // the edge the builder makes: a doublet with its own fit parameters for the
+  // prompt graph, one carrying the triplets it belongs to for the displaced
+  using edge_t = typename graph_builder_t::EdgeType;
+
+  // The prompt builder hands back the graph it built, while the displaced one
+  // still fills caller-owned storage and returns the counts, so its result is
+  // gathered into the same shape here.
+  constexpr bool isPrompt = std::is_same_v<graph_builder_t, GbtsGraphBuilder>;
+  struct DisplacedGraph {
+    std::vector<edge_t> edgeStorage;
+    std::uint32_t nEdges = 0;
+    std::uint32_t nConnections = 0;
+  };
+  std::conditional_t<isPrompt, GbtsGraph, DisplacedGraph> graph;
+
+  if constexpr (isPrompt) {
+    graph = graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
+  } else {
+    std::tie(graph.nEdges, graph.nConnections) = graphBuilder.buildTheGraph(
+        roi, nodeStorage, graph.edgeStorage, options.bFieldInZ);
+  }
 
   ACTS_DEBUG("Created graph with " << graph.edgeStorage.size() << " edges and "
                                    << graph.nConnections << " edge links");
@@ -99,12 +123,32 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
     ACTS_WARNING("Missing edges or edge connections");
   }
 
-  const std::uint32_t maxLevel = graph.runCCA(m_cfg.ccaMaxIterations);
+  std::uint32_t maxLevel = 0;
+  if constexpr (isPrompt) {
+    maxLevel = graph.runCCA(m_cfg.ccaMaxIterations);
+  } else {
+    maxLevel = graphBuilder.runCCA(graph.nEdges, graph.edgeStorage);
+  }
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
+  std::vector<edge_t*> vChainHeads;
+  if constexpr (isPrompt) {
+    vChainHeads = graph.extractChainHeads(
+        m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
+  } else {
+    vChainHeads =
+        graphBuilder.extractChainHeads(graph.edgeStorage, graph.nEdges);
+  }
+
+  if (vChainHeads.empty()) {
+    ACTS_WARNING("No chains passed minimum edge requirement");
+    return;
+  }
+
   std::vector<OutputSeedProperties> vOutputSeeds;
-  extractSeedsFromTheGraph(nodeStorage, graph, vOutputSeeds, filter);
+  extractSeedsFromTheGraph<graph_builder_t>(nodeStorage, graph.edgeStorage,
+                                            vOutputSeeds, filter, vChainHeads);
 
   ACTS_DEBUG("GBTS created " << vOutputSeeds.size() << " seeds");
   if (vOutputSeeds.empty()) {
@@ -119,17 +163,14 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
   }
 }
 
+template <typename graph_builder_t>
 void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
-    const GbtsNodeStorage& nodeStorage, GbtsGraph& graph,
+    const GbtsNodeStorage& nodeStorage,
+    std::vector<typename graph_builder_t::EdgeType>& edgeStorage,
     std::vector<OutputSeedProperties>& vOutputSeeds,
-    const GbtsTrackingFilter& filter) const {
-  std::vector<detail::GbtsEdge*> vChainHeads = graph.extractChainHeads(
-      m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
-
-  if (vChainHeads.empty()) {
-    ACTS_WARNING("No chains passed minimum edge requirement");
-    return;
-  }
+    const GbtsTrackingFilter& filter,
+    std::vector<typename graph_builder_t::EdgeType*>& vChainHeads) const {
+  using edge_t = typename graph_builder_t::EdgeType;
 
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
   // `addTriplets` accepts a chain one level short. Signed: an uncollected
@@ -149,21 +190,23 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
   std::uint32_t seedCounter = 0;
 
-  GbtsTrackingFilter::State filterState{};
+  GbtsTrackingFilter::State<edge_t> filterState{};
 
-  for (detail::GbtsEdge* pS : vChainHeads) {
+  for (edge_t* pS : vChainHeads) {
     if (pS->level == -1) {
       continue;
     }
 
-    detail::GbtsEdgeState rs =
-        filter.followTrack(filterState, nodeView, graph.edgeStorage, *pS);
+    detail::GbtsEdgeState<edge_t> rs =
+        filter.followTrack(filterState, nodeView, edgeStorage, *pS);
 
     if (!rs.initialized) {
       continue;
     }
 
-    const float seedAbsEta = std::abs(-std::log(pS->p[0]));
+    // the prompt edge keeps exp(eta) among its fit parameters and the
+    // displaced one in a field of its own, so ask rather than reach in
+    const float seedAbsEta = std::abs(-std::log(detail::edgeExpEta(*pS)));
 
     const std::uint32_t chainLength = static_cast<std::uint32_t>(rs.vs.size());
 
@@ -376,6 +419,25 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     }
   }
 }
+
+// The seeder is written once and built for each graph builder that exists.
+template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
+    const SpacePointContainer&, const GbtsRoiDescriptor&,
+    const GbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
+    SeedContainer&) const;
+
+template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
+    GbtsNodeStorage&, const GbtsRoiDescriptor&, const GbtsGraphBuilder&,
+    const GbtsTrackingFilter&, const Options&, SeedContainer&) const;
+
+template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraph>(
+    const SpacePointContainer&, const GbtsRoiDescriptor&,
+    const DisplacedGbtsGraph&, const GbtsTrackingFilter&, const Options&,
+    SeedContainer&) const;
+
+template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraph>(
+    GbtsNodeStorage&, const GbtsRoiDescriptor&, const DisplacedGbtsGraph&,
+    const GbtsTrackingFilter&, const Options&, SeedContainer&) const;
 
 float GraphBasedTrackSeeder::estimateCurvature(
     const detail::GbtsNodeView& nodeView,
