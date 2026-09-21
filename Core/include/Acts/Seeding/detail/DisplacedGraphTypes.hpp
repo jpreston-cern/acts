@@ -5,6 +5,7 @@
 #include "Acts/Seeding/detail/GbtsGraphTypes.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -37,6 +38,60 @@ namespace Acts::Experimental::detail{
     /// Azimuth of the track tangent at the innermost of the triplet's three
     /// nodes, which is this edge's own inner node, was p[2]
     float phi{};
+  };
+
+  /// The circle three nodes put a track on, from the same conformal mapping
+  /// the prompt graph validates a triplet with, but kept whole rather than
+  /// reduced to a verdict.
+  ///
+  /// Displaced, this is the first place the track parameters exist at all: a
+  /// doublet fixes a circle only by borrowing the beamline as a third point,
+  /// which is exactly the assumption large radius tracking drops.
+  struct TripletCircle {
+    /// Slope of the conformal line. Its arctangent is the track direction at
+    /// the middle node, in the frame the fit rotated into.
+    float slope{};
+    /// Intercept of the conformal line, which is what carries the curvature.
+    float intercept{};
+    /// Signed curvature, in the prompt graph's dphi/dr convention -- half the
+    /// geometric 1/R -- so that the cut values tuned there carry over.
+    float curvature{};
+    /// Signed transverse impact parameter with respect to the beamline.
+    float d0{};
+    /// Azimuth of the middle node: the frame the local coordinates sit in.
+    float phiMid{};
+    /// cot(theta) along the fitted arc rather than along the chord.
+    float tau{};
+    /// exp(eta) from @ref tau.
+    float expEta{};
+    /// 1 / @ref expEta, the form the tau ratio is taken in.
+    float invExpEta{};
+    /// The three nodes in that frame, inside out, the middle one at the
+    /// origin.
+    std::array<std::array<float, 2>, 3> local{};
+
+    /// Azimuth of the track tangent at one of the three nodes, pointing
+    /// outwards. Two triplets sharing a doublet are matched through this, so
+    /// it has to describe the circle and not the frame it was fitted in.
+    /// @param k Which node, inside out
+    /// @return The tangent azimuth, not wrapped
+    float tangentPhi(const std::uint32_t k) const {
+      // The tangent to x^2 + y^2 = 2ax + 2by at (x, y) is (b - y, x - a), and
+      // 2b*intercept = 1, 2a*intercept = -slope. Scaling by 2|intercept| keeps
+      // the direction and takes the straight track out of being a special
+      // case.
+      return phiMid + std::atan2(slope + 2.0f * intercept * local[k][0],
+                                 1.0f - 2.0f * intercept * local[k][1]);
+    }
+
+    /// Track direction at one of the three nodes. Not normalised: the strip
+    /// calibration only reads ratios of it.
+    /// @param k Which node, inside out
+    /// @return The direction in global coordinates
+    std::array<float, 3> direction(const std::uint32_t k) const {
+      const float phi = tangentPhi(k);
+      return {std::cos(phi), std::sin(phi), tau};
+    }
   };
 
   struct DisplacedGbtsEdge final {

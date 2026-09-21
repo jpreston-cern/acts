@@ -38,151 +38,6 @@ struct SlidingWindow {
   GbtsLayerTechnology technology{};
 };
 
-/// The circle three nodes put a track on, from the same conformal mapping the
-/// prompt graph validates a triplet with, but kept whole rather than reduced
-/// to a verdict.
-///
-/// Displaced, this is the first place the track parameters exist at all: a
-/// doublet fixes a circle only by borrowing the beamline as a third point,
-/// which is exactly the assumption large radius tracking drops.
-struct TripletCircle {
-  /// Slope of the conformal line. Its arctangent is the track direction at
-  /// the middle node, in the frame the fit rotated into.
-  float slope{};
-  /// Intercept of the conformal line, which is what carries the curvature.
-  float intercept{};
-  /// Signed curvature, in the prompt graph's dphi/dr convention -- half the
-  /// geometric 1/R -- so that the cut values tuned there carry over.
-  float curvature{};
-  /// Signed transverse impact parameter with respect to the beamline.
-  float d0{};
-  /// Azimuth of the middle node: the frame the local coordinates sit in.
-  float phiMid{};
-  /// cot(theta) along the fitted arc rather than along the chord.
-  float tau{};
-  /// exp(eta) from @ref tau.
-  float expEta{};
-  /// 1 / @ref expEta, the form the tau ratio is taken in.
-  float invExpEta{};
-  /// The three nodes in that frame, inside out, the middle one at the origin.
-  std::array<std::array<float, 2>, 3> local{};
-
-  /// Azimuth of the track tangent at one of the three nodes, pointing
-  /// outwards. Two triplets sharing a doublet are matched through this, so it
-  /// has to describe the circle and not the frame it was fitted in.
-  /// @param k Which node, inside out
-  /// @return The tangent azimuth, not wrapped
-  float tangentPhi(const std::uint32_t k) const {
-    // The tangent to x^2 + y^2 = 2ax + 2by at (x, y) is (b - y, x - a), and
-    // 2b*intercept = 1, 2a*intercept = -slope. Scaling by 2|intercept| keeps
-    // the direction and takes the straight track out of being a special case.
-    return phiMid + std::atan2(slope + 2.0f * intercept * local[k][0],
-                               1.0f - 2.0f * intercept * local[k][1]);
-  }
-
-  /// Track direction at one of the three nodes. Not normalised: the strip
-  /// calibration only reads ratios of it.
-  /// @param k Which node, inside out
-  /// @return The direction in global coordinates
-  std::array<float, 3> direction(const std::uint32_t k) const {
-    const float phi = tangentPhi(k);
-    return {std::cos(phi), std::sin(phi), tau};
-  }
-};
-
-/// Fit the circle through the three nodes of a triplet.
-///
-/// The transverse plane is inverted about the middle node, which maps every
-/// circle through that node onto a straight line, so the fit is the line
-/// through the two remaining nodes and needs no iteration.
-///
-/// @param points The three node positions, inside out
-/// @return The circle, or nothing if the nodes are degenerate
-std::optional<TripletCircle> fitTripletCircle(
-    const std::array<std::array<float, 3>, 3>& points) {
-  TripletCircle circle{};
-
-  const float x0 = points[1][0];
-  const float y0 = points[1][1];
-  const float r0 = fastHypot(x0, y0);
-
-  if (r0 == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float cosA = x0 / r0;
-  const float sinA = y0 / r0;
-
-  circle.phiMid = std::atan2(y0, x0);
-
-  // conformal mapping with the center at the middle spacepoint
-  std::array<float, 2> u{};
-  std::array<float, 2> v{};
-
-  for (std::uint32_t k = 0; k < 2; k++) {
-    const std::uint32_t spIdx = (k == 1) ? 2 : 0;
-
-    const float dx = points[spIdx][0] - x0;
-    const float dy = points[spIdx][1] - y0;
-
-    const float d2 = dx * dx + dy * dy;
-
-    if (d2 == 0.0f) {
-      return std::nullopt;
-    }
-
-    const float r2Inv = 1.0f / d2;
-
-    const float xn = dx * cosA + dy * sinA;
-    const float yn = -dx * sinA + dy * cosA;
-
-    circle.local[spIdx] = {xn, yn};
-
-    u[k] = xn * r2Inv;
-    v[k] = yn * r2Inv;
-  }
-
-  const float du = u[0] - u[1];
-
-  if (du == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float A = (v[0] - v[1]) / du;
-  const float B = v[1] - A * u[1];
-
-  circle.slope = A;
-  circle.intercept = B;
-  circle.d0 = r0 * (B * r0 - A);
-  circle.curvature = B / fastHypot(1.0f, A);
-
-  // cot(theta) per unit transverse path, which is the arc and not the chord:
-  // the sagitta a displaced track turns through over three layers is small but
-  // it biases tau the same way for every triplet, so taking it out keeps the
-  // triplet tau comparable with the doublet one.
-  const float dx13 = points[2][0] - points[0][0];
-  const float dy13 = points[2][1] - points[0][1];
-  const float chord13 = fastHypot(dx13, dy13);
-
-  if (chord13 == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float sagittaTerm = circle.curvature * chord13;
-  const float arc13 = chord13 * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
-
-  circle.tau = (points[2][2] - points[0][2]) / arc13;
-
-  const float hypotTau = fastHypot(1.0f, circle.tau);
-
-  circle.expEta = hypotTau - circle.tau;
-  // as in the doublet case, the sum is 1 / (hypotTau - tau) and the better
-  // conditioned form of it for large tau
-  circle.invExpEta = hypotTau + circle.tau;
-
-  return circle;
-}
-
 /// exp(eta) of the chord between two points, the form the tau ratio of a
 /// triplet compares its two doublets in.
 ///
@@ -636,7 +491,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                   nodePoint(tripletNodes[0]), nodePoint(tripletNodes[1]),
                   nodePoint(tripletNodes[2])};
 
-              std::optional<TripletCircle> circle = fitTripletCircle(points);
+              std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
 
               if (!circle.has_value()) {
                 continue;
@@ -890,8 +745,6 @@ std::uint32_t DisplacedGbtsGraph::runCCA(
       continue;
     }
 
-    // TODO: increment level for segments as they already have at least one
-    // neighbour
     vOld.push_back(pS);
   }
 
@@ -990,6 +843,91 @@ std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
                     [](const detail::DisplacedGbtsEdge* e) { return e->level; });
 
   return vChainHeads;
+}
+
+std::optional<detail::TripletCircle> DisplacedGbtsGraph::fitTripletCircle(
+    const std::array<std::array<float, 3>, 3>& points) const {
+  detail::TripletCircle circle{};
+
+  const float x0 = points[1][0];
+  const float y0 = points[1][1];
+  const float r0 = fastHypot(x0, y0);
+
+  if (r0 == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float cosA = x0 / r0;
+  const float sinA = y0 / r0;
+
+  circle.phiMid = std::atan2(y0, x0);
+
+  // conformal mapping with the center at the middle spacepoint
+  std::array<float, 2> u{};
+  std::array<float, 2> v{};
+
+  for (std::uint32_t k = 0; k < 2; k++) {
+    const std::uint32_t spIdx = (k == 1) ? 2 : 0;
+
+    const float dx = points[spIdx][0] - x0;
+    const float dy = points[spIdx][1] - y0;
+
+    const float d2 = dx * dx + dy * dy;
+
+    if (d2 == 0.0f) {
+      return std::nullopt;
+    }
+
+    const float r2Inv = 1.0f / d2;
+
+    const float xn = dx * cosA + dy * sinA;
+    const float yn = -dx * sinA + dy * cosA;
+
+    circle.local[spIdx] = {xn, yn};
+
+    u[k] = xn * r2Inv;
+    v[k] = yn * r2Inv;
+  }
+
+  const float du = u[0] - u[1];
+
+  if (du == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float A = (v[0] - v[1]) / du;
+  const float B = v[1] - A * u[1];
+
+  circle.slope = A;
+  circle.intercept = B;
+  circle.d0 = r0 * (B * r0 - A);
+  circle.curvature = B / fastHypot(1.0f, A);
+
+  // cot(theta) per unit transverse path, which is the arc and not the chord:
+  // the sagitta a displaced track turns through over three layers is small but
+  // it biases tau the same way for every triplet, so taking it out keeps the
+  // triplet tau comparable with the doublet one.
+  const float dx13 = points[2][0] - points[0][0];
+  const float dy13 = points[2][1] - points[0][1];
+  const float chord13 = fastHypot(dx13, dy13);
+
+  if (chord13 == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float sagittaTerm = circle.curvature * chord13;
+  const float arc13 = chord13 * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
+
+  circle.tau = (points[2][2] - points[0][2]) / arc13;
+
+  const float hypotTau = fastHypot(1.0f, circle.tau);
+
+  circle.expEta = hypotTau - circle.tau;
+  // as in the doublet case, the sum is 1 / (hypotTau - tau) and the better
+  // conditioned form of it for large tau
+  circle.invExpEta = hypotTau + circle.tau;
+
+  return circle;
 }
 
 } // Acts::Experimental namespace

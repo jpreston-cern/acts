@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -207,6 +208,17 @@ namespace Acts::Experimental{
         std::uint32_t nEdges) const;
 
     private:
+
+    /// Fit the circle through the three nodes of a triplet.
+    ///
+    /// The transverse plane is inverted about the middle node, which maps
+    /// every circle through that node onto a straight line, so the fit is the
+    /// line through the two remaining nodes and needs no iteration.
+    ///
+    /// @param points The three node positions, inside out
+    /// @return The circle, or nothing if the nodes are degenerate
+    std::optional<detail::TripletCircle> fitTripletCircle(
+        const std::array<std::array<float, 3>, 3>& points) const;
 
     Config m_cfg;
 
