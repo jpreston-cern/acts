@@ -325,6 +325,33 @@ GbtsGeometry::GbtsGeometry(
         "on none of them");
   }
 
+  // How deep each barrel layer sits, counting outwards from the innermost the
+  // geometry was given. `barrelOrder` above cannot answer that: it numbers the
+  // pixel barrel alone, so on a detector whose inner layers are strips it is
+  // -1 throughout and anything keyed on it never fires.
+  std::vector<GbtsLayerDescription*> barrel;
+  for (GbtsLayerDescription& layer : layers) {
+    if (layer.type == GbtsLayerType::Barrel) {
+      barrel.push_back(&layer);
+    }
+  }
+
+  const auto numAtDepth = std::ranges::count_if(
+      barrel, [](const GbtsLayerDescription* l) { return l->depth >= 0; });
+  if (numAtDepth == 0) {
+    // ties broken by id so the result does not depend on the input order
+    std::ranges::sort(barrel, {}, [](const GbtsLayerDescription* l) {
+      return std::pair{l->refCoord, l->id};
+    });
+    for (std::size_t i = 0; i < barrel.size(); ++i) {
+      barrel[i]->depth = static_cast<std::int32_t>(i);
+    }
+  } else if (numAtDepth != std::ssize(barrel)) {
+    throw std::invalid_argument(
+        "GbtsGeometry: depth must be set on every barrel layer or on none of "
+        "them");
+  }
+
   for (const GbtsLayerDescription& layer : layers) {
     const detail::GbtsLayer& pL = createLayer(layer, m_nEtaBins);
     m_nEtaBins += pL.binning().numBins;
