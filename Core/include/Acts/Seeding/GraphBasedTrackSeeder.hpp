@@ -28,8 +28,6 @@
 
 namespace Acts::Experimental {
 
-class GbtsGraphBuilder;
-
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
  public:
@@ -121,6 +119,10 @@ class GraphBasedTrackSeeder {
   /// Convenience wrapper that builds and finalizes the node storage itself. The
   /// container must carry the `gbtsLayerIndex`, `clusterWidth` and
   /// `localPositionY` columns.
+  /// @tparam graph_builder_t The graph builder, `GbtsGraphBuilder` for
+  ///                         prompt tracks or `DisplacedGbtsGraph` for large
+  ///                         radius ones. Its `EdgeType` says which edge the
+  ///                         two carry.
   /// @param spacePoints Space point container
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder, which also carries the chain
@@ -128,13 +130,15 @@ class GraphBasedTrackSeeder {
   /// @param filter Tracking filter to be applied
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
+  template <typename graph_builder_t>
   void createSeeds(const SpacePointContainer& spacePoints,
                    const GbtsRoiDescriptor& roi,
-                   const GbtsGraphBuilder& graphBuilder,
+                   const graph_builder_t& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
   /// Create seeds from a finalized node storage in a region of interest.
+  /// @tparam graph_builder_t The graph builder, prompt or displaced
   /// @param nodeStorage Finalized graph node storage
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder, which also carries the chain
@@ -142,8 +146,9 @@ class GraphBasedTrackSeeder {
   /// @param filter Tracking filter to be applied
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
+  template <typename graph_builder_t>
   void createSeeds(GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-                   const GbtsGraphBuilder& graphBuilder,
+                   const graph_builder_t& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
@@ -194,18 +199,21 @@ class GraphBasedTrackSeeder {
   const Acts::Logger& logger() const { return *m_logger; }
 
   /// Extract seed candidates from the graph.
+  /// @tparam graph_builder_t The graph builder, prompt or displaced
   /// @param nodeStorage Storage containing the graph nodes
   /// @param edgeStorage Storage containing edges
   /// @param vOutputSeeds Output vector for seed candidates
   /// @param filter Tracking filter to be applied
   /// @param vChainHeads Chain heads the graph selected
   /// @param graphBuilder Doublet graph builder, read for its chain selection
-  void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
-                                std::vector<detail::GbtsEdge>& edgeStorage,
-                                std::vector<OutputSeedProperties>& vOutputSeeds,
-                                const GbtsTrackingFilter& filter,
-                                std::vector<detail::GbtsEdge*>& vChainHeads,
-                                const GbtsGraphBuilder& graphBuilder) const;
+  template <typename graph_builder_t>
+  void extractSeedsFromTheGraph(
+      const GbtsNodeStorage& nodeStorage,
+      std::vector<typename graph_builder_t::EdgeType>& edgeStorage,
+      std::vector<OutputSeedProperties>& vOutputSeeds,
+      const GbtsTrackingFilter& filter,
+      std::vector<typename graph_builder_t::EdgeType*>& vChainHeads,
+      const graph_builder_t& graphBuilder) const;
 
   /// Estimate the inverse radius of the circle through three nodes.
   /// @param nodeView View of the node positions and layers

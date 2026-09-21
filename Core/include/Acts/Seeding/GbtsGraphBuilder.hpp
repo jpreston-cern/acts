@@ -47,6 +47,10 @@ struct GbtsGraph {
 /// indexing they slide over cannot disagree.
 class GbtsGraphBuilder {
  public:
+  /// The edge this graph builds, so that the seeder and the filter can follow
+  /// a graph to its edge type rather than being told both.
+  using EdgeType = detail::GbtsEdge;
+
   /// Config for the prompt graph
   struct Config {
     /// Match seeds before creating them.

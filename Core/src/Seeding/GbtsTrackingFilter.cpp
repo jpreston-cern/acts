@@ -9,6 +9,7 @@
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 
 #include "Acts/Seeding/GbtsGeometry.hpp"
+#include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
 #include <algorithm>
@@ -20,8 +21,9 @@
 
 namespace Acts::Experimental::detail {
 
-void detail::GbtsEdgeState::initialize(const detail::GbtsEdge& pS,
-                                       const detail::GbtsNodeView& nodeView,
+template <typename edge_t>
+void GbtsEdgeState<edge_t>::initialize(const edge_t& pS,
+                                       const GbtsNodeView& nodeView,
                                        const std::array<float, 3>& varianceX,
                                        const std::array<float, 2>& varianceY) {
   initialized = true;
@@ -69,6 +71,11 @@ void detail::GbtsEdgeState::initialize(const detail::GbtsEdge& pS,
   cy[1][1] = varianceY[1];
 }
 
+// The graph walk reads only the two nodes and the neighbour links, so it runs
+// over either edge; these are the two that exist.
+template struct GbtsEdgeState<GbtsEdge>;
+template struct GbtsEdgeState<DisplacedGbtsEdge>;
+
 }  // namespace Acts::Experimental::detail
 
 namespace Acts::Experimental {
@@ -78,19 +85,20 @@ GbtsTrackingFilter::GbtsTrackingFilter(
     std::unique_ptr<const Logger> logger)
     : m_cfg(config), m_geometry(geometry), m_logger(std::move(logger)) {}
 
-detail::GbtsEdgeState GbtsTrackingFilter::followTrack(
-    State& state, const detail::GbtsNodeView& nodeView,
-    std::vector<detail::GbtsEdge>& sb, detail::GbtsEdge& pS) const {
+template <typename edge_t>
+detail::GbtsEdgeState<edge_t> GbtsTrackingFilter::followTrack(
+    State<edge_t>& state, const detail::GbtsNodeView& nodeView,
+    std::vector<edge_t>& sb, edge_t& pS) const {
   if (pS.level == -1) {
     // already collected
-    return detail::GbtsEdgeState(false);
+    return detail::GbtsEdgeState<edge_t>(false);
   }
 
   state.globalStateCounter = 0;
 
   // create track state
 
-  detail::GbtsEdgeState& pInitState =
+  detail::GbtsEdgeState<edge_t>& pInitState =
       state.stateStore[state.globalStateCounter];
   ++state.globalStateCounter;
 
@@ -104,27 +112,29 @@ detail::GbtsEdgeState GbtsTrackingFilter::followTrack(
   propagate(state, nodeView, sb, pS, pInitState);
 
   if (state.stateVec.empty()) {
-    return detail::GbtsEdgeState(false);
+    return detail::GbtsEdgeState<edge_t>(false);
   }
 
-  std::ranges::sort(state.stateVec, std::ranges::greater{},
-                    [](const detail::GbtsEdgeState* s) { return s->j; });
+  std::ranges::sort(
+      state.stateVec, std::ranges::greater{},
+      [](const detail::GbtsEdgeState<edge_t>* s) { return s->j; });
 
   state.globalStateCounter = 0;
 
   return *state.stateVec.front();
 }
 
-void GbtsTrackingFilter::propagate(State& state,
+template <typename edge_t>
+void GbtsTrackingFilter::propagate(State<edge_t>& state,
                                    const detail::GbtsNodeView& nodeView,
-                                   std::vector<detail::GbtsEdge>& sb,
-                                   detail::GbtsEdge& pS,
-                                   detail::GbtsEdgeState& ts) const {
+                                   std::vector<edge_t>& sb, edge_t& pS,
+                                   detail::GbtsEdgeState<edge_t>& ts) const {
   if (state.globalStateCounter >= detail::kGbtsMaxEdgeStates) {
     return;
   }
 
-  detail::GbtsEdgeState& newTs = state.stateStore[state.globalStateCounter];
+  detail::GbtsEdgeState<edge_t>& newTs =
+      state.stateStore[state.globalStateCounter];
   ++state.globalStateCounter;
   newTs = ts;
 
@@ -140,13 +150,13 @@ void GbtsTrackingFilter::propagate(State& state,
 
   const std::int32_t level = pS.level;
 
-  std::vector<detail::GbtsEdge*> lCont;
+  std::vector<edge_t*> lCont;
 
   // loop over the neighbours of this segment
   for (std::uint32_t nIdx = 0; nIdx < pS.nNei; ++nIdx) {
     const std::uint32_t nextSegmentIdx = pS.vNei[nIdx];
 
-    detail::GbtsEdge& pN = sb[nextSegmentIdx];
+    edge_t& pN = sb[nextSegmentIdx];
 
     if (pN.level == -1) {
       // already collected
@@ -164,7 +174,8 @@ void GbtsTrackingFilter::propagate(State& state,
     if (state.globalStateCounter < detail::kGbtsMaxEdgeStates) {
       if (state.stateVec.empty()) {
         // add the first segment state
-        detail::GbtsEdgeState* p = &state.stateStore[state.globalStateCounter];
+        detail::GbtsEdgeState<edge_t>* p =
+            &state.stateStore[state.globalStateCounter];
         ++state.globalStateCounter;
         *p = newTs;
         state.stateVec.push_back(p);
@@ -172,7 +183,7 @@ void GbtsTrackingFilter::propagate(State& state,
         // compare with the best and add
         const float bestSoFar = state.stateVec.front()->j;
         if (newTs.j > bestSoFar) {
-          detail::GbtsEdgeState* p =
+          detail::GbtsEdgeState<edge_t>* p =
               &state.stateStore[state.globalStateCounter];
           ++state.globalStateCounter;
           *p = newTs;
@@ -182,16 +193,17 @@ void GbtsTrackingFilter::propagate(State& state,
     }
   } else {
     // branching
-    for (detail::GbtsEdge* sIt : lCont) {
+    for (edge_t* sIt : lCont) {
       // recursive call
       propagate(state, nodeView, sb, *sIt, newTs);
     }
   }
 }
 
+template <typename edge_t>
 bool GbtsTrackingFilter::update(const detail::GbtsNodeView& nodeView,
-                                const detail::GbtsEdge& pS,
-                                detail::GbtsEdgeState& ts) const {
+                                const edge_t& pS,
+                                detail::GbtsEdgeState<edge_t>& ts) const {
   if (ts.cx[2][2] < 0 || ts.cx[1][1] < 0 || ts.cx[0][0] < 0) {
     ACTS_DEBUG("Negative cov_x");
   }
@@ -361,5 +373,20 @@ GbtsLayerType GbtsTrackingFilter::getLayerType(
     const GbtsLayerIndex layerIndex) const {
   return m_geometry->layerDescription(layerIndex).type;
 }
+
+// Only followTrack is called from outside; propagate and update are reached
+// through it and instantiate with it.
+template detail::GbtsEdgeState<detail::GbtsEdge>
+GbtsTrackingFilter::followTrack(
+    GbtsTrackingFilter::State<detail::GbtsEdge>& state,
+    const detail::GbtsNodeView& nodeView, std::vector<detail::GbtsEdge>& sb,
+    detail::GbtsEdge& pS) const;
+
+template detail::GbtsEdgeState<detail::DisplacedGbtsEdge>
+GbtsTrackingFilter::followTrack(
+    GbtsTrackingFilter::State<detail::DisplacedGbtsEdge>& state,
+    const detail::GbtsNodeView& nodeView,
+    std::vector<detail::DisplacedGbtsEdge>& sb,
+    detail::DisplacedGbtsEdge& pS) const;
 
 }  // namespace Acts::Experimental

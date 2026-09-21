@@ -226,4 +226,16 @@ struct GbtsEdge final {
 };
 //! [gbts edge]
 
+/// exp(eta) of an edge, which the prompt edge keeps as the first of the fit
+/// parameters a doublet is enough to determine.
+///
+/// The displaced edge keeps it somewhere else, so anything that walks either
+/// graph asks through this overload set rather than naming the field.
+///
+/// @param edge The edge
+/// @return exp(eta) of the edge
+inline float edgeExpEta(const GbtsEdge& edge) {
+  return edge.p[0];
+}
+
 }  // namespace Acts::Experimental::detail
