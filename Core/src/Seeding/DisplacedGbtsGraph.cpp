@@ -121,6 +121,17 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       m_cfg.maxEdgesPerSP * static_cast<float>(nodeStorage.numberOfNodes()));
 
   edgeStorage.reserve(nMaxEdges);
+
+  // Every edge's exp(eta), kept beside the storage rather than inside it.
+  //
+  // The first thing asked of a triplet candidate is that its two doublets
+  // agree on tau, and most candidates fail it. Asking that of the edge itself
+  // means touching a whole edge, over a hundred bytes of it spread across
+  // however many the graph holds, for a single float. Kept apart, the scan
+  // runs over four bytes an edge and the edge is only reached for the few that
+  // get past it. Indices are the storage's own.
+  std::vector<float> edgeExpEta;
+  edgeExpEta.reserve(nMaxEdges);
   
   // number of edges acepted into the storage, 
   // will need a seperate one for the proper storage, 
@@ -441,6 +452,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           if (nEdges < nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
                                      sinAlpha12, barrelOrder2);
+            edgeExpEta.push_back(expEta);
 
             ++numCreatedEdges;
 
@@ -462,16 +474,18 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 break;
               }
 
-              detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
-
+              // Off the compact array, so that a candidate that fails here
+              // never has its edge brought in from memory at all.
               const float absTauRatio =
-                  std::abs(pS->expEta * invExpEta - 1.0f);
+                  std::abs(edgeExpEta[inEdgeIdx] * invExpEta - 1.0f);
 
               // the loosest form of the tau ratio, which rejects most
               // candidates before anything below has to run
               if (absTauRatio > maxTauRatioCut) {
                 continue;
               }
+
+              detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
 
               if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
                 continue;
