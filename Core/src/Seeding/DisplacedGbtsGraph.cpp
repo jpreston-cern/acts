@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <numbers>
 #include <optional>
 #include <span>
@@ -872,6 +873,123 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   }
 
   return std::make_pair(nEdges, nConnections);
+}
+
+std::uint32_t DisplacedGbtsGraph::runCCA(
+    const std::uint32_t nEdges,
+    std::vector<detail::DisplacedGbtsEdge>& edgeStorage) const {
+  std::uint32_t maxLevel = 0;
+
+  std::uint32_t iter = 0;
+
+  std::vector<detail::DisplacedGbtsEdge*> vOld;
+
+  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
+    detail::DisplacedGbtsEdge* pS = &(edgeStorage[edgeIndex]);
+    if (pS->nNei == 0) {
+      continue;
+    }
+
+    // TODO: increment level for segments as they already have at least one
+    // neighbour
+    vOld.push_back(pS);
+  }
+
+  std::vector<detail::DisplacedGbtsEdge*> vNew;
+  vNew.reserve(vOld.size());
+
+  // generate proposals
+  for (; iter < m_cfg.ccaMaxIterations; iter++) {
+    vNew.clear();
+
+    for (detail::DisplacedGbtsEdge* pS : vOld) {
+      std::int32_t nextLevel = pS->level;
+
+      for (std::uint32_t nIdx = 0; nIdx < pS->nNei; ++nIdx) {
+        const std::uint32_t nextEdgeIdx = pS->vNei[nIdx];
+
+        const detail::DisplacedGbtsEdge* pN = &(edgeStorage[nextEdgeIdx]);
+
+        if (pS->level == pN->level) {
+          nextLevel = pS->level + 1;
+          vNew.push_back(pS);
+          break;
+        }
+      }
+
+      // proposal
+      pS->next = static_cast<std::int8_t>(nextLevel);
+    }
+
+    // update
+
+    std::uint32_t nChanges = 0;
+
+    for (auto pS : vNew) {
+      if (pS->next != pS->level) {
+        nChanges++;
+        pS->level = pS->next;
+        // levels only grow from zero here, so the cast is safe
+        maxLevel = std::max(maxLevel, static_cast<std::uint32_t>(pS->level));
+      }
+    }
+
+    if (nChanges == 0) {
+      break;
+    }
+
+    vOld.swap(vNew);
+    vNew.clear();
+  }
+
+  return maxLevel;
+}
+
+std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
+    std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
+    std::uint32_t nEdges) const {
+  const auto minLevel = static_cast<std::uint8_t>(m_cfg.minSeedLevel);
+  // `addTriplets` accepts a chain one level short. Signed: an uncollected
+  // edge sits at level -1 and `minSeedLevel` may be configured to 0.
+  const int minLevelAddTriplets = int{minLevel} - 1;
+  std::vector<detail::DisplacedGbtsEdge*> vChainHeads;
+
+  vChainHeads.reserve(nEdges / 2);
+
+  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
+    detail::DisplacedGbtsEdge* pS = &edgeStorage[edgeIndex];
+
+    if (!m_cfg.addTriplets) {
+      if (pS->level < minLevel) {
+        continue;
+      }
+    } else {  // eta-dependent cut
+      // the edge's own eta, from the doublet: eta is -log(exp(eta)) and the
+      // displaced edge keeps exp(eta) where the prompt one kept it in p[0]
+      const float edgeAbsEta = std::abs(-std::log(pS->expEta));
+
+      if (edgeAbsEta > m_cfg.maxAbsEtaAddTriplets) {
+        if (pS->level < minLevel) {
+          continue;
+        }
+      } else {
+        if (pS->level < minLevelAddTriplets) {
+          continue;
+        }
+      }
+    }
+
+    vChainHeads.push_back(pS);
+  }
+
+  if (vChainHeads.empty()) {
+    return vChainHeads;
+  }
+
+  std::ranges::sort(vChainHeads, std::ranges::greater{},
+                    [](const detail::DisplacedGbtsEdge* e) { return e->level; });
+
+  return vChainHeads;
 }
 
 } // Acts::Experimental namespace
