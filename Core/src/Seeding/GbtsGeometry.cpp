@@ -295,40 +295,12 @@ GbtsGeometry::GbtsGeometry(
   const float minZ0 = z0Range.min;
   const float maxZ0 = z0Range.max;
 
-  // The adaptive cuts key on where a pixel barrel layer sits radially. Derive
-  // that ordinal here so the seeder never has to read an experiment layer id.
+  // Three things need to know where a layer sits in the barrel: the adaptive
+  // tau widening, the z0 histogram and matchBeforeCreate. Derive that depth
+  // here so the seeder never has to read an experiment layer id.
   std::vector<GbtsLayerDescription> layers(layerDescriptions.begin(),
                                            layerDescriptions.end());
 
-  std::vector<GbtsLayerDescription*> pixelBarrel;
-  for (GbtsLayerDescription& layer : layers) {
-    if (layer.type == GbtsLayerType::Barrel &&
-        layer.technology == GbtsLayerTechnology::Pixel) {
-      pixelBarrel.push_back(&layer);
-    }
-  }
-
-  const auto numOrdered = std::ranges::count_if(
-      pixelBarrel,
-      [](const GbtsLayerDescription* l) { return l->barrelOrder >= 0; });
-  if (numOrdered == 0) {
-    // ties broken by id so the result does not depend on the input order
-    std::ranges::sort(pixelBarrel, {}, [](const GbtsLayerDescription* l) {
-      return std::pair{l->refCoord, l->id};
-    });
-    for (std::size_t i = 0; i < pixelBarrel.size(); ++i) {
-      pixelBarrel[i]->barrelOrder = static_cast<std::int32_t>(i);
-    }
-  } else if (numOrdered != std::ssize(pixelBarrel)) {
-    throw std::invalid_argument(
-        "GbtsGeometry: barrelOrder must be set on every pixel barrel layer or "
-        "on none of them");
-  }
-
-  // How deep each barrel layer sits, counting outwards from the innermost the
-  // geometry was given. `barrelOrder` above cannot answer that: it numbers the
-  // pixel barrel alone, so on a detector whose inner layers are strips it is
-  // -1 throughout and anything keyed on it never fires.
   std::vector<GbtsLayerDescription*> barrel;
   for (GbtsLayerDescription& layer : layers) {
     if (layer.type == GbtsLayerType::Barrel) {
