@@ -223,6 +223,40 @@ std::vector<Track> makeDisplacedTracks() {
   return tracks;
 }
 
+/// A tight bundle of displaced tracks, close enough in every coordinate that
+/// the graph forms edges across them.
+///
+/// The prompt suite's dense case packs tracks into a narrow phi and tau
+/// window. Displaced, phi is not enough on its own: d0 moves a track's azimuth
+/// at a given radius by acos(d0 / r), so a wide d0 range fans the bundle back
+/// out however close its directions are. These share a d0 to within a couple
+/// of centimetres, which is what puts their hits on top of one another, and it
+/// is the case the prompt graph never has to face.
+///
+/// The tau range is the one thing kept open. Two tracks closer in tau than
+/// `tauRatioCut` are not two tracks as far as the graph is concerned, so
+/// packing them tighter than that measures nothing but the fixture: adjacent
+/// tracks here differ by about 1.5%, against a cut of 0.7%.
+std::vector<Track> makeDenseDisplacedTracks() {
+  constexpr std::size_t nTracks = 40;
+
+  std::vector<Track> tracks;
+  tracks.reserve(nTracks);
+
+  for (std::size_t i = 0; i < nTracks; ++i) {
+    const float frac = static_cast<float>(i) / nTracks;
+    Track track;
+    track.phi0 = -0.03f + 0.06f * frac;
+    track.d0 = 240.f + 24.f * frac;
+    track.z0 = 240.f + 40.f * frac;
+    track.tau = 0.20f + 0.30f * frac;
+    track.radius = 3333.f + 13333.f * frac;
+    track.sense = (i % 2 == 0) ? 1 : -1;
+    tracks.push_back(track);
+  }
+  return tracks;
+}
+
 /// A strip module of the toy barrel, roughly the ITk strip barrel.
 constexpr float kStereoAngle = 26e-3f;
 constexpr float kModuleGap = 2.f;
@@ -487,6 +521,71 @@ Completeness checkCompleteness(const GraphRun& run,
   return result;
 }
 
+/// What the seeder returned, per track.
+struct SeedTally {
+  /// Seeds whose innermost hit belongs to this track.
+  std::vector<std::size_t> seeds;
+  /// Hits in the longest of them.
+  std::vector<std::size_t> longest;
+  /// Hits the track left in the container.
+  std::vector<std::size_t> hits;
+  /// Seeds mixing hits of more than one track.
+  std::size_t impure{};
+  std::string report;
+};
+
+/// Run the seeder and check the invariants that hold however dense the event
+/// is: a seed holds hits of one track, innermost first.
+SeedTally runSeeding(const SeederSetup& setup,
+                     const SpacePointContainer& spacePoints,
+                     const std::vector<Track>& tracks) {
+  SeedContainer seeds;
+  seeds.assignSpacePointContainer(spacePoints);
+  setup.seeder.createSeeds(spacePoints, setup.roi, setup.graph, setup.filter,
+                           setup.options, seeds);
+
+  auto trackColumn = spacePoints.column<std::uint32_t>("trackId");
+
+  SeedTally tally;
+  tally.seeds.assign(tracks.size(), 0);
+  tally.longest.assign(tracks.size(), 0);
+  for (const std::vector<std::uint32_t>& own :
+       hitsPerTrack(spacePoints, tracks.size())) {
+    tally.hits.push_back(own.size());
+  }
+
+  for (const auto& seed : seeds) {
+    const auto indices = seed.spacePointIndices();
+    BOOST_REQUIRE_GE(indices.size(), 3u);
+    const std::uint32_t track = spacePoints.at(indices[0]).extra(trackColumn);
+
+    float previousR = -1.f;
+    bool pure = true;
+    for (const auto index : indices) {
+      const auto sp = spacePoints.at(index);
+      pure = pure && sp.extra(trackColumn) == track;
+      BOOST_CHECK_GT(sp.r(), previousR);
+      previousR = sp.r();
+    }
+    if (!pure) {
+      ++tally.impure;
+    }
+    tally.seeds.at(track) += 1;
+    tally.longest.at(track) = std::max(tally.longest.at(track), indices.size());
+  }
+
+  std::ostringstream detail;
+  detail << "seeds: " << seeds.size() << " for " << tracks.size()
+         << " tracks, " << tally.impure << " mixing tracks\n";
+  for (std::size_t track = 0; track < tracks.size(); ++track) {
+    detail << "  track " << track << ": " << tally.seeds[track] << " seed(s)"
+           << ", longest " << tally.longest[track] << " of "
+           << tally.hits[track] << " hits\n";
+  }
+  tally.report = detail.str();
+  return tally;
+}
+
 }  // namespace
 
 BOOST_AUTO_TEST_SUITE(DisplacedGbtsSeeding)
@@ -597,6 +696,63 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeWithTheTurnPrecutActive) {
   BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
 }
 
+// Guards the dense fixture: it is only worth running if the tracks really do
+// overlap, which is measured by how much work the graph is made to do beyond
+// the edges the tracks themselves owe it.
+BOOST_AUTO_TEST_CASE(DenseInputIsActuallyDense) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  BOOST_CHECK_EQUAL(spacePoints.size(), tracks.size() * detector.layers.size());
+
+  // the hits of one layer, spread over a hand's width of azimuth at most
+  auto layerColumn =
+      spacePoints.column<Experimental::GbtsLayerIndex>("gbtsLayerIndex");
+  float minPhi = std::numbers::pi_v<float>;
+  float maxPhi = -std::numbers::pi_v<float>;
+  for (const auto& sp : spacePoints) {
+    if (sp.extra(layerColumn) != 0) {
+      continue;
+    }
+    minPhi = std::min(minPhi, sp.phi());
+    maxPhi = std::max(maxPhi, sp.phi());
+  }
+  BOOST_TEST_MESSAGE("innermost layer spans " << (maxPhi - minPhi)
+                                              << " rad over " << tracks.size()
+                                              << " tracks");
+  BOOST_CHECK_LT(maxPhi - minPhi, 0.2f);
+}
+
+// The same completeness demand under real combinatorics: the tracks overlap,
+// so the graph builds far more edges than they owe it and has to keep all of
+// theirs among them.
+BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeAmongDenseTracks) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeederSetup setup = makeSeeder(detector);
+  const GraphRun run = buildGraph(setup, spacePoints);
+
+  const Completeness result = checkCompleteness(run, spacePoints, tracks);
+
+  BOOST_TEST_MESSAGE("dense graph: "
+                     << run.nEdges << " edges (" << result.expectedEdges
+                     << " owed), " << run.nConnections << " connections ("
+                     << result.expectedLinks << " owed)");
+  if (!result.report.empty()) {
+    BOOST_TEST_MESSAGE("missing:\n" << result.report);
+  }
+
+  BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
+  BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
+
+  // the point of the fixture: the graph is carrying real combinatorics here,
+  // not just the tracks' own edges
+  BOOST_CHECK_GT(run.nEdges, 2 * result.expectedEdges);
+}
+
 // Everything above feeds seeds: one per track, holding all four hits.
 BOOST_AUTO_TEST_CASE(SeedsFromDisplacedTracks) {
   const ToyDetector detector = stripBarrelDetector();
@@ -604,50 +760,38 @@ BOOST_AUTO_TEST_CASE(SeedsFromDisplacedTracks) {
   const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
 
   const SeederSetup setup = makeSeeder(detector);
+  const SeedTally tally = runSeeding(setup, spacePoints, tracks);
 
-  SeedContainer seeds;
-  seeds.assignSpacePointContainer(spacePoints);
-  setup.seeder.createSeeds(spacePoints, setup.roi, setup.graph, setup.filter,
-                           setup.options, seeds);
-
-  auto trackColumn = spacePoints.column<std::uint32_t>("trackId");
-  const std::vector<std::vector<std::uint32_t>> hits =
-      hitsPerTrack(spacePoints, tracks.size());
-
-  std::vector<std::size_t> seedsPerTrack(tracks.size(), 0);
-  std::vector<std::size_t> longestSeed(tracks.size(), 0);
-
-  for (const auto& seed : seeds) {
-    const auto indices = seed.spacePointIndices();
-    BOOST_REQUIRE_GE(indices.size(), 3u);
-    const std::uint32_t track = spacePoints.at(indices[0]).extra(trackColumn);
-    float previousR = -1.f;
-    for (const auto index : indices) {
-      const auto sp = spacePoints.at(index);
-      // a seed holds hits of one track, innermost first
-      BOOST_CHECK_EQUAL(sp.extra(trackColumn), track);
-      BOOST_CHECK_GT(sp.r(), previousR);
-      previousR = sp.r();
-    }
-    seedsPerTrack.at(track) += 1;
-    longestSeed.at(track) = std::max(longestSeed.at(track), indices.size());
-  }
-
-  std::ostringstream detail;
-  for (std::size_t track = 0; track < tracks.size(); ++track) {
-    detail << "  track " << track << ": " << seedsPerTrack[track] << " seed(s)"
-           << ", longest " << longestSeed[track] << " of " << hits[track].size()
-           << " hits\n";
-  }
-  BOOST_TEST_MESSAGE("seeds: " << seeds.size() << " for " << tracks.size()
-                               << " tracks\n"
-                               << detail.str());
+  BOOST_TEST_MESSAGE(tally.report);
 
   // the tracks are far apart in phi, so clone removal should resolve the
   // branching to exactly one seed per track, holding every hit it left
+  BOOST_CHECK_EQUAL(tally.impure, 0u);
   for (std::size_t track = 0; track < tracks.size(); ++track) {
-    BOOST_CHECK_EQUAL(seedsPerTrack[track], 1u);
-    BOOST_CHECK_EQUAL(longestSeed[track], hits[track].size());
+    BOOST_CHECK_EQUAL(tally.seeds[track], 1u);
+    BOOST_CHECK_EQUAL(tally.longest[track], tally.hits[track]);
+  }
+}
+
+// The same, out of a graph carrying thirty times the edges the tracks owe it.
+// Every track still has to come back whole, which is the filter and clone
+// removal resolving the branching rather than the graph handing them an easy
+// problem.
+BOOST_AUTO_TEST_CASE(SeedsFromDenseDisplacedTracks) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeederSetup setup = makeSeeder(detector);
+  const SeedTally tally = runSeeding(setup, spacePoints, tracks);
+
+  BOOST_TEST_MESSAGE(tally.report);
+
+  // every track back whole, and no seed built out of two of them
+  BOOST_CHECK_EQUAL(tally.impure, 0u);
+  for (std::size_t track = 0; track < tracks.size(); ++track) {
+    BOOST_CHECK_GE(tally.seeds[track], 1u);
+    BOOST_CHECK_EQUAL(tally.longest[track], tally.hits[track]);
   }
 }
 
