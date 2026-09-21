@@ -105,7 +105,12 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   // to record what a later edge would have been matched against
   std::uint32_t nSaturatedProperties = 0;
 
-  edgeStorage.reserve(m_cfg.nMaxEdges);
+  // Scales the maximum number of edges by the number of space points using the
+  // factor maxEdgesPerSP
+  const auto nMaxEdges = static_cast<std::uint32_t>(
+      m_cfg.maxEdgesPerSP * static_cast<float>(nodeStorage.numberOfNodes()));
+
+  edgeStorage.reserve(nMaxEdges);
   
   // number of edges acepted into the storage, 
   // will need a seperate one for the proper storage, 
@@ -393,7 +398,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
             }
           }
 
-          if (nEdges < m_cfg.nMaxEdges) {
+          if (nEdges < nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, barrelOrder2);
 
             ++numCreatedEdges;
@@ -707,7 +712,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
     } // n1Idx
   } // bin groups
 
-  if (nEdges >= m_cfg.nMaxEdges) {
+  if (nEdges >= nMaxEdges) {
     ACTS_WARNING(
         "Maximum number of graph edges exceeded - possible efficiency loss "
         << nEdges);
@@ -732,7 +737,8 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
 std::uint32_t DisplacedGbtsGraph::runCCA(
     const std::uint32_t nEdges,
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage) const {
+    std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
+    const std::uint32_t maxIterations) const {
   std::uint32_t maxLevel = 0;
 
   std::uint32_t iter = 0;
@@ -752,7 +758,7 @@ std::uint32_t DisplacedGbtsGraph::runCCA(
   vNew.reserve(vOld.size());
 
   // generate proposals
-  for (; iter < m_cfg.ccaMaxIterations; iter++) {
+  for (; iter < maxIterations; iter++) {
     vNew.clear();
 
     for (detail::DisplacedGbtsEdge* pS : vOld) {
@@ -800,8 +806,9 @@ std::uint32_t DisplacedGbtsGraph::runCCA(
 
 std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
     std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-    std::uint32_t nEdges) const {
-  const auto minLevel = static_cast<std::uint8_t>(m_cfg.minSeedLevel);
+    std::uint32_t nEdges, const std::uint8_t minSeedLevel,
+    const bool addTriplets, const float maxAbsEtaAddTriplets) const {
+  const std::uint8_t minLevel = minSeedLevel;
   // `addTriplets` accepts a chain one level short. Signed: an uncollected
   // edge sits at level -1 and `minSeedLevel` may be configured to 0.
   const int minLevelAddTriplets = int{minLevel} - 1;
@@ -812,7 +819,7 @@ std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
   for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
     detail::DisplacedGbtsEdge* pS = &edgeStorage[edgeIndex];
 
-    if (!m_cfg.addTriplets) {
+    if (!addTriplets) {
       if (pS->level < minLevel) {
         continue;
       }
@@ -821,7 +828,7 @@ std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
       // displaced edge keeps exp(eta) where the prompt one kept it in p[0]
       const float edgeAbsEta = std::abs(-std::log(pS->expEta));
 
-      if (edgeAbsEta > m_cfg.maxAbsEtaAddTriplets) {
+      if (edgeAbsEta > maxAbsEtaAddTriplets) {
         if (pS->level < minLevel) {
           continue;
         }

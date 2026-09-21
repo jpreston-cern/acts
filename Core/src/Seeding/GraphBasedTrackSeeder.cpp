@@ -127,7 +127,8 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
   if constexpr (isPrompt) {
     maxLevel = graph.runCCA(m_cfg.ccaMaxIterations);
   } else {
-    maxLevel = graphBuilder.runCCA(graph.nEdges, graph.edgeStorage);
+    maxLevel = graphBuilder.runCCA(graph.nEdges, graph.edgeStorage,
+                                   m_cfg.ccaMaxIterations);
   }
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
@@ -137,8 +138,9 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
     vChainHeads = graph.extractChainHeads(
         m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
   } else {
-    vChainHeads =
-        graphBuilder.extractChainHeads(graph.edgeStorage, graph.nEdges);
+    vChainHeads = graphBuilder.extractChainHeads(
+        graph.edgeStorage, graph.nEdges, m_cfg.minSeedLevel, m_cfg.addTriplets,
+        m_cfg.maxAbsEtaAddTriplets);
   }
 
   if (vChainHeads.empty()) {
