@@ -1,9 +1,10 @@
 #include "Acts/Seeding/DisplacedGbtsGraph.hpp"
-
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <span>
 #include <utility>
@@ -45,7 +46,7 @@ struct SlidingWindow {
 
   std::pair<std::uint32_t, std::uint32_t> DisplacedGbtsGraph::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
-    std::vector<detail::GbtsEdge>& edgeStorage, const float bFieldInZ) const {
+    std::vector<detail::DisplacedGbtsEdge>& edgeStorage, const float bFieldInZ) const {
   // used to calculate the outer Z cut on doublets
   const float cutZMinU =
       m_cfg.minZ0 + m_cfg.maxOuterRadius * static_cast<float>(roi.dzdrMin());
@@ -194,18 +195,269 @@ struct SlidingWindow {
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
       // again this is problamatic ( think i need to implement a layer first approach here)
+      // maybe keep for now and let claude do it once you have 
       window.barrelOrder = B2.barrelOrder;
       window.type = B2.type;
       window.technology = B2.technology;
     }
 
-    // in GBTSv3 the outer loop goes over n1 nodes in the Layer 1 bin
+    // in GBTSv3 the outer loop goes over n1 nodes in the Layer 1 bin (inner most node first)
     for (SpacePointIndex n1Idx = B1.nodes.first; n1Idx < B1.nodes.second;
          ++n1Idx) {
-
+      
       // put inside loop here where things are going to get more complicated 
-    }
-  }
+      // initialization using the top watermark of the edge storage
+      edgeInfo[n1Idx].firstEdge = nEdges;
+
+      // the counter for the incoming graph edges created for n1
+      // it has to be here as we iterrate over edges on a shared node in the inner loop
+      std::uint16_t numCreatedEdges = 0;
+      
+      const detail::GbtsNodeParams& n1pars = params[n1Idx];
+
+      const float phi1 = n1pars.phi;
+      const float r1 = n1pars.r;
+      const float z1 = n1pars.z;
+
+      // the chord of a pair, both paths need it now
+      const std::array<float, 4>& position = nodeView.positions[n1Idx];
+      float x1 = position[0];
+      float y1 = position[1];
+      
+      // the intermediate loop over sliding windows. these are associated with the nodes in the outer bin
+      for (auto& slw : phiSlidingWindow) {
+        const std::int32_t barrelOrder2 = slw.barrelOrder;
+
+        const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
+        const bool isPixelBarrel2 = barrelOrder2 >= 0;
+
+        const bool stripPair = calibrate && (!isPixel1 || !isPixel2);
+
+        const float deltaPhi = slw.deltaPhi;
+
+        // sliding window phi1 +/- deltaPhi
+        // need to check if the equation i derived is the half width or full phi window
+        const float minPhi = phi1 - deltaPhi;
+        const float maxPhi = phi1 + deltaPhi;
+
+        for (std::uint32_t n2PhiIdx = slw.firstIt; n2PhiIdx < slw.numPhiNodes;
+             ++n2PhiIdx) {
+
+          const float phi2 = slw.phiNodes[n2PhiIdx].first;
+
+          if (phi2 < minPhi) {
+            // update the window position
+            slw.firstIt = n2PhiIdx;
+            continue;
+          }
+          if (phi2 > maxPhi) {
+            // break and go to the next window
+            break;
+          }
+
+          const SpacePointIndex n2Idx = slw.phiNodes[n2PhiIdx].second;
+
+          const detail::GbtsNodeEdgeInfo& n2Info = edgeInfo[n2Idx];
+
+          // get rid of for now, 
+          // even though we are only using one large storage atm, we should move to two in the future
+          // which wont require this
+          const std::uint16_t nodeInfo = n2Info.isConnected;
+
+          const std::uint32_t n2FirstEdge = n2Info.firstEdge;
+          const std::uint16_t n2NumEdges = n2Info.numEdges;
+          const std::uint32_t n2LastEdge = n2FirstEdge + n2NumEdges;
+
+          const detail::GbtsNodeParams& n2pars = params[n2Idx];
+
+          const std::array<float, 4>& position = nodeView.positions[n2Idx];
+
+          const float dx = position[0] - x1;
+          const float dy = position[1] - y1;
+
+          const float r2 = n2pars.r;
+          const float chord = fastHypot(dx, dy);
+          
+
+          // On the nominal radii, so an endcap pair the slide would have
+          // opened up is lost here. The cheap reject is worth more.
+
+          // we should work out the chord here i think for each pair and then cut on a minimum chord length 
+          // set to same value i think for now as they serve similar purposes (can tune later)
+          if (chord < m_cfg.minDeltaRadius) {
+            continue;
+          }
+
+          const float z2 = n2pars.z;
+
+          // the ends as the pair puts them: nominal, or slid along the strip
+          // when resolved. Azimuth is kept as it was -- exactly right in the
+          // barrel, and to the stereo angle in the endcap, where the strip
+          // slid along is a hair off radial.
+          float r1c = r1;
+          float z1c = z1;
+          float r2c = r2;
+          float z2c = z2;
+
+          const float dz = z2c - z1c;
+          const float tau = dz / chord;
+          const float ftau = std::fabs(tau);
+          if (ftau > m_cfg.maxAbsTau) {
+            continue;
+          }
+
+          // z is linear in transverse arc length, so z0 = z1 - S1 * tau with S1
+          // the transverse path from the perigee to hit 1. The prompt form took
+          // S1 = r1, which only holds for a track leaving the beamline
+          // radially. Displaced, S1 = sqrt(r1^2 - d0^2), and d0 is unknown at
+          // doublet stage -- two transverse points do not fix a circle -- so z0
+          // is a band spanned by d0 in [0, d0Max]. S1 is monotonic in d0, so
+          // the two endpoints bracket the band.
+          const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
+
+          const float s1Max = r1c;  // d0 = 0
+          const float s1Min = std::sqrt(std::max(0.f, r1c * r1c - d0MaxSquare));
+
+          const float z0A = z1c - s1Max * tau;
+          const float z0B = z1c - s1Min * tau;
+          const float z0Lo = std::min(z0A, z0B);
+          const float z0Hi = std::max(z0A, z0B);
+
+          if (m_cfg.doubletFilterRZ) {
+            // the band has to overlap the allowed range, not sit inside it
+            if (z0Hi < m_cfg.minZ0 || z0Lo > m_cfg.maxZ0) {
+              continue;
+            }
+
+            // z(rOut) = z1 + (sOut - S1) * tau, and (sOut - S1) also grows
+            // monotonically with d0, so the endpoints bracket this band too.
+            const float rOut = m_cfg.maxOuterRadius;
+            const float sOutMin =
+                std::sqrt(std::max(0.f, rOut * rOut - d0MaxSquare));
+
+            const float zOutA = z1c + (rOut - s1Max) * tau;
+            const float zOutB = z1c + (sOutMin - s1Min) * tau;
+
+            // NOTE: the two bands are tested separately although they share the
+            // same d0, so a pair can pass the two on different d0 values. That
+            // is a relaxation, never a rejection, which is the safe direction
+            // for a pre-filter; the triplet fit resolves d0 properly.
+            if (std::max(zOutA, zOutB) < cutZMinU ||
+                std::min(zOutA, zOutB) > cutZMaxU) {
+              continue;
+            }
+          }
+
+        
+          const float hypotTau = fastHypot(1, tau);
+          const float expEta = hypotTau - tau;
+          // 1 / expEta, since (hypotTau - tau) * (hypotTau + tau) == 1. The
+          // sum is also the better conditioned form for large tau.
+          const float invExpEta = hypotTau + tau;
+
+          // match edge candidate against edges incoming to n2
+          // can keep this i think 
+          if (useMatchBeforeCreate) {
+            // we must have enough incoming edges to decide
+            bool isGood = n2NumEdges <= m_cfg.matchBeforeCreateMaxEdges;
+
+            if (!isGood) {
+              const float uat1 = invExpEta;
+
+              for (std::uint32_t n2InIdx = n2FirstEdge; n2InIdx < n2LastEdge;
+                   ++n2InIdx) {
+                const float tau2 = edgeStorage[n2InIdx].properties[0].expEta;
+                const float tauRatio = tau2 * uat1 - 1.0f;
+
+                if (std::abs(tauRatio) > m_cfg.tauRatioPrecut) {  // bad match
+                  continue;
+                }
+                isGood = true;  // good match found
+                break;
+              }
+            }
+
+            if (!isGood) {  // no match found, skip creating [n1 <- n2] edge
+              continue;
+            }
+          }
+
+          if (nEdges < m_cfg.nMaxEdges) {
+            edgeStorage.emplace_back(n1Idx, n2Idx, expEta, barrelOrder2);
+
+            ++numCreatedEdges;
+
+            const std::uint32_t outEdgeIdx = nEdges;
+            
+            const float uat2 = invExpEta;
+          
+            // FIXME: incomplete. In GbtsGraph this block also runs the triplet
+            // neighbour loop over n2's incoming edges (the tau/dPhi/dcurv
+            // matching that fills vNei and sets isConnected) and ends with
+            // ++nEdges. Until that is written, uat2/phi2u/curv2 are unused and
+            // nEdges never advances, so every edge overwrites slot 0.
+            // looking for neighbours of the new edge using outer node 
+            for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
+                 ++inEdgeIdx) {
+              
+              // i think i need to add the triplet stuff here already such that everything can be calibrated properly before (maybe)
+              detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
+
+              const float absTauRatio = std::abs(pS->expEta * uat2 - 1.0f);
+
+              // rejects most candidates before the layer bookkeeping below
+              // this can stay as we want the tau ratio still 
+              if (absTauRatio > maxTauRatioCut) {
+                continue;
+              }
+
+              if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
+                continue;
+              }
+
+              const std::int32_t barrelOrder3 = pS->n2BarrelOrder;
+
+              const bool isPixelBarrel3 = barrelOrder3 >= 0;
+
+              float addTauRatioCorr = 0;
+
+              if (m_cfg.useAdaptiveCuts) {
+                if (isPixelBarrel1 && isPixelBarrel2 && isPixelBarrel3) {
+                  // three radially consecutive layers, none skipped
+                  const bool noGap = (barrelOrder2 - barrelOrder1) == 1 &&
+                                     (barrelOrder3 - barrelOrder2) == 1;
+
+                  // assume more scattering due to the layer in between
+                  if (!noGap) {
+                    addTauRatioCorr = m_cfg.tauRatioCorr;
+                  }
+                } else {
+                  bool mixedTriplet =
+                      isPixelBarrel1 && isPixelBarrel2 && !isPixelBarrel3;
+                  if (mixedTriplet) {
+                    addTauRatioCorr = m_cfg.tauRatioCorr;
+                  }
+                }
+              }
+              // The two doublets sharing a strip node resolved it separately,
+              // so a triplet through a strip may disagree on tau by more. Any
+              // of the three: the outer two carry their end's error into tau.
+              if (m_cfg.tauRatioCorrStrip > 0.f &&
+                  (!isPixel1 || !isPixel2 ||
+                   nodeView.strip(pS->n2) != nullptr)) {
+                addTauRatioCorr += m_cfg.tauRatioCorrStrip;
+              }
+
+              // bad match
+              if (absTauRatio > m_cfg.tauRatioCut + addTauRatioCorr) {
+                continue;
+              }
+            } // inEdgeIdx
+          } // if (nEdges < nMaxEdges)
+        } // n2PhiIdx
+      } // slw
+    } // n1Idx
+  } // bin groups
 
   return std::make_pair(nEdges, nConnections);
 }

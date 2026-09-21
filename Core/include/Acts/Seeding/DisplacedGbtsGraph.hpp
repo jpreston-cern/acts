@@ -6,6 +6,7 @@
 #include "Acts/Seeding/GbtsLayerDescription.hpp"
 #include "Acts/Seeding/GbtsNodeStorage.hpp"
 #include "Acts/Seeding/GbtsRoiDescriptor.hpp"
+#include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
 #include "Acts/Seeding/detail/GbtsGraphTypes.hpp"
 #include "Acts/Utilities/Logger.hpp"
 
@@ -34,6 +35,9 @@ namespace Acts::Experimental{
       /// Tau ratio cut threshold.
       float tauRatioCut = 0.007f;
 
+      /// Tau ratio precut threshold.
+      float tauRatioPrecut = 0.009f;
+
       /// Correction applied to tau acceptance if a layer is missed during edge
       /// connecting.
       float tauRatioCorr = 0.006f;
@@ -55,8 +59,18 @@ namespace Acts::Experimental{
       /// Use eta binning from geometry structure.
       bool useEtaBinning = true;
 
+      /// Apply RZ cuts on doublets.
+      bool doubletFilterRZ = true;
+
       /// Maximum number of GBTS edges/doublets.
       std::uint32_t nMaxEdges = 2000000;
+
+      /// Minimum delta radius between layers.
+      float minDeltaRadius = 2.0f * Acts::UnitConstants::mm;
+
+      /// Largest |cot(theta)| accepted for a doublet. The default corresponds to
+      /// |eta| of about 4.3, beyond the acceptance of any current tracker.
+      float maxAbsTau = 36.0f;
 
       /// Minimum z0 value. In pixel mode the value is picked from the RoI.
       float minZ0 = -600.0f;
@@ -77,6 +91,10 @@ namespace Acts::Experimental{
       /// Maximum |curvature| below `curvatureSplitAbsTau`, before that scaling.
       float maxCurvatureLowEta = 3.75e-4f / Acts::UnitConstants::mm;
 
+      /// |cot(theta)| separating the two curvature cuts, corresponding to |eta|
+      /// of about 2.1.
+      float curvatureSplitAbsTau = 4.0f;
+
       /// Radial separation splitting the two phi-window slopes below.
       float phiWindowSplitDeltaRadius = 60.0f * Acts::UnitConstants::mm;
 
@@ -94,6 +112,9 @@ namespace Acts::Experimental{
       /// Slope of the far phi window per unit radial separation. Scaled by
       /// `tuningPt / minPt`.
       float phiWindowFarSlope = 2.2e-4f / Acts::UnitConstants::mm;
+
+      /// Incoming edge count below which a node is accepted without a tau match.
+      std::uint32_t matchBeforeCreateMaxEdges = 2;
 
       /// Highest pixel barrel layer, counted inside out, whose nodes are cut
       /// against the z0 histogram of their outer neighbourhood and whose isolated
@@ -128,7 +149,7 @@ namespace Acts::Experimental{
 
     std::pair<std::uint32_t, std::uint32_t> buildTheGraph(const GbtsRoiDescriptor& roi, 
                                                           GbtsNodeStorage& nodeStorage,
-                                                          std::vector<detail::GbtsEdge>& edgeStorage, 
+                                                          std::vector<detail::DisplacedGbtsEdge>& edgeStorage, 
                                                           float bFieldInZ) const;
             
     std::uint32_t runCCA(std::uint32_t nEdges, std::vector<detail::GbtsEdge>& edgeStorage) const;
