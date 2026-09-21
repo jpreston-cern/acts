@@ -101,14 +101,21 @@ namespace Acts::Experimental::detail{
   /// @param n1_ Inner node index
   /// @param n2_ Outer node index
   /// @param expEta_ exp(eta) of the edge, the first fit parameter
+  /// @param chord_ Transverse length of the edge's own chord
+  /// @param cosAlpha_ Cosine of the azimuth of that chord
+  /// @param sinAlpha_ Sine of the azimuth of that chord
   /// @param n2BarrelOrder_ Pixel barrel ordinal of the outer node's layer
   DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_,
+           float chord_, float cosAlpha_, float sinAlpha_,
            std::int32_t n2BarrelOrder_)
       : n1{n1_},
         n2{n2_},
         level{1},
         next{1},
         expEta(expEta_),
+        chord(chord_),
+        cosAlpha(cosAlpha_),
+        sinAlpha(sinAlpha_),
         n2BarrelOrder{n2BarrelOrder_} {
 
           properties.reserve(kGbtsMaxEdgeNeighbours);
@@ -128,6 +135,24 @@ namespace Acts::Experimental::detail{
   /// exp(eta) of the doublet, from the chord between its two nodes. All a
   /// displaced edge knows about itself before a triplet fit.
   float expEta{};
+
+  /// Transverse length of the edge's own chord.
+  ///
+  /// Two edges meeting at a node bound the triplet's outer chord between them,
+  /// L13 <= L12 + L23, which is what lets the turn below be cut against this
+  /// pair's own reach rather than the whole detector's.
+  float chord{};
+
+  /// The edge's own chord direction in the transverse plane, (dx, dy) / chord.
+  ///
+  /// The turn from one edge to another is asin(curvature * L13), so it falls
+  /// with pT and a wide turn is not worth fitting. Holding the direction as a
+  /// unit vector rather than as an angle gives that turn's sine and cosine
+  /// from a dot and a cross of two cached pairs, so the innermost loop reaches
+  /// the cut without trigonometry, a wrap, or a square root.
+  float cosAlpha{};
+  /// @copydoc cosAlpha
+  float sinAlpha{};
 
   /// One entry per triplet this edge is the inner edge of, at most
   /// @c kGbtsMaxEdgeNeighbours of them. Empty while the edge is the outermost
