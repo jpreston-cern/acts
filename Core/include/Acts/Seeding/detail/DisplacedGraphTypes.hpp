@@ -110,13 +110,18 @@ namespace Acts::Experimental::detail{
   /// @param cosAlpha_ Cosine of the azimuth of that chord
   /// @param sinAlpha_ Sine of the azimuth of that chord
   /// @param n2Depth_ Barrel depth of the outer node's layer
+  /// @param n2Type_ Type of the outer node's layer
+  /// @param n2Technology_ Technology of the outer node's layer
   DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_,
            float chord_, float cosAlpha_, float sinAlpha_,
-           std::int32_t n2Depth_)
+           std::int32_t n2Depth_, GbtsLayerType n2Type_,
+           GbtsLayerTechnology n2Technology_)
       : n1{n1_},
         n2{n2_},
         level{1},
         next{1},
+        n2Type{n2Type_},
+        n2Technology{n2Technology_},
         expEta(expEta_),
         chord(chord_),
         cosAlpha(cosAlpha_),
@@ -136,6 +141,13 @@ namespace Acts::Experimental::detail{
   /// How many of @ref properties are filled. Zero while the edge is the
   /// outermost pair of every chain it could start.
   std::uint8_t nProperties{0};
+
+  /// Type and technology of the outer node's layer, which together say
+  /// whether that node is an endcap strip the turn cut must not trust. Both
+  /// are a byte and sit in what would be padding here.
+  GbtsLayerType n2Type{};
+  /// @copydoc n2Type
+  GbtsLayerTechnology n2Technology{};
 
   /// exp(eta) of the doublet, from the chord between its two nodes. All a
   /// displaced edge knows about itself before a triplet fit.

@@ -172,6 +172,14 @@ struct GbtsGraphConfig {
   /// multiple of the strip half-length, so 1 is the strip itself. This is the
   /// same quantity as `TripletSeedFinder::Config::toleranceParam`.
   float maxStripLengthFraction = 1.1f;
+
+  /// Cut a candidate triplet on the turn between its two edges before the
+  /// triplet fit, against the curvature limit over the pair's own chords.
+  /// Where calibration is on, a triplet with an endcap strip end skips it,
+  /// since that end still slides along its strip and the strip is radial.
+  ///
+  /// @note Displaced only.
+  bool useTurnAngleCut = true;
 };
 
 }  // namespace Acts::Experimental
