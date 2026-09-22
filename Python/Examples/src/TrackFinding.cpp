@@ -101,9 +101,9 @@ void addTrackFinding(py::module& mex) {
         py::class_<Config>(mex, "GbtsGraphBuilderConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(c, minPt, maxEdgesPerSP, minDeltaRadius, doubletFilterRZ,
                        matchBeforeCreate, validateTriplets, useAdaptiveCuts,
-                       calibrateStrips, useTurnAngleCut, maxOuterRadius, d0Max,
-                       cutDPhiMax, cutDCurvMax, tauRatioCut, useSumRatioCut,
-                       sumRatioCutMax);
+                       calibrateStrips, useTurnAngleCut, tripletFilterRZ,
+                       maxOuterRadius, d0Max, cutDPhiMax, cutDCurvMax,
+                       tauRatioCut, useSumRatioCut, sumRatioCutMax);
     patchKwargsConstructor(c);
   }
 
