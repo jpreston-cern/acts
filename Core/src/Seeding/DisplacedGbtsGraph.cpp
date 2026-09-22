@@ -134,7 +134,9 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   std::uint32_t nEdges = 0;
 
   // views of the nodes and edges (need to doublec check the update on the edge view, this should be keyed to global, not local layer pair store)
+  // for outside the doublet loop
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
+  // for inner doublet loop 
   const std::span<const detail::GbtsNodeParams> params =
       nodeStorage.nodeParams();
   const std::span<detail::GbtsNodeEdgeInfo> edgeInfo =
@@ -360,6 +362,27 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           const float tau = dz / chord;
           const float ftau = std::fabs(tau);
           if (ftau > m_cfg.maxAbsTau) {
+            continue;
+          }
+
+          // The cluster width tau window. The node storage narrows it from its
+          // lookup table, and only for the pixel barrel nodes that table was
+          // trained on; every other node keeps the infinite defaults and so
+          // passes here untouched. Strip only running therefore pays four
+          // comparisons and nothing else, and the cut comes into its own as
+          // soon as the pixel layers are fed in.
+          //
+          // What the window bounds is the track's own |cot(theta)| where it
+          // crossed the node, and the pair's tau is the estimate of it. Taken
+          // over the chord rather than a radial step, which is the transverse
+          // path the track actually walked between the two nodes: for a
+          // displaced track the radial step is not that, and it is the radial
+          // step that would misjudge the window, not the chord.
+          if (ftau < n1pars.minTau || ftau > n1pars.maxTau) {
+            continue;
+          }
+
+          if (ftau < n2pars.minTau || ftau > n2pars.maxTau) {
             continue;
           }
 
