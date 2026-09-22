@@ -34,7 +34,20 @@ struct SlidingWindow {
   std::int32_t depth{-1};
   /// Technology of the bin's layer.
   GbtsLayerTechnology technology{};
+  /// Type of the bin's layer.
+  GbtsLayerType type{};
 };
+
+/// Whether a strip node on a layer of this type and technology slides
+/// radially when calibrated. An endcap strip is radial, so the slide moves the
+/// transverse position the turn cut reads; a barrel strip runs along z, so its
+/// slide is almost all z and leaves the transverse position to within the
+/// stereo projection.
+constexpr bool slidesRadially(GbtsLayerType type,
+                              GbtsLayerTechnology technology) {
+  return type == GbtsLayerType::Endcap &&
+         technology == GbtsLayerTechnology::Strip;
+}
 
 /// exp(eta) of the chord between two points, the form the tau ratio of a
 /// triplet compares its two doublets in.
@@ -252,6 +265,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       window.deltaPhi = deltaPhi;
       window.depth = B2.depth;
       window.technology = B2.technology;
+      window.type = B2.type;
     }
 
     // in GBTSv3 the outer loop goes over n1 nodes in the Layer 1 bin (inner most node first)
@@ -291,12 +305,15 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
 
-        // Whether the inner two nodes of every triplet from this window have
-        // an end still to slide along a strip. When they do, the geometric
-        // cut below is off whatever the third node turns out to be, and when
-        // the calibration is off nothing moves at all -- either way the
-        // third node need not be looked at to know.
-        const bool innerEndsMove = calibrate && (!isPixel1 || !isPixel2);
+        // Whether the turn cut below is off for every triplet from this
+        // window: either it is off altogether, or one of the inner two nodes
+        // is an endcap strip still to slide radially along its strip. Either
+        // way the third node need not be looked at to know. A barrel strip
+        // end keeps the cut, since its slide is almost all z.
+        const bool innerSkipTurn =
+            !m_cfg.useTurnAngleCut ||
+            (calibrate && (slidesRadially(B1.type, B1.technology) ||
+                           slidesRadially(slw.type, slw.technology)));
 
         const float deltaPhi = slw.deltaPhi;
 
@@ -465,7 +482,8 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
           if (nEdges < m_cfg.nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
-                                     sinAlpha12, depth2);
+                                     sinAlpha12, depth2, slw.type,
+                                     slw.technology);
             edgeExpEta.push_back(expEta);
 
             ++numCreatedEdges;
@@ -509,14 +527,14 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               // endcap that slide is largely radial, so it moves the chords
               // the geometric cut below is reading. Where it cannot be sure it
               // does not cut: rejecting a candidate the fit would have kept is
-              // the one thing it must not do.
+              // the one thing it must not do. In the barrel the slide is
+              // along z and the transverse position holds, so the cut stays.
               //
-              // The third node is only worth asking about when the inner two
-              // have settled it either way, which keeps the lookup off the
-              // path of every candidate the turn is about to reject.
-              const bool endsWillMove =
-                  innerEndsMove ||
-                  (calibrate && nodeView.strip(pS->n2) != nullptr);
+              // The third node goes by its layer, cached on the edge, so the
+              // check costs no lookup.
+              const bool skipTurn =
+                  innerSkipTurn ||
+                  (calibrate && slidesRadially(pS->n2Type, pS->n2Technology));
 
               // The turn from the inner edge to this one, which is
               // asin(curvature * L13) and so falls with pT. Both directions
@@ -530,7 +548,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
               // fires and one that does not: the widest turn the curvature
               // limit allows runs from about three degrees between adjacent
               // pixel layers to ten across the strips.
-              if (!endsWillMove) {
+              if (!skipTurn) {
                 const float sinDelta =
                     cosAlpha12 * pS->sinAlpha - sinAlpha12 * pS->cosAlpha;
                 const float cosDelta =
