@@ -180,6 +180,14 @@ struct GbtsGraphConfig {
   ///
   /// @note Displaced only.
   bool useTurnAngleCut = true;
+
+  /// Cut a fitted triplet on its z0 against [minZ0, maxZ0] and its z at
+  /// `maxOuterRadius` against the RoI, using the fitted d0. Gated apart from
+  /// `doubletFilterRZ`, which applies the same ranges to doublets as bands
+  /// over d0.
+  ///
+  /// @note Displaced only.
+  bool tripletFilterRZ = true;
 };
 
 }  // namespace Acts::Experimental
