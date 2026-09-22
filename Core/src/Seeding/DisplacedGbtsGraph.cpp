@@ -13,14 +13,15 @@
 #include <utility>
 #include <vector>
 
+// Every rejection in buildTheGraph is marked `[CUT]`, so `grep "\[CUT\]"`
+// lists them in the order a candidate meets them.
+
 namespace Acts::Experimental{
 
 namespace {
 
-/// Sliding window in phi used to define range used for edge creation.
-///
-/// Covers one non-empty source eta bin, whose phi-ordered node list it holds
-/// directly so that the innermost loop does not reach through the bin.
+/// Sliding window in phi over one non-empty eta bin, holding its phi-ordered
+/// nodes directly so the innermost loop does not reach through the bin.
 struct SlidingWindow {
   /// phi-ordered nodes of the bin, including the wrap-around duplicates
   const std::pair<float, SpacePointIndex>* phiNodes{};
@@ -28,7 +29,7 @@ struct SlidingWindow {
   std::uint32_t numPhiNodes{};
   /// sliding window position
   std::uint32_t firstIt{};
-  /// window half-width;
+  /// window half-width
   float deltaPhi{};
   /// How deep the bin's layer sits in the barrel, -1 for an endcap.
   std::int32_t depth{-1};
@@ -38,19 +39,16 @@ struct SlidingWindow {
   GbtsLayerType type{};
 };
 
-/// Whether a strip node on a layer of this type and technology slides
-/// radially when calibrated. An endcap strip is radial, so the slide moves the
-/// transverse position the turn cut reads; a barrel strip runs along z, so its
-/// slide is almost all z and leaves the transverse position to within the
-/// stereo projection.
+/// Whether a strip node on this layer slides radially when calibrated: true
+/// for endcap strips. Barrel strips slide along z and keep their transverse
+/// position.
 constexpr bool slidesRadially(GbtsLayerType type,
                               GbtsLayerTechnology technology) {
   return type == GbtsLayerType::Endcap &&
          technology == GbtsLayerTechnology::Strip;
 }
 
-/// exp(eta) of the chord between two points, the form the tau ratio of a
-/// triplet compares its two doublets in.
+/// exp(eta) of the chord between two points.
 ///
 /// @param inner The inner point
 /// @param outer The outer point
@@ -68,8 +66,28 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   return fastHypot(1.0f, tau) - tau;
 }
 
+/// Transverse arc length from the perigee out to radius r, for a track of
+/// impact parameter d0 and curvature in the prompt convention (1 / 2R).
+/// Straight-line distance plus the same sagitta correction the triplet fit
+/// uses for its tau.
+///
+/// @return The arc length, or nothing if the track never reaches r
+std::optional<float> arcFromPerigee(const float r, const float d0,
+                                    const float curvature) {
+  const float chordSquare = r * r - d0 * d0;
+
+  if (chordSquare < 0.0f) {
+    return std::nullopt;
+  }
+
+  const float chord = std::sqrt(chordSquare);
+  const float sagittaTerm = curvature * chord;
+
+  return chord * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
+}
+
 }  // namespace
-    
+
   DisplacedGbtsGraph::DisplacedGbtsGraph(const Config& config,
                      std::shared_ptr<const GbtsGeometry> geometry,
                      std::unique_ptr<const Acts::Logger> logger)
@@ -80,25 +98,22 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
   std::pair<std::uint32_t, std::uint32_t> DisplacedGbtsGraph::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
     std::vector<detail::DisplacedGbtsEdge>& edgeStorage, const float bFieldInZ) const {
-  // used to calculate the outer Z cut on doublets
+  // z range at the outer radius, for the outer z cuts
   const float cutZMinU =
       m_cfg.minZ0 + m_cfg.maxOuterRadius * static_cast<float>(roi.dzdrMin());
   const float cutZMaxU =
       m_cfg.maxZ0 + m_cfg.maxOuterRadius * static_cast<float>(roi.dzdrMax());
 
-  // these define the actual pT used 
   const float tripletPtMin = m_cfg.tripletPtFraction * m_cfg.minPt;
 
   const float ptScale = m_cfg.tuningPt / m_cfg.minPt;
-  
-  // eta dependent curvature cuts, on triplets now that a doublet no longer
-  // knows its own curvature
-  // different values due to different affects of MS at differnet pTs
+
+  // eta dependent curvature cuts, applied to triplets (a displaced doublet has
+  // no curvature)
   const float curvatureCutHighEta = m_cfg.maxCurvatureHighEta * ptScale;
   const float curvatureCutLowEta = m_cfg.maxCurvatureLowEta * ptScale;
 
-  // the looser of the two, for the precuts that run before the fitted tau
-  // exists to say which of them applies
+  // for the precuts that run before the fitted tau picks one of the two
   const float curvatureCutLoosest =
       std::max(curvatureCutLowEta, curvatureCutHighEta);
 
@@ -107,49 +122,31 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
       (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStrip : 0.0f);
 
-  // The z0 band a doublet spans as d0 runs over [0, d0Max]. Everything in it
-  // that no pair affects is taken here, since the square roots would otherwise
-  // be worked out again for every candidate pair in the event.
+  // per-event parts of the doublet z0 band over d0 in [0, d0Max]
   const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
   const float rOut = m_cfg.maxOuterRadius;
   const float sOutMin = std::sqrt(std::max(0.f, rOut * rOut - d0MaxSquare));
 
-  // the default sliding window along phi. Taken from the node storage so that
-  // the windows and the phi indexing they slide over cannot disagree.
+  // default phi half-window, from the node storage so the two cannot disagree
   const float deltaPhi0 = 0.5f * nodeStorage.m_cfg.phiSliceWidth;
 
   std::uint32_t nConnections = 0;
 
-  // edges that filled their neighbour array, each one a connection the graph
-  // could have gone on to make and now cannot
+  // edges that filled their neighbour array or their triplet property store,
+  // reported as possible efficiency loss
   std::uint32_t nSaturatedNeighbours = 0;
-
-  // edges that filled their triplet property store, which leaves them unable
-  // to record what a later edge would have been matched against
   std::uint32_t nSaturatedProperties = 0;
 
   edgeStorage.reserve(m_cfg.nMaxEdges);
 
-  // Every edge's exp(eta), kept beside the storage rather than inside it.
-  //
-  // The first thing asked of a triplet candidate is that its two doublets
-  // agree on tau, and most candidates fail it. Asking that of the edge itself
-  // means touching a whole edge, over a hundred bytes of it spread across
-  // however many the graph holds, for a single float. Kept apart, the scan
-  // runs over four bytes an edge and the edge is only reached for the few that
-  // get past it. Indices are the storage's own.
+  // Every edge's exp(eta), kept beside the storage so the first tau ratio cut
+  // scans 4 bytes per edge instead of loading whole edges. Same indices.
   std::vector<float> edgeExpEta;
   edgeExpEta.reserve(m_cfg.nMaxEdges);
-  
-  // number of edges acepted into the storage, 
-  // will need a seperate one for the proper storage, 
-  // global and local layer storages should be seperate due to some properties not being needed 
+
   std::uint32_t nEdges = 0;
 
-  // views of the nodes and edges (need to doublec check the update on the edge view, this should be keyed to global, not local layer pair store)
-  // for outside the doublet loop
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
-  // for inner doublet loop 
   const std::span<const detail::GbtsNodeParams> params =
       nodeStorage.nodeParams();
   const std::span<detail::GbtsNodeEdgeInfo> edgeInfo =
@@ -157,12 +154,11 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
   // reused across bin groups so that the windows are allocated once
   std::vector<SlidingWindow> phiSlidingWindow;
-  
+
   // if we apply calibration to the strips
   const bool calibrate = m_cfg.calibrateStrips && nodeStorage.hasStrips();
 
-  // the nominal position of a node, which is where a strip node sits before
-  // its triplet resolves it along the strip
+  // nominal position of a node, before any strip calibration
   const auto nodePoint = [&nodeView](const SpacePointIndex node) {
     const std::array<float, 4>& position = nodeView.positions[node];
     return std::array<float, 3>{position[0], position[1], position[2]};
@@ -170,69 +166,50 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
   // loop over bin groups
   for (const auto& bg : m_geometry->binGroups()) {
-    // B1 is the innermost bin in the pair, 
-    // but we still look out to in on the bin group level,
-    // has to be this way to set the width of the phi window (deifned from innermost bin)
+    // B1 is the inner bin of every pair in the group
     const detail::GbtsEtaBinInfo& B1 = nodeStorage.etaBin(bg.bin);
 
     if (B1.empty()) {
       continue;
     }
 
-    // used for the phi window width creation
+    // used for the phi window width
     const float rb1 = B1.minRadius;
 
-
-    // used to define whether a node in this bin needs calibrating due to low stip resoution in the r/ plane
     const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
-    // How deep this bin's layer sits in the barrel, counting every barrel
-    // layer whatever it is made of. Both the tau widening below and
-    // matchBeforeCreate key on it.
+    // barrel depth over all barrel layers, -1 for an endcap
     const std::int32_t depth1 = B1.depth;
 
     const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
                                       depth1 <= m_cfg.matchBeforeCreateMaxDepth;
 
     // prepare a sliding window for each non-empty bin2 in the group
-
     phiSlidingWindow.clear();
 
-    // loop over n2 eta-bins in L2 layers
     for (const std::uint32_t b2Idx : bg.links) {
-      // outer most bin 
+      // outer bin
       const detail::GbtsEtaBinInfo& B2 = nodeStorage.etaBin(b2Idx);
 
       if (B2.empty()) {
         continue;
       }
 
-      // used for working out phi window width
       const float rb2 = B2.maxRadius;
 
       float deltaPhi = deltaPhi0;  // the default
 
-      // override the default window width
       if (m_cfg.useEtaBinning) {
-        
+
         const float absDr = std::fabs(rb2 - rb1);
         const float maxD0 = m_cfg.d0Max;
         auto phiWindow = [&rb1, &rb2, &maxD0, ptScale](const float& phiWindowOffset, const float& phiWindowSlope){
                                    const float maxD0Square = maxD0*maxD0;
 
-                                   // How far round the beamline a displaced
-                                   // track walks between the two radii. A
-                                   // straight track of impact parameter d0
-                                   // sits at azimuth acos(d0 / r), which is
-                                   // exact and not a small angle expansion.
-                                   //
-                                   // A track only reaches radius r if its |d0|
-                                   // is below r, so a bin inside the d0 limit
-                                   // takes the limit down to its own radius.
-                                   // Without that the ratio passes one and the
-                                   // arc cosine returns a NaN, which would
-                                   // leave every phi comparison false and so
-                                   // the sliding window neither closing nor
-                                   // advancing.
+                                   // Azimuth a straight track of impact
+                                   // parameter d0 walks between the radii,
+                                   // exactly acos(d0 / r). The ratio is capped
+                                   // at 1 for bins inside d0Max, otherwise
+                                   // acos gives NaN and the window breaks.
                                    const float frac1 = std::min(1.0f, maxD0/rb1);
                                    const float frac2 = std::min(1.0f, maxD0/rb2);
                                    const float displacmentTerm = std::acos(frac2) - std::acos(frac1);
@@ -242,12 +219,8 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
                                    const float curvatureTerm = (corr2 - corr1)*phiWindowSlope*ptScale;
 
-                                   // The two add. Where the track started and
-                                   // which way it bends are independent, so a
-                                   // track displaced to one side and bending
-                                   // the same way walks the sum of them, and a
-                                   // window that took the difference would be
-                                   // covering only the case where they cancel.
+                                   // displacement and bending are independent,
+                                   // so the worst case is their sum
                                    const float absPhiWindow = phiWindowOffset + std::abs(displacmentTerm) + std::abs(curvatureTerm);
 
                                    return absPhiWindow;
@@ -268,16 +241,15 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       window.type = B2.type;
     }
 
-    // in GBTSv3 the outer loop goes over n1 nodes in the Layer 1 bin (inner most node first)
+    // outer loop over n1 nodes in the inner bin
     for (SpacePointIndex n1Idx = B1.nodes.first; n1Idx < B1.nodes.second;
          ++n1Idx) {
       // initialization using the top watermark of the edge storage
       edgeInfo[n1Idx].firstEdge = nEdges;
 
-      // the counter for the incoming graph edges created for n1
-      // it has to be here as we iterrate over edges on a shared node in the inner loop
+      // incoming edges created for n1
       std::uint16_t numCreatedEdges = 0;
-      
+
       const detail::GbtsNodeParams& n1pars = params[n1Idx];
 
       const float phi1 = n1pars.phi;
@@ -291,37 +263,29 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
       // this node as the triplet fit wants it, before any strip resolution
       const std::array<float, 3> point1{x1, y1, z1};
 
-      // The transverse path from the perigee to this node at the two ends of
-      // the d0 range, and from there the lever arm out to the detector edge.
-      // Both ends of the band are linear in the pair's tau, so the pair has
-      // only a multiply left to do.
+      // Transverse path from the perigee to n1 at d0 = d0Max, and the lever
+      // arms out to rOut at both ends of the d0 range, for the z0 band.
       const float s1Min = std::sqrt(std::max(0.f, r1 * r1 - d0MaxSquare));
       const float outerLeverZeroD0 = rOut - r1;
       const float outerLeverMaxD0 = sOutMin - s1Min;
-      
-      // the intermediate loop over sliding windows. these are associated with the nodes in the outer bin
+
+      // loop over the sliding windows of the outer bins
       for (auto& slw : phiSlidingWindow) {
         const std::int32_t depth2 = slw.depth;
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
 
-        // Whether the turn cut below is off for every triplet from this
-        // window: either it is off altogether, or one of the inner two nodes
-        // is an endcap strip still to slide radially along its strip. Either
-        // way the third node need not be looked at to know. A barrel strip
-        // end keeps the cut, since its slide is almost all z.
+        // The turn cut is skipped when switched off, or when an end will
+        // slide radially under calibration (an endcap strip). Settled here for
+        // the inner two nodes; the third is checked per candidate.
         const bool innerSkipTurn =
             !m_cfg.useTurnAngleCut ||
             (calibrate && (slidesRadially(B1.type, B1.technology) ||
                            slidesRadially(slw.type, slw.technology)));
 
+        // deltaPhi is the half width: displacement and charge are both
+        // symmetric about phi1
         const float deltaPhi = slw.deltaPhi;
-
-        // Sliding window phi1 +/- deltaPhi, so deltaPhi is the half width.
-        // That is what the terms above give: a track displaced to +d0Max walks
-        // the displacement term one way round and one at -d0Max walks it the
-        // other, and the same for the two charges, so the full span is
-        // symmetric about phi1 and each term is already its half.
         const float minPhi = phi1 - deltaPhi;
         const float maxPhi = phi1 + deltaPhi;
 
@@ -330,6 +294,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
           const float phi2 = slw.phiNodes[n2PhiIdx].first;
 
+          // [CUT] phi window
           if (phi2 < minPhi) {
             // update the window position
             slw.firstIt = n2PhiIdx;
@@ -356,45 +321,29 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
           const float dy = position2[1] - y1;
 
           const float chord = fastHypot(dx, dy);
-          
 
-          // On the nominal radii, so an endcap pair the slide would have
-          // opened up is lost here. The cheap reject is worth more.
-
-          // Shares `minDeltaRadius` with the prompt graph's radial separation
-          // cut since the two serve the same purpose, though a chord and a
-          // radial step are not the same thing and this can be tuned apart.
+          // [CUT] minimum chord. Shares `minDeltaRadius` with the prompt
+          // graph's radial step cut; nominal positions.
           if (chord < m_cfg.minDeltaRadius) {
             continue;
           }
 
           const float z2 = n2pars.z;
 
-          // The ends stay nominal here. Resolving a strip node needs the
-          // track direction, and the chord is only that for a track from the
-          // beamline, so the slide along the strip waits for the triplet fit
-          // below. What that leaves behind is a doublet tau taken on
-          // unresolved ends, which is what `tauRatioCorrStrip` is for.
+          // Doublet tau on nominal ends: strip calibration needs the track
+          // direction, which only the triplet fit gives. `tauRatioCorrStrip`
+          // covers the difference.
           const float dz = z2 - z1;
           const float tau = dz / chord;
           const float ftau = std::fabs(tau);
+
+          // [CUT] max |tau|
           if (ftau > m_cfg.maxAbsTau) {
             continue;
           }
 
-          // The cluster width tau window. The node storage narrows it from its
-          // lookup table, and only for the pixel barrel nodes that table was
-          // trained on; every other node keeps the infinite defaults and so
-          // passes here untouched. Strip only running therefore pays four
-          // comparisons and nothing else, and the cut comes into its own as
-          // soon as the pixel layers are fed in.
-          //
-          // What the window bounds is the track's own |cot(theta)| where it
-          // crossed the node, and the pair's tau is the estimate of it. Taken
-          // over the chord rather than a radial step, which is the transverse
-          // path the track actually walked between the two nodes: for a
-          // displaced track the radial step is not that, and it is the radial
-          // step that would misjudge the window, not the chord.
+          // [CUT] cluster width tau window, on both nodes. Only pixel barrel
+          // nodes have a finite window; the rest pass.
           if (ftau < n1pars.minTau || ftau > n1pars.maxTau) {
             continue;
           }
@@ -403,55 +352,44 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
             continue;
           }
 
-          // z is linear in transverse arc length, so z0 = z1 - S1 * tau with S1
-          // the transverse path from the perigee to hit 1. The prompt form took
-          // S1 = r1, which only holds for a track leaving the beamline
-          // radially. Displaced, S1 = sqrt(r1^2 - d0^2), and d0 is unknown at
-          // doublet stage -- two transverse points do not fix a circle -- so z0
-          // is a band spanned by d0 in [0, d0Max]. S1 is monotonic in d0, so
-          // the two endpoints bracket the band.
+          // z0 = z1 - S1 * tau, with S1 = sqrt(r1^2 - d0^2) the transverse path
+          // from the perigee. d0 is unknown for a doublet, so z0 and z(rOut)
+          // are bands over d0 in [0, d0Max], bracketed by the two ends.
           if (m_cfg.doubletFilterRZ) {
             const float z0A = z1 - r1 * tau;     // d0 = 0
             const float z0B = z1 - s1Min * tau;  // d0 = d0Max
 
-            // the band has to overlap the allowed range, not sit inside it
+            // [CUT] doublet z0 band must overlap [minZ0, maxZ0]
             if (std::max(z0A, z0B) < m_cfg.minZ0 ||
                 std::min(z0A, z0B) > m_cfg.maxZ0) {
               continue;
             }
 
-            // z(rOut) = z1 + (sOut - S1) * tau, and (sOut - S1) also grows
-            // monotonically with d0, so the endpoints bracket this band too.
             const float zOutA = z1 + outerLeverZeroD0 * tau;
             const float zOutB = z1 + outerLeverMaxD0 * tau;
 
-            // NOTE: the two bands are tested separately although they share the
-            // same d0, so a pair can pass the two on different d0 values. That
-            // is a relaxation, never a rejection, which is the safe direction
-            // for a pre-filter; the triplet fit resolves d0 properly.
+            // [CUT] doublet z(rOut) band must overlap the RoI. The two bands
+            // may pass on different d0; `tripletFilterRZ` tightens this.
             if (std::max(zOutA, zOutB) < cutZMinU ||
                 std::min(zOutA, zOutB) > cutZMaxU) {
               continue;
             }
           }
 
-        
           const float hypotTau = fastHypot(1, tau);
           const float expEta = hypotTau - tau;
-          // 1 / expEta, since (hypotTau - tau) * (hypotTau + tau) == 1. The
-          // sum is also the better conditioned form for large tau.
+          // 1 / expEta, since (hypotTau - tau) * (hypotTau + tau) == 1
           const float invExpEta = hypotTau + tau;
 
-          // match edge candidate against edges incoming to n2
+          // [CUT] match before create: n2 must have an incoming edge that
+          // agrees on tau, once it has enough edges to decide
           if (useMatchBeforeCreate) {
-            // we must have enough incoming edges to decide
             bool isGood = n2NumEdges <= m_cfg.matchBeforeCreateMaxEdges;
 
             if (!isGood) {
               for (std::uint32_t n2InIdx = n2FirstEdge; n2InIdx < n2LastEdge;
                    ++n2InIdx) {
-                // the doublet's own tau: a displaced edge has no fit
-                // parameters of its own until a triplet gives it some
+                // the doublet's own tau, as the edge has no fit of its own
                 const float tau2 = edgeStorage[n2InIdx].expEta;
                 const float tauRatio = tau2 * invExpEta - 1.0f;
 
@@ -468,18 +406,15 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
             }
           }
 
-          // The inner edge's own chord direction, which every candidate below
-          // is measured against and which its own edge then carries for the
-          // triplets it will be the outer edge of. The chord is already here,
-          // so the unit vector costs a reciprocal.
+          // unit chord direction, for the turn cut and cached on the edge
           const float invChord = 1.0f / chord;
           const float cosAlpha12 = dx * invChord;
           const float sinAlpha12 = dy * invChord;
 
-          // the middle node of every triplet the loop below tries, which does
-          // not depend on which outer edge it pairs with
+          // middle node of every triplet tried below
           const std::array<float, 3> point2{position2[0], position2[1], z2};
 
+          // [CUT] edge storage full
           if (nEdges < m_cfg.nMaxEdges) {
             edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
                                      sinAlpha12, depth2, slw.type,
@@ -490,95 +425,66 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
             const std::uint32_t outEdgeIdx = nEdges;
 
-            // the edge just made, which the loop below records its triplets
-            // on. Nothing reallocates the storage, since it was reserved to
-            // nMaxEdges and never grows past it.
+            // safe to hold: the storage was reserved to nMaxEdges
             detail::DisplacedGbtsEdge& newEdge = edgeStorage[outEdgeIdx];
-            
+
             // looking for neighbours of the new edge using outer node
             for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
                  ++inEdgeIdx) {
 
-              // The new edge can only record so many triplets, and a triplet
-              // it did not record is one a later match cannot see, so there is
-              // nothing to gain from looking further.
+              // [CUT] new edge's triplet store full: an unrecorded triplet
+              // could not be matched later anyway
               if (newEdge.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
                 break;
               }
 
-              // Off the compact array, so that a candidate that fails here
-              // never has its edge brought in from memory at all.
               const float absTauRatio =
                   std::abs(edgeExpEta[inEdgeIdx] * invExpEta - 1.0f);
 
-              // the loosest form of the tau ratio, which rejects most
-              // candidates before anything below has to run
+              // [CUT] loosest tau ratio, off the compact array
               if (absTauRatio > maxTauRatioCut) {
                 continue;
               }
 
               detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
 
+              // [CUT] outer edge's neighbour array full
               if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
                 continue;
               }
 
-              // A strip end has still to slide along its strip, and in the
-              // endcap that slide is largely radial, so it moves the chords
-              // the geometric cut below is reading. Where it cannot be sure it
-              // does not cut: rejecting a candidate the fit would have kept is
-              // the one thing it must not do. In the barrel the slide is
-              // along z and the transverse position holds, so the cut stays.
-              //
-              // The third node goes by its layer, cached on the edge, so the
-              // check costs no lookup.
               const bool skipTurn =
                   innerSkipTurn ||
                   (calibrate && slidesRadially(pS->n2Type, pS->n2Technology));
 
-              // The turn from the inner edge to this one, which is
-              // asin(curvature * L13) and so falls with pT. Both directions
-              // were taken once, each when its own edge was made, so the turn
-              // comes out of a dot and a cross of two cached unit vectors and
-              // the cut never forms the angle at all.
-              //
-              // L13 is not measured here; the two chords bound it, since
-              // L13 <= L12 + L23. That bound is this pair's own rather than
-              // the detector's, which is the difference between a cut that
-              // fires and one that does not: the widest turn the curvature
-              // limit allows runs from about three degrees between adjacent
-              // pixel layers to ten across the strips.
+              // Turn between the two chords, from the cached unit vectors.
+              // For a circle sin(turn) = curvature * L13 <= curvature *
+              // (L12 + L23). Per pair rather than hoisted: hoisting leaked 2%
+              // more candidates to the fit for 4% more time.
               if (!skipTurn) {
                 const float sinDelta =
                     cosAlpha12 * pS->sinAlpha - sinAlpha12 * pS->cosAlpha;
                 const float cosDelta =
                     cosAlpha12 * pS->cosAlpha + sinAlpha12 * pS->sinAlpha;
 
-                // Turning by a quarter circle between two layers puts the
-                // triplet's own ends half a circle apart, which is orders
-                // below any pT worth seeding. It also puts the turn past where
-                // its sine still grows with curvature, so the test below would
-                // stop meaning anything.
+                // [CUT] turn past a quarter circle, where the sine test below
+                // stops meaning anything
                 if (cosDelta <= 0.0f) {
                   continue;
                 }
 
+                // [CUT] turn angle against the loosest curvature limit
                 if (std::abs(sinDelta) >
                     curvatureCutLoosest * (chord + pS->chord)) {
                   continue;
                 }
               }
 
-              // The three nodes of the candidate triplet, inside out. The
-              // doublet stage could not fix a circle, so everything the prompt
-              // graph read off a single doublet -- curvature, the tangent
-              // azimuth, d0, pT -- is found here instead.
+              // the candidate triplet, inside out
               const std::array<SpacePointIndex, 3> tripletNodes{n1Idx, n2Idx,
                                                                 pS->n2};
 
-              // Whether each node has an along-strip coordinate sitting in the
-              // tau it contributes. The inner two go by their bin, the third
-              // by whether it carries a stereo pair.
+              // whether each node's tau carries an along-strip coordinate
               const std::array<bool, 3> isStrip{
                   !isPixel1, !isPixel2,
                   nodeView.strip(tripletNodes[2]) != nullptr};
@@ -587,42 +493,30 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
               float addTauRatioCorr = 0;
 
-              // How much material the triplet crossed, which is what the tau
-              // widening is really asking about, so it counts every barrel
-              // layer rather than the pixel ones alone: a strip layer between
-              // two pixel layers is material the triplet scattered in, and
-              // numbering the pixels alone would call them adjacent.
+              // Widen for material: a gap in barrel depth (over all barrel
+              // layers, strips included), or a third node that left the barrel.
               if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
                 if (depth3 >= 0) {
-                  // three radially consecutive layers, none skipped
                   const bool noGap =
                       (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
 
-                  // assume more scattering due to the layer in between
                   if (!noGap) {
                     addTauRatioCorr = m_cfg.tauRatioCorr;
                   }
                 } else {
-                  // the third node left the barrel, so there is no counting
-                  // the layers between and a gap has to be assumed
                   addTauRatioCorr = m_cfg.tauRatioCorr;
                 }
               }
-              // The two doublets sharing a strip node resolved it separately,
-              // so a triplet through a strip may disagree on tau by more. Any
-              // of the three: the outer two carry their end's error into tau.
-              // Held apart from the correction above because the calibration
-              // below is what takes this one away and not that one.
+
+              // Widen for strips, whose along-strip coordinate is unresolved
+              // until the calibration below, which removes this again.
               const float stripTauRatioCorr =
                   (m_cfg.tauRatioCorrStrip > 0.f &&
                    (isStrip[0] || isStrip[1] || isStrip[2]))
                       ? m_cfg.tauRatioCorrStrip
                       : 0.0f;
 
-              // bad match. Loose on purpose: the along-strip coordinate the
-              // doublet tau leans on is the very thing the calibration is
-              // about to move, so this is only a precut and the tight version
-              // of it runs on the resolved points further down.
+              // [CUT] doublet tau ratio, loose; retaken tight after calibration
               if (absTauRatio >
                   m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr) {
                 continue;
@@ -633,26 +527,19 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
               std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
 
+              // [CUT] degenerate circle fit
               if (!circle.has_value()) {
                 continue;
               }
 
-              // How much of the strip looseness survives. It comes off only
-              // the nodes the calibration actually put back where the track
-              // crossed, so a node its bin calls a strip but that carries no
-              // stereo pair keeps it, as does every node when the calibration
-              // is off.
+              // strip widening left over: kept unless every strip end resolved
               float unresolvedStripCorr = stripTauRatioCorr;
 
-              // whether any end ended up somewhere other than where the node
-              // storage put it, which is the only case the cuts below have
-              // anything new to work with
+              // whether any end moved off its nominal position
               bool moved = false;
 
-              // Slide each strip node along its strip to where the fitted
-              // track crossed it, then fit again on the moved ends. Once is
-              // enough: the slide is a small fraction of a strip and the fit
-              // is linear in the node positions to that order.
+              // Slide each strip end to where the fitted track crosses it, then
+              // refit once; the slide is small enough for one pass.
               if (calibrate) {
                 bool resolved = true;
                 bool allStripsResolved = true;
@@ -667,7 +554,6 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                     continue;
                   }
 
-                  // a direction that misses the strip is no crossing at all
                   if (!Acts::detail::calibrateOuterStripSpacePoint(
                           circle->direction(k), *strip, points[k],
                           m_cfg.maxStripLengthFraction)) {
@@ -678,6 +564,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                   moved = true;
                 }
 
+                // [CUT] fitted direction misses a strip
                 if (!resolved) {
                   continue;
                 }
@@ -685,6 +572,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 if (moved) {
                   circle = fitTripletCircle(points);
 
+                  // [CUT] degenerate refit
                   if (!circle.has_value()) {
                     continue;
                   }
@@ -695,20 +583,8 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 }
               }
 
-              // The along-strip coordinate is where a strip node's z lives and
-              // z is all tau is made of, which is why the doublet tau above
-              // needed the looseness at all. Every strip end now sits where
-              // the fitted track crossed it, so the same ratio is worth
-              // retaking on the resolved points, at the tight threshold. It
-              // still says something despite the fit having supplied the
-              // directions: an end moves by about the module separation per
-              // unit of tau error, a millimetre against a lever arm of a
-              // hundred, so the calibration cannot pull three ends into an
-              // agreement a real track would not have had.
-              //
-              // Nothing moved means this is the doublet tau over again, and
-              // the threshold is the one it already passed, so it is only
-              // retaken when it can differ.
+              // Tau ratio retaken on the calibrated ends at the tight
+              // threshold. If nothing moved it equals the doublet one.
               float resolvedTauRatio = absTauRatio;
 
               if (moved) {
@@ -717,6 +593,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 const std::optional<float> expEta23 =
                     chordExpEta(points[1], points[2]);
 
+                // [CUT] calibrated ends share a transverse position
                 if (!expEta12.has_value() || !expEta23.has_value()) {
                   continue;
                 }
@@ -724,6 +601,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 resolvedTauRatio = std::abs(*expEta23 / *expEta12 - 1.0f);
               }
 
+              // [CUT] tight tau ratio on the calibrated ends
               if (resolvedTauRatio >
                   m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
                 continue;
@@ -731,7 +609,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
 
               const float tripletCurv = circle->curvature;
 
-              // the eta dependent curvature cut the doublets could not carry
+              // [CUT] eta dependent curvature
               if (std::abs(tripletCurv) >
                   (std::abs(circle->tau) < m_cfg.curvatureSplitAbsTau
                        ? curvatureCutLowEta
@@ -739,23 +617,56 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 continue;
               }
 
-              // final check: cuts on pT and d0
+              // With d0 fitted, z0 and z(rOut) are single values rather than
+              // the doublet's bands, from the calibrated inner end.
+              if (m_cfg.tripletFilterRZ) {
+                const float r1c = fastHypot(points[0][0], points[0][1]);
+                const std::optional<float> s1 =
+                    arcFromPerigee(r1c, circle->d0, tripletCurv);
+
+                // [CUT] triplet never reaches its own inner radius
+                if (!s1.has_value()) {
+                  continue;
+                }
+
+                const float z0 = points[0][2] - *s1 * circle->tau;
+
+                // [CUT] triplet z0
+                if (z0 < m_cfg.minZ0 || z0 > m_cfg.maxZ0) {
+                  continue;
+                }
+
+                // a track whose |d0| exceeds rOut never gets there, and has
+                // nothing to check
+                if (const std::optional<float> sOut =
+                        arcFromPerigee(rOut, circle->d0, tripletCurv);
+                    sOut.has_value()) {
+                  const float zOuter = points[0][2] + (*sOut - *s1) * circle->tau;
+
+                  // [CUT] triplet z(rOut)
+                  if (zOuter < cutZMinU || zOuter > cutZMaxU) {
+                    continue;
+                  }
+                }
+              }
+
               if (m_cfg.validateTriplets) {
+                // [CUT] d0
                 if (std::abs(circle->d0) > m_cfg.d0Max) {
                   continue;
                 }
 
                 if (tripletCurv != 0.0f) {  // straight-line track is OK
-                  // curvature is 1 / R in the prompt convention, where R is
-                  // twice the radius, so pT = bFieldInZ * R / 2 is this
+                  // curvature is 1 / 2R, so pT = bFieldInZ * R
                   const float pT = 0.5f * std::abs(bFieldInZ / tripletCurv);
 
+                  // [CUT] min pT
                   if (pT < tripletPtMin) {
                     continue;
                   }
 
-                  if (pT > 5 * tripletPtMin) {  // relatively high-pT track
-
+                  // [CUT] tighter tau ratio for relatively high-pT tracks
+                  if (pT > 5 * tripletPtMin) {
                     if (resolvedTauRatio > 0.9f * m_cfg.tauRatioCut) {
                       continue;
                     }
@@ -763,18 +674,12 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                 }
               }
 
-              // Match against the triplets the outer edge is already part of.
-              // Each of those shares the (n2, n3) doublet with this one, so
-              // the two are the same track candidate seen one node apart and
-              // both hold a tangent azimuth at n2: this is the displaced
-              // stand-in for the dphi/dcurv match the prompt graph runs
-              // between two doublets, which needed a curvature a displaced
-              // doublet does not have. An outer edge that is not yet in any
-              // triplet is the outermost pair of a chain and has nothing to
-              // disagree with, so it passes.
+              // Match against the triplets the outer edge already belongs to,
+              // which share the (n2, n3) doublet: the displaced form of the
+              // prompt dphi/dcurv doublet match. An outer edge in no triplet
+              // yet is a chain end and passes.
               if (pS->nProperties > 0) {
-                // node 1 of this triplet is the inner node of the shared
-                // doublet, which is where the recorded tangents were taken
+                // tangent at n2, where the recorded ones were taken
                 const float phiShared = circle->tangentPhi(1);
 
                 bool matched = false;
@@ -790,18 +695,19 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                     dPhi -= 2 * std::numbers::pi_v<float>;
                   }
 
+                  // [CUT] triplet match: tangent dphi
                   if (std::abs(dPhi) > m_cfg.cutDPhiMax) {
                     continue;
                   }
 
                   const float dcurv = tripletCurv - prev.curvature;
 
+                  // [CUT] triplet match: dcurv
                   if (dcurv < -m_cfg.cutDCurvMax || dcurv > m_cfg.cutDCurvMax) {
                     continue;
                   }
 
-                  // the arc corrected taus of the two fits, which is a tighter
-                  // statement than the doublet tau ratio already tested
+                  // [CUT] triplet match: tau ratio of the two fits
                   if (std::abs(prev.expEta * circle->invExpEta - 1.0f) >
                       m_cfg.tauRatioCut + addTauRatioCorr +
                           unresolvedStripCorr) {
@@ -812,14 +718,13 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
                   break;
                 }
 
+                // [CUT] no recorded triplet matched
                 if (!matched) {
                   continue;
                 }
               }
 
-              // The new edge is the inner edge of this triplet, so what a
-              // later triplet through (n1, n2) will be matched against is the
-              // tangent at n1, node 0.
+              // record the tangent at n1 for later triplets through (n1, n2)
               newEdge.properties[newEdge.nProperties] =
                   detail::TripletProperties{circle->expEta, tripletCurv,
                                             circle->tangentPhi(0)};
@@ -843,9 +748,7 @@ std::optional<float> chordExpEta(const std::array<float, 3>& inner,
         } // n2PhiIdx
       } // slw
 
-      // updating the n1 node attributes. Without this the edges just created
-      // are invisible to the nodes of the next bin group in and no triplet
-      // could ever be formed through n1.
+      // makes n1's edges visible to the next bin group in
       edgeInfo[n1Idx].numEdges = numCreatedEdges;
     } // n1Idx
   } // bin groups

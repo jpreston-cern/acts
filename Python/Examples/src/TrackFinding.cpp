@@ -100,6 +100,7 @@ void addTrackFinding(py::module& mex) {
                        maxAbsEtaAddTriplets, nMaxEdges, minDeltaRadius,
                        doubletFilterRZ, matchBeforeCreate, validateTriplets,
                        useAdaptiveCuts, calibrateStrips, useTurnAngleCut,
+                       tripletFilterRZ,
                        maxOuterRadius, d0Max,
                        cutDPhiMax, cutDCurvMax, tauRatioCut, ccaMaxIterations);
     patchKwargsConstructor(c);
