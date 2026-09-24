@@ -24,32 +24,6 @@
 
 namespace Acts::Experimental {
 
-/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder`.
-struct GbtsGraph {
-  /// The graph edges, i.e. the doublets.
-  std::vector<detail::GbtsEdge> edgeStorage;
-
-  /// Number of links between edges.
-  std::uint32_t nConnections = 0;
-
-  /// Run connected component analysis on the graph, updating the edge levels.
-  /// @param maxIterations Maximum number of connected-component iterations
-  /// @return The highest chain level any edge reached
-  std::uint32_t runCCA(std::uint32_t maxIterations);
-
-  /// extract edges that start a chain
-  /// @param minSeedLevel Chain length a seed candidate must reach
-  /// @param addTriplets Accept chains one level short within
-  ///        `maxAbsEtaAddTriplets`
-  /// @param maxAbsEtaAddTriplets The maximum |eta| at which `addTriplets`
-  ///        applies
-  /// @return The edges that start chains, ordered by length of chain, empty
-  ///         if no chain reached the required level
-  std::vector<detail::GbtsEdge*> extractChainHeads(std::uint8_t minSeedLevel,
-                                                   bool addTriplets,
-                                                   float maxAbsEtaAddTriplets);
-};
-
 /// Builds the doublet graph of the GBTS workflow.
 ///
 /// Turns a finalized `GbtsNodeStorage` into a graph whose edges are doublets
@@ -87,8 +61,9 @@ class GbtsGraphBuilder {
   /// @param nodeStorage Data storage containing nodes
   /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
   /// @return The graph, with its edges and their link counts
-  GbtsGraph buildTheGraph(const GbtsRoiDescriptor& roi,
-                          GbtsNodeStorage& nodeStorage, float bFieldInZ) const;
+  detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
+                                            GbtsNodeStorage& nodeStorage,
+                                            float bFieldInZ) const;
 
  private:
   Config m_cfg;

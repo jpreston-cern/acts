@@ -8,6 +8,7 @@
 
 #include "Acts/Seeding/GbtsGraphBuilder.hpp"
 
+#include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
@@ -203,10 +204,10 @@ GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
   }
 }
 
-GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
-                                          GbtsNodeStorage& nodeStorage,
-                                          const float bFieldInZ) const {
-  GbtsGraph graph;
+detail::GbtsGraph<detail::GbtsEdge> GbtsGraphBuilder::buildTheGraph(
+    const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::GbtsEdge> graph;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 
   // used to calculate Z cut on doublets
@@ -695,17 +696,19 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   return graph;
 }
 
-std::uint32_t GbtsGraph::runCCA(const std::uint32_t maxIterations) {
+template <typename edge_t>
+std::uint32_t detail::GbtsGraph<edge_t>::runCCA(
+    const std::uint32_t maxIterations) {
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
 
   std::uint32_t maxLevel = 0;
 
   std::uint32_t iter = 0;
 
-  std::vector<detail::GbtsEdge*> vOld;
+  std::vector<edge_t*> vOld;
 
   for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
-    detail::GbtsEdge* pS = &(edgeStorage[edgeIndex]);
+    edge_t* pS = &(edgeStorage[edgeIndex]);
     if (pS->nNei == 0) {
       continue;
     }
@@ -715,20 +718,20 @@ std::uint32_t GbtsGraph::runCCA(const std::uint32_t maxIterations) {
     vOld.push_back(pS);
   }
 
-  std::vector<detail::GbtsEdge*> vNew;
+  std::vector<edge_t*> vNew;
   vNew.reserve(vOld.size());
 
   // generate proposals
   for (; iter < maxIterations; iter++) {
     vNew.clear();
 
-    for (detail::GbtsEdge* pS : vOld) {
+    for (edge_t* pS : vOld) {
       std::int32_t nextLevel = pS->level;
 
       for (std::uint32_t nIdx = 0; nIdx < pS->nNei; ++nIdx) {
         const std::uint32_t nextEdgeIdx = pS->vNei[nIdx];
 
-        const detail::GbtsEdge* pN = &(edgeStorage[nextEdgeIdx]);
+        const edge_t* pN = &(edgeStorage[nextEdgeIdx]);
 
         if (pS->level == pN->level) {
           nextLevel = pS->level + 1;
@@ -765,7 +768,8 @@ std::uint32_t GbtsGraph::runCCA(const std::uint32_t maxIterations) {
   return maxLevel;
 }
 
-std::vector<detail::GbtsEdge*> GbtsGraph::extractChainHeads(
+template <typename edge_t>
+std::vector<edge_t*> detail::GbtsGraph<edge_t>::extractChainHeads(
     const std::uint8_t minSeedLevel, const bool addTriplets,
     const float maxAbsEtaAddTriplets) {
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
@@ -774,19 +778,21 @@ std::vector<detail::GbtsEdge*> GbtsGraph::extractChainHeads(
   // edge sits at level -1 and `minSeedLevel` may be configured to 0.
   const std::int8_t minLevelAddTriplets =
       static_cast<std::int8_t>(minSeedLevel - 1);
-  std::vector<detail::GbtsEdge*> vChainHeads;
+  std::vector<edge_t*> vChainHeads;
 
   vChainHeads.reserve(nEdges / 2);
 
   for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
-    detail::GbtsEdge* pS = &edgeStorage[edgeIndex];
+    edge_t* pS = &edgeStorage[edgeIndex];
 
     if (!addTriplets) {
       if (pS->level < minSeedLevel) {
         continue;
       }
     } else {  // eta-dependent cut
-      const float edgeAbsEta = std::abs(-std::log(pS->p[0]));
+      // the prompt edge keeps exp(eta) among its fit parameters and the
+      // displaced one in a field of its own, so ask rather than reach in
+      const float edgeAbsEta = std::abs(-std::log(detail::edgeExpEta(*pS)));
 
       if (edgeAbsEta > maxAbsEtaAddTriplets) {
         if (pS->level < minSeedLevel) {
@@ -803,9 +809,13 @@ std::vector<detail::GbtsEdge*> GbtsGraph::extractChainHeads(
   }
 
   std::ranges::sort(vChainHeads, std::ranges::greater{},
-                    [](const detail::GbtsEdge* e) { return e->level; });
+                    [](const edge_t* e) { return e->level; });
 
   return vChainHeads;
 }
+
+// The graph is written once and built for each edge a builder makes.
+template struct detail::GbtsGraph<detail::GbtsEdge>;
+template struct detail::GbtsGraph<detail::DisplacedGbtsEdge>;
 
 }  // namespace Acts::Experimental

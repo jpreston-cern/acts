@@ -20,8 +20,6 @@
 #include <numbers>
 #include <span>
 #include <stdexcept>
-#include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -98,23 +96,8 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
   // prompt graph, one carrying the triplets it belongs to for the displaced
   using edge_t = typename graph_builder_t::EdgeType;
 
-  // The prompt builder hands back the graph it built, while the displaced one
-  // still fills caller-owned storage and returns the counts, so its result is
-  // gathered into the same shape here.
-  constexpr bool isPrompt = std::is_same_v<graph_builder_t, GbtsGraphBuilder>;
-  struct DisplacedGraph {
-    std::vector<edge_t> edgeStorage;
-    std::uint32_t nEdges = 0;
-    std::uint32_t nConnections = 0;
-  };
-  std::conditional_t<isPrompt, GbtsGraph, DisplacedGraph> graph;
-
-  if constexpr (isPrompt) {
-    graph = graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
-  } else {
-    std::tie(graph.nEdges, graph.nConnections) = graphBuilder.buildTheGraph(
-        roi, nodeStorage, graph.edgeStorage, options.bFieldInZ);
-  }
+  detail::GbtsGraph<edge_t> graph =
+      graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
 
   ACTS_DEBUG("Created graph with " << graph.edgeStorage.size() << " edges and "
                                    << graph.nConnections << " edge links");
@@ -123,34 +106,12 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
     ACTS_WARNING("Missing edges or edge connections");
   }
 
-  std::uint32_t maxLevel = 0;
-  if constexpr (isPrompt) {
-    maxLevel = graph.runCCA(m_cfg.ccaMaxIterations);
-  } else {
-    maxLevel = graphBuilder.runCCA(graph.nEdges, graph.edgeStorage,
-                                   m_cfg.ccaMaxIterations);
-  }
+  const std::uint32_t maxLevel = graph.runCCA(m_cfg.ccaMaxIterations);
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-  std::vector<edge_t*> vChainHeads;
-  if constexpr (isPrompt) {
-    vChainHeads = graph.extractChainHeads(
-        m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
-  } else {
-    vChainHeads = graphBuilder.extractChainHeads(
-        graph.edgeStorage, graph.nEdges, m_cfg.minSeedLevel, m_cfg.addTriplets,
-        m_cfg.maxAbsEtaAddTriplets);
-  }
-
-  if (vChainHeads.empty()) {
-    ACTS_WARNING("No chains passed minimum edge requirement");
-    return;
-  }
-
   std::vector<OutputSeedProperties> vOutputSeeds;
-  extractSeedsFromTheGraph<graph_builder_t>(nodeStorage, graph.edgeStorage,
-                                            vOutputSeeds, filter, vChainHeads);
+  extractSeedsFromTheGraph(nodeStorage, graph, vOutputSeeds, filter);
 
   ACTS_DEBUG("GBTS created " << vOutputSeeds.size() << " seeds");
   if (vOutputSeeds.empty()) {
@@ -165,14 +126,18 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
   }
 }
 
-template <typename graph_builder_t>
+template <typename edge_t>
 void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
-    const GbtsNodeStorage& nodeStorage,
-    std::vector<typename graph_builder_t::EdgeType>& edgeStorage,
+    const GbtsNodeStorage& nodeStorage, detail::GbtsGraph<edge_t>& graph,
     std::vector<OutputSeedProperties>& vOutputSeeds,
-    const GbtsTrackingFilter& filter,
-    std::vector<typename graph_builder_t::EdgeType*>& vChainHeads) const {
-  using edge_t = typename graph_builder_t::EdgeType;
+    const GbtsTrackingFilter& filter) const {
+  std::vector<edge_t*> vChainHeads = graph.extractChainHeads(
+      m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
+
+  if (vChainHeads.empty()) {
+    ACTS_WARNING("No chains passed minimum edge requirement");
+    return;
+  }
 
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
   // `addTriplets` accepts a chain one level short. Signed: an uncollected
@@ -200,7 +165,7 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
     }
 
     detail::GbtsEdgeState<edge_t> rs =
-        filter.followTrack(filterState, nodeView, edgeStorage, *pS);
+        filter.followTrack(filterState, nodeView, graph.edgeStorage, *pS);
 
     if (!rs.initialized) {
       continue;

@@ -23,7 +23,7 @@ namespace Acts::Experimental{
   /// The doublet graph of the GBTS workflow, built without assuming the track
   /// came from the beamline.
   ///
-  /// Does the same job as @c GbtsGraph and takes the same configuration, but
+  /// Does the same job as @c GbtsGraphBuilder and takes the same configuration, but
   /// a doublet here cannot be read for a curvature, an azimuth at the perigee
   /// or a @c z0: all three of those come from treating the beamline as a third
   /// point on the circle, which is exactly the assumption large radius
@@ -65,38 +65,11 @@ namespace Acts::Experimental{
     /// Build the displaced doublet graph from nodes.
     /// @param roi Region of interest descriptor
     /// @param nodeStorage Data storage containing nodes
-    /// @param edgeStorage Storage for generated edges
     /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
-    /// @return Pair of edge count and edge link count
-    std::pair<std::uint32_t, std::uint32_t> buildTheGraph(const GbtsRoiDescriptor& roi, 
-                                                          GbtsNodeStorage& nodeStorage,
-                                                          std::vector<detail::DisplacedGbtsEdge>& edgeStorage, 
-                                                          float bFieldInZ) const;
-            
-    /// Run connected component analysis on the graph.
-    /// @param nEdges Number of edges in the graph
-    /// @param edgeStorage Storage containing graph edges
-    /// @param maxIterations Maximum number of connected-component iterations
-    /// @return The highest chain level any edge reached
-    std::uint32_t runCCA(
-        std::uint32_t nEdges,
-        std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-        std::uint32_t maxIterations) const;
-
-    /// extract edges that start a chain
-    /// @param edgeStorage Storage containing graph edges
-    /// @param nEdges Number of edges in the graph
-    /// @param minSeedLevel Chain length a seed candidate must reach
-    /// @param addTriplets Accept chains one level short within
-    ///        `maxAbsEtaAddTriplets`
-    /// @param maxAbsEtaAddTriplets The maximum |eta| at which `addTriplets`
-    ///        applies
-    /// @return The edges that start chains, ordered by length of chain, empty
-    ///         if no chain reached the required level
-    std::vector<detail::DisplacedGbtsEdge*> extractChainHeads(
-        std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-        std::uint32_t nEdges, std::uint8_t minSeedLevel, bool addTriplets,
-        float maxAbsEtaAddTriplets) const;
+    /// @return The graph, with its edges and their link counts
+    detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
+                                              GbtsNodeStorage& nodeStorage,
+                                              float bFieldInZ) const;
 
     private:
 

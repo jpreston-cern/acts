@@ -213,20 +213,16 @@ class GraphBasedTrackSeeder {
   const Acts::Logger& logger() const { return *m_logger; }
 
   /// Extract seed candidates from the graph.
-  /// @tparam graph_builder_t The graph builder, prompt or displaced
+  /// @tparam edge_t The edge of the graph, prompt or displaced
   /// @param nodeStorage Storage containing the graph nodes
-  /// @param edgeStorage Storage containing edges, after the connected
-  ///                    component analysis
+  /// @param graph The graph, after the connected component analysis
   /// @param vOutputSeeds Output vector for seed candidates
   /// @param filter Tracking filter to be applied
-  /// @param vChainHeads Chain heads the graph selected
-  template <typename graph_builder_t>
-  void extractSeedsFromTheGraph(
-      const GbtsNodeStorage& nodeStorage,
-      std::vector<typename graph_builder_t::EdgeType>& edgeStorage,
-      std::vector<OutputSeedProperties>& vOutputSeeds,
-      const GbtsTrackingFilter& filter,
-      std::vector<typename graph_builder_t::EdgeType*>& vChainHeads) const;
+  template <typename edge_t>
+  void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
+                                detail::GbtsGraph<edge_t>& graph,
+                                std::vector<OutputSeedProperties>& vOutputSeeds,
+                                const GbtsTrackingFilter& filter) const;
 
   /// Estimate the inverse radius of the circle through three nodes.
   /// @param nodeView View of the node positions and layers
