@@ -20,8 +20,6 @@
 #include <numbers>
 #include <span>
 #include <stdexcept>
-#include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -98,23 +96,8 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
   // prompt graph, one carrying the triplets it belongs to for the displaced
   using edge_t = typename graph_builder_t::EdgeType;
 
-  // The prompt builder hands back the graph it built, while the displaced one
-  // still fills caller-owned storage and returns the counts, so its result is
-  // gathered into the same shape here.
-  constexpr bool isPrompt = std::is_same_v<graph_builder_t, GbtsGraphBuilder>;
-  struct DisplacedGraph {
-    std::vector<edge_t> edgeStorage;
-    std::uint32_t nEdges = 0;
-    std::uint32_t nConnections = 0;
-  };
-  std::conditional_t<isPrompt, GbtsGraph, DisplacedGraph> graph;
-
-  if constexpr (isPrompt) {
-    graph = graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
-  } else {
-    std::tie(graph.nEdges, graph.nConnections) = graphBuilder.buildTheGraph(
-        roi, nodeStorage, graph.edgeStorage, options.bFieldInZ);
-  }
+  detail::GbtsGraph<edge_t> graph =
+      graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
 
   ACTS_DEBUG("Created graph with " << graph.nEdges << " edges and "
                                    << graph.nConnections << " edge links");
@@ -123,12 +106,7 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
     ACTS_WARNING("Missing edges or edge connections");
   }
 
-  std::uint32_t maxLevel = 0;
-  if constexpr (isPrompt) {
-    maxLevel = graphBuilder.runCCA(graph);
-  } else {
-    maxLevel = graphBuilder.runCCA(graph.nEdges, graph.edgeStorage);
-  }
+  const std::uint32_t maxLevel = graphBuilder.runCCA(graph);
 
   const auto minLevel =
       static_cast<std::uint8_t>(graphBuilder.config().minSeedLevel);
@@ -138,13 +116,7 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
 
   ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-  std::vector<edge_t*> vChainHeads;
-  if constexpr (isPrompt) {
-    vChainHeads = graphBuilder.extractChainHeads(graph);
-  } else {
-    vChainHeads =
-        graphBuilder.extractChainHeads(graph.edgeStorage, graph.nEdges);
-  }
+  std::vector<edge_t*> vChainHeads = graphBuilder.extractChainHeads(graph);
 
   if (vChainHeads.empty()) {
     ACTS_WARNING("No chains passed minimum edge requirement");

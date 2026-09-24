@@ -54,10 +54,10 @@ GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
-                                          GbtsNodeStorage& nodeStorage,
-                                          const float bFieldInZ) const {
-  GbtsGraph graph;
+detail::GbtsGraph<detail::GbtsEdge> GbtsGraphBuilder::buildTheGraph(
+    const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::GbtsEdge> graph;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 
   // used to calculate Z cut on doublets
@@ -542,7 +542,8 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   return graph;
 }
 
-std::uint32_t GbtsGraphBuilder::runCCA(GbtsGraph& graph) const {
+std::uint32_t GbtsGraphBuilder::runCCA(
+    detail::GbtsGraph<detail::GbtsEdge>& graph) const {
   const std::uint32_t nEdges = graph.nEdges;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 
@@ -614,7 +615,7 @@ std::uint32_t GbtsGraphBuilder::runCCA(GbtsGraph& graph) const {
 }
 
 std::vector<detail::GbtsEdge*> GbtsGraphBuilder::extractChainHeads(
-    GbtsGraph& graph) const {
+    detail::GbtsGraph<detail::GbtsEdge>& graph) const {
   const std::uint32_t nEdges = graph.nEdges;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 

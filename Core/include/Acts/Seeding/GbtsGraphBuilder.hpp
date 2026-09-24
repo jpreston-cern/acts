@@ -25,18 +25,6 @@
 
 namespace Acts::Experimental {
 
-/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder`.
-struct GbtsGraph {
-  /// The graph edges, i.e. the doublets. Only the first `nEdges` are in use.
-  std::vector<detail::GbtsEdge> edgeStorage;
-
-  /// Number of edges in the graph.
-  std::uint32_t nEdges = 0;
-
-  /// Number of links between edges.
-  std::uint32_t nConnections = 0;
-};
-
 /// Builds the doublet graph of the GBTS workflow.
 ///
 /// Turns a finalized `GbtsNodeStorage` into a graph whose edges are doublets
@@ -75,19 +63,21 @@ class GbtsGraphBuilder {
   /// @param nodeStorage Data storage containing nodes
   /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
   /// @return The graph, with its edges and their edge and link counts
-  GbtsGraph buildTheGraph(const GbtsRoiDescriptor& roi,
-                          GbtsNodeStorage& nodeStorage, float bFieldInZ) const;
+  detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
+                                            GbtsNodeStorage& nodeStorage,
+                                            float bFieldInZ) const;
 
   /// Run connected component analysis on the graph.
   /// @param graph The graph, whose edge levels are updated
   /// @return The highest chain level any edge reached
-  std::uint32_t runCCA(GbtsGraph& graph) const;
+  std::uint32_t runCCA(detail::GbtsGraph<EdgeType>& graph) const;
 
   /// extract edges that start a chain
   /// @param graph The graph
   /// @return The edges that start chains, ordered by length of chain, empty
   ///         if no chain reached the required level
-  std::vector<detail::GbtsEdge*> extractChainHeads(GbtsGraph& graph) const;
+  std::vector<detail::GbtsEdge*> extractChainHeads(
+      detail::GbtsGraph<EdgeType>& graph) const;
 
  private:
   /// Check to see if z0 of segment is within the expected z range of the

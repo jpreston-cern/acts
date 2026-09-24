@@ -245,4 +245,19 @@ inline float edgeExpEta(const GbtsEdge& edge) {
   return edge.p[0];
 }
 
+/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder` or
+/// `DisplacedGbtsGraph`.
+/// @tparam edge_t The edge the builder makes, its `EdgeType`
+template <typename edge_t>
+struct GbtsGraph {
+  /// The graph edges, i.e. the doublets. Only the first `nEdges` are in use.
+  std::vector<edge_t> edgeStorage;
+
+  /// Number of edges in the graph.
+  std::uint32_t nEdges = 0;
+
+  /// Number of links between edges.
+  std::uint32_t nConnections = 0;
+};
+
 }  // namespace Acts::Experimental::detail

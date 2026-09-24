@@ -427,10 +427,11 @@ GraphRun buildGraph(const SeederSetup& setup,
   storage.finalize();
 
   GraphRun run;
-  const auto stats = setup.graph.buildTheGraph(
-      setup.roi, storage, run.edges, setup.options.bFieldInZ);
-  run.nEdges = stats.first;
-  run.nConnections = stats.second;
+  Experimental::detail::GbtsGraph<DisplacedGbtsEdge> graph =
+      setup.graph.buildTheGraph(setup.roi, storage, setup.options.bFieldInZ);
+  run.edges = std::move(graph.edgeStorage);
+  run.nEdges = graph.nEdges;
+  run.nConnections = graph.nConnections;
 
   run.nodeOfSpacePoint.assign(spacePoints.size(), 0);
   for (std::uint32_t node = 0; node < storage.numberOfNodes(); ++node) {

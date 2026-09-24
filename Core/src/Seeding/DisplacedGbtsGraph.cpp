@@ -95,9 +95,12 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-  std::pair<std::uint32_t, std::uint32_t> DisplacedGbtsGraph::buildTheGraph(
+  detail::GbtsGraph<detail::DisplacedGbtsEdge> DisplacedGbtsGraph::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage, const float bFieldInZ) const {
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::DisplacedGbtsEdge> graph;
+  std::vector<detail::DisplacedGbtsEdge>& edgeStorage = graph.edgeStorage;
+
   // z range at the outer radius, for the outer z cuts
   const float cutZMinU =
       m_cfg.minZ0 + m_cfg.maxOuterRadius * static_cast<float>(roi.dzdrMin());
@@ -773,12 +776,16 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
                  << " edges - possible efficiency loss");
   }
 
-  return std::make_pair(nEdges, nConnections);
+  graph.nEdges = nEdges;
+  graph.nConnections = nConnections;
+  return graph;
 }
 
 std::uint32_t DisplacedGbtsGraph::runCCA(
-    const std::uint32_t nEdges,
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage) const {
+    detail::GbtsGraph<detail::DisplacedGbtsEdge>& graph) const {
+  const std::uint32_t nEdges = graph.nEdges;
+  std::vector<detail::DisplacedGbtsEdge>& edgeStorage = graph.edgeStorage;
+
   std::uint32_t maxLevel = 0;
 
   std::uint32_t iter = 0;
@@ -845,8 +852,10 @@ std::uint32_t DisplacedGbtsGraph::runCCA(
 }
 
 std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-    std::uint32_t nEdges) const {
+    detail::GbtsGraph<detail::DisplacedGbtsEdge>& graph) const {
+  const std::uint32_t nEdges = graph.nEdges;
+  std::vector<detail::DisplacedGbtsEdge>& edgeStorage = graph.edgeStorage;
+
   const auto minLevel = static_cast<std::uint8_t>(m_cfg.minSeedLevel);
   // `addTriplets` accepts a chain one level short. Signed: an uncollected
   // edge sits at level -1 and `minSeedLevel` may be configured to 0.
