@@ -23,7 +23,7 @@
 namespace Acts::Experimental::detail {
 
 /// Maximum number of neighbouring edges recorded per graph edge
-static constexpr std::uint32_t kGbtsMaxEdgeNeighbours = 6;
+static constexpr std::uint32_t kGbtsMaxEdgeNeighbours = 50;
 
 /// Bins of the per-node z0 histogram, which is kept as a bit mask in
 /// GbtsNodeEdgeInfo::isConnected and so may not exceed its width.
