@@ -89,10 +89,9 @@ class GbtsTrackingFilter final {
   /// @param pS Starting edge
   /// @return Final edge state after following the track
   template <typename edge_t>
-  detail::GbtsEdgeState<edge_t> followTrack(State<edge_t>& state,
-                                            const detail::GbtsNodeView& nodeView,
-                                            std::vector<edge_t>& sb,
-                                            edge_t& pS) const;
+  detail::GbtsEdgeState<edge_t> followTrack(
+      State<edge_t>& state, const detail::GbtsNodeView& nodeView,
+      std::vector<edge_t>& sb, edge_t& pS) const;
 
   /// Configuration for the tracking filter.
   Config m_cfg{};

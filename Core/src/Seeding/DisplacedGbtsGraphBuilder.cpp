@@ -1,4 +1,13 @@
+// This file is part of the ACTS project.
+//
+// Copyright (C) 2016 CERN for the benefit of the ACTS project
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 #include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
+
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
@@ -16,7 +25,7 @@
 // Every rejection in buildTheGraph is marked `[CUT]`, so `grep "\[CUT\]"`
 // lists them in the order a candidate meets them.
 
-namespace Acts::Experimental{
+namespace Acts::Experimental {
 
 namespace {
 
@@ -118,16 +127,17 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
 }  // namespace
 
-  DisplacedGbtsGraphBuilder::DisplacedGbtsGraphBuilder(const Config& config,
-                     std::shared_ptr<const GbtsGeometry> geometry,
-                     std::unique_ptr<const Acts::Logger> logger)
+DisplacedGbtsGraphBuilder::DisplacedGbtsGraphBuilder(
+    const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
+    std::unique_ptr<const Acts::Logger> logger)
     : m_cfg(config),
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-  detail::GbtsGraph<detail::DisplacedGbtsEdge> DisplacedGbtsGraphBuilder::buildTheGraph(
-    const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
-    const float bFieldInZ) const {
+detail::GbtsGraph<detail::DisplacedGbtsEdge>
+DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
+                                         GbtsNodeStorage& nodeStorage,
+                                         const float bFieldInZ) const {
   detail::GbtsGraph<detail::DisplacedGbtsEdge> graph;
   std::vector<detail::DisplacedGbtsEdge>& edgeStorage = graph.edgeStorage;
 
@@ -308,36 +318,42 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
       float deltaPhi = deltaPhi0;  // the default
 
       if (m_cfg.useEtaBinning) {
-
         const float absDr = std::fabs(rb2 - rb1);
         const float maxD0 = m_cfg.d0Max;
-        auto phiWindow = [&rb1, &rb2, &maxD0, ptScale](const float& phiWindowOffset, const float& phiWindowSlope){
-                                   const float maxD0Square = maxD0*maxD0;
+        auto phiWindow = [&rb1, &rb2, &maxD0, ptScale](
+                             const float& phiWindowOffset,
+                             const float& phiWindowSlope) {
+          const float maxD0Square = maxD0 * maxD0;
 
-                                   // Azimuth a straight track of impact
-                                   // parameter d0 walks between the radii,
-                                   // exactly acos(d0 / r). The ratio is capped
-                                   // at 1 for bins inside d0Max, otherwise
-                                   // acos gives NaN and the window breaks.
-                                   const float frac1 = std::min(1.0f, maxD0/rb1);
-                                   const float frac2 = std::min(1.0f, maxD0/rb2);
-                                   const float displacmentTerm = std::acos(frac2) - std::acos(frac1);
+          // Azimuth a straight track of impact parameter d0 walks between
+          // the radii, exactly acos(d0 / r). The ratio is capped at 1 for
+          // bins inside d0Max, otherwise acos gives NaN and the window breaks.
+          const float frac1 = std::min(1.0f, maxD0 / rb1);
+          const float frac2 = std::min(1.0f, maxD0 / rb2);
+          const float displacementTerm = std::acos(frac2) - std::acos(frac1);
 
-                                   const float corr1 = std::sqrt(std::max(0.0f, rb1*rb1 - maxD0Square));
-                                   const float corr2 = std::sqrt(std::max(0.0f, rb2*rb2 - maxD0Square));
+          const float corr1 =
+              std::sqrt(std::max(0.0f, rb1 * rb1 - maxD0Square));
+          const float corr2 =
+              std::sqrt(std::max(0.0f, rb2 * rb2 - maxD0Square));
 
-                                   const float curvatureTerm = (corr2 - corr1)*phiWindowSlope*ptScale;
+          const float curvatureTerm =
+              (corr2 - corr1) * phiWindowSlope * ptScale;
 
-                                   // displacement and bending are independent,
-                                   // so the worst case is their sum
-                                   const float absPhiWindow = phiWindowOffset + std::abs(displacmentTerm) + std::abs(curvatureTerm);
+          // displacement and bending are independent, so the worst case is
+          // their sum
+          const float absPhiWindow = phiWindowOffset +
+                                     std::abs(displacementTerm) +
+                                     std::abs(curvatureTerm);
 
-                                   return absPhiWindow;
-                                   };
+          return absPhiWindow;
+        };
         if (absDr < m_cfg.phiWindowSplitDeltaRadius) {
-          deltaPhi = phiWindow(m_cfg.phiWindowNearOffset, m_cfg.phiWindowNearSlope);
+          deltaPhi =
+              phiWindow(m_cfg.phiWindowNearOffset, m_cfg.phiWindowNearSlope);
         } else {
-          deltaPhi = phiWindow(m_cfg.phiWindowFarOffset, m_cfg.phiWindowFarSlope);
+          deltaPhi =
+              phiWindow(m_cfg.phiWindowFarOffset, m_cfg.phiWindowFarSlope);
         }
       }
 
@@ -407,7 +423,6 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
         for (std::uint32_t n2PhiIdx = slw.firstIt; n2PhiIdx < slw.numPhiNodes;
              ++n2PhiIdx) {
-
           const float phi2 = slw.phiNodes[n2PhiIdx].first;
 
           // [CUT] phi window
@@ -591,7 +606,6 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
           // looking for neighbours of the new doublet using outer node
           for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
                ++inEdgeIdx) {
-
             // [CUT] new doublet's triplet count full: an unrecorded triplet
             // could not be matched later anyway
             if (newDoublet.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
@@ -685,7 +699,8 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
             std::array<std::array<float, 3>, 3> points{
                 point1, point2, nodePoint(tripletNodes[2])};
 
-            std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
+            std::optional<detail::TripletCircle> circle =
+                fitTripletCircle(points);
 
             // [CUT] degenerate circle fit
             if (!circle.has_value()) {
@@ -870,8 +885,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
                 // [CUT] triplet match: tau ratio of the two fits
                 if (std::abs(prev.expEta * circle->invExpEta - 1.0f) >
-                    m_cfg.tauRatioCut + addTauRatioCorr +
-                        unresolvedStripCorr) {
+                    m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
                   continue;
                 }
 
@@ -898,13 +912,11 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
             if (pS->edge == detail::kNoGbtsEdge) {
               pS->edge = static_cast<std::uint32_t>(edgeStorage.size());
-              edgeStorage.emplace_back(n2Idx, pS->n2,
-                                       outer.expEta[inEdgeIdx]);
+              edgeStorage.emplace_back(n2Idx, pS->n2, outer.expEta[inEdgeIdx]);
             }
 
             if (newDoublet.edge == detail::kNoGbtsEdge) {
-              newDoublet.edge =
-                  static_cast<std::uint32_t>(edgeStorage.size());
+              newDoublet.edge = static_cast<std::uint32_t>(edgeStorage.size());
               edgeStorage.emplace_back(n1Idx, n2Idx, expEta);
             }
 
@@ -929,16 +941,16 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
             }
 
             nConnections++;
-          } // inEdgeIdx
-        } // n2PhiIdx
-      } // slw
+          }  // inEdgeIdx
+        }  // n2PhiIdx
+      }  // slw
 
       // makes n1's doublets visible to the next bin group in
       edgeInfo[n1Idx].numEdges = numCreatedEdges;
-    } // n1Idx
+    }  // n1Idx
 
     finishGroup(bg);
-  } // bin groups
+  }  // bin groups
 
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
 
@@ -971,7 +983,8 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   return graph;
 }
 
-std::optional<detail::TripletCircle> DisplacedGbtsGraphBuilder::fitTripletCircle(
+std::optional<detail::TripletCircle>
+DisplacedGbtsGraphBuilder::fitTripletCircle(
     const std::array<std::array<float, 3>, 3>& points) const {
   detail::TripletCircle circle{};
 
@@ -1056,4 +1069,4 @@ std::optional<detail::TripletCircle> DisplacedGbtsGraphBuilder::fitTripletCircle
   return circle;
 }
 
-} // Acts::Experimental namespace
+}  // namespace Acts::Experimental

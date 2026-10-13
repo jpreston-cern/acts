@@ -1,3 +1,10 @@
+// This file is part of the ACTS project.
+//
+// Copyright (C) 2016 CERN for the benefit of the ACTS project
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #pragma once
 
@@ -9,111 +16,110 @@
 #include <cstdint>
 #include <limits>
 
-namespace Acts::Experimental::detail{
-
-  /// The three fit parameters GbtsEdge kept in its @c p array, in the same
-  /// order, so that slot n here means what p[n] meant there. What differs is
-  /// where they come from: a displaced doublet cannot fix a circle, so these
-  /// belong to a triplet the edge is part of and not to the edge itself, and
-  /// an edge holds one set per such triplet.
-  ///
-  /// They are what a later edge is matched against. Both the recorded values
-  /// and the ones matched against them describe the circle at the inner node
-  /// of the doublet they share, which is the only point the two triplets
-  /// agree on by construction.
-//! [displaced triplet properties]
-  struct TripletProperties{
-
-    TripletProperties() = default;
-
-    /// Constructor
-    /// @param expEta_ exp(eta) of the triplet
-    /// @param curvature_ Signed curvature of the fitted circle
-    /// @param phi_ Tangent azimuth at the triplet's innermost node
-    TripletProperties(float expEta_, float curvature_, float phi_)
-    : expEta{expEta_}, curvature{curvature_}, phi{phi_}{};
-    /// exp(eta) of the triplet, was p[0]. Along the fitted arc rather than the
-    /// chord, so it is not quite the edge's own @c expEta.
-    float expEta{};
-    /// Signed curvature of the fitted circle, was p[1]. In the prompt graph's
-    /// dphi/dr convention, i.e. half the geometric 1/R.
-    float curvature{};
-    /// Azimuth of the track tangent at the innermost of the triplet's three
-    /// nodes, which is this edge's own inner node, was p[2]
-    float phi{};
-  };
-
-  /// The circle three nodes put a track on, from the same conformal mapping
-  /// the prompt graph validates a triplet with, but kept whole rather than
-  /// reduced to a verdict.
-  ///
-  /// Displaced, this is the first place the track parameters exist at all: a
-  /// doublet fixes a circle only by borrowing the beamline as a third point,
-  /// which is exactly the assumption large radius tracking drops.
-  struct TripletCircle {
-    /// Slope of the conformal line. Its arctangent is the track direction at
-    /// the middle node, in the frame the fit rotated into.
-    float slope{};
-    /// Intercept of the conformal line, which is what carries the curvature.
-    float intercept{};
-    /// Signed curvature, in the prompt graph's dphi/dr convention -- half the
-    /// geometric 1/R -- so that the cut values tuned there carry over.
-    float curvature{};
-    /// Signed transverse impact parameter with respect to the beamline.
-    float d0{};
-    /// Azimuth of the middle node: the frame the local coordinates sit in.
-    float phiMid{};
-    /// cot(theta) along the fitted arc rather than along the chord.
-    float tau{};
-    /// exp(eta) from @ref tau.
-    float expEta{};
-    /// 1 / @ref expEta, the form the tau ratio is taken in.
-    float invExpEta{};
-    /// The three nodes in that frame, inside out, the middle one at the
-    /// origin.
-    std::array<std::array<float, 2>, 3> local{};
-
-    /// Azimuth of the track tangent at one of the three nodes, pointing
-    /// outwards. Two triplets sharing a doublet are matched through this, so
-    /// it has to describe the circle and not the frame it was fitted in.
-    /// @param k Which node, inside out
-    /// @return The tangent azimuth, not wrapped
-    float tangentPhi(const std::uint32_t k) const {
-      // The tangent to x^2 + y^2 = 2ax + 2by at (x, y) is (b - y, x - a), and
-      // 2b*intercept = 1, 2a*intercept = -slope. Scaling by 2|intercept| keeps
-      // the direction and takes the straight track out of being a special
-      // case.
-      return phiMid + std::atan2(slope + 2.0f * intercept * local[k][0],
-                                 1.0f - 2.0f * intercept * local[k][1]);
-    }
-
-    /// Track direction at one of the three nodes. Not normalised: the strip
-    /// calibration only reads ratios of it.
-    /// @param k Which node, inside out
-    /// @return The direction in global coordinates
-    std::array<float, 3> direction(const std::uint32_t k) const {
-      const float phi = tangentPhi(k);
-      return {std::cos(phi), std::sin(phi), tau};
-    }
-  };
+namespace Acts::Experimental::detail {
 
 //! [displaced triplet properties]
+/// The three fit parameters GbtsEdge kept in its @c p array, in the same order,
+/// so that slot n here means what p[n] meant there. What differs is where they
+/// come from: a displaced doublet cannot fix a circle, so these belong to a
+/// triplet the doublet is part of and not to the doublet itself, and a doublet
+/// holds one set per such triplet.
+///
+/// They are what a later doublet is matched against. Both the recorded values
+/// and the ones matched against them describe the circle at the inner node of
+/// the doublet they share, which is the only point the two triplets agree on
+/// by construction.
+struct TripletProperties {
+  TripletProperties() = default;
+
+  /// Constructor
+  /// @param expEta_ exp(eta) of the triplet
+  /// @param curvature_ Signed curvature of the fitted circle
+  /// @param phi_ Tangent azimuth at the triplet's innermost node
+  TripletProperties(float expEta_, float curvature_, float phi_)
+      : expEta{expEta_}, curvature{curvature_}, phi{phi_} {}
+
+  /// exp(eta) of the triplet, was p[0]. Along the fitted arc rather than the
+  /// chord, so it is not quite the doublet's own @c expEta.
+  float expEta{};
+  /// Signed curvature of the fitted circle, was p[1]. In the prompt graph's
+  /// dphi/dr convention, i.e. half the geometric 1/R.
+  float curvature{};
+  /// Azimuth of the track tangent at the innermost of the triplet's three
+  /// nodes, which is this doublet's own inner node, was p[2]
+  float phi{};
+};
+//! [displaced triplet properties]
+
+/// The circle three nodes put a track on, from the same conformal mapping
+/// the prompt graph validates a triplet with, but kept whole rather than
+/// reduced to a verdict.
+///
+/// Displaced, this is the first place the track parameters exist at all: a
+/// doublet fixes a circle only by borrowing the beamline as a third point,
+/// which is exactly the assumption large radius tracking drops.
+struct TripletCircle {
+  /// Slope of the conformal line. Its arctangent is the track direction at
+  /// the middle node, in the frame the fit rotated into.
+  float slope{};
+  /// Intercept of the conformal line, which is what carries the curvature.
+  float intercept{};
+  /// Signed curvature, in the prompt graph's dphi/dr convention -- half the
+  /// geometric 1/R -- so that the cut values tuned there carry over.
+  float curvature{};
+  /// Signed transverse impact parameter with respect to the beamline.
+  float d0{};
+  /// Azimuth of the middle node: the frame the local coordinates sit in.
+  float phiMid{};
+  /// cot(theta) along the fitted arc rather than along the chord.
+  float tau{};
+  /// exp(eta) from @ref tau.
+  float expEta{};
+  /// 1 / @ref expEta, the form the tau ratio is taken in.
+  float invExpEta{};
+  /// The three nodes in that frame, inside out, the middle one at the
+  /// origin.
+  std::array<std::array<float, 2>, 3> local{};
+
+  /// Azimuth of the track tangent at one of the three nodes, pointing
+  /// outwards. Two triplets sharing a doublet are matched through this, so
+  /// it has to describe the circle and not the frame it was fitted in.
+  /// @param k Which node, inside out
+  /// @return The tangent azimuth, not wrapped
+  float tangentPhi(const std::uint32_t k) const {
+    // The tangent to x^2 + y^2 = 2ax + 2by at (x, y) is (b - y, x - a), and
+    // 2b*intercept = 1, 2a*intercept = -slope. Scaling by 2|intercept| keeps
+    // the direction and takes the straight track out of being a special
+    // case.
+    return phiMid + std::atan2(slope + 2.0f * intercept * local[k][0],
+                               1.0f - 2.0f * intercept * local[k][1]);
+  }
+
+  /// Track direction at one of the three nodes. Not normalised: the strip
+  /// calibration only reads ratios of it.
+  /// @param k Which node, inside out
+  /// @return The direction in global coordinates
+  std::array<float, 3> direction(const std::uint32_t k) const {
+    const float phi = tangentPhi(k);
+    return {std::cos(phi), std::sin(phi), tau};
+  }
+};
 
 /// What @c DisplacedGbtsDoublet::edge holds until the doublet is in a triplet.
 constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
 
 //! [displaced doublet]
-  /// A doublet that passed the doublet cuts, with what a triplet fit through
-  /// it will ask for and nothing else.
-  ///
-  /// Most displaced doublets never pass a triplet, so they are not graph
-  /// edges. They live with the others sharing their inner eta bin, only until
-  /// every bin that links to that bin has been built, and only the ones a
-  /// triplet passes through are copied out as a @c DisplacedGbtsEdge.
-  ///
-  /// The inner node is not held: a node's doublets are a contiguous range,
-  /// found through the node, so whoever reads one already has it.
-  struct DisplacedGbtsDoublet final {
+/// A doublet that passed the doublet cuts, with what a triplet fit through
+/// it will ask for and nothing else.
+///
+/// Most displaced doublets never pass a triplet, so they are not graph
+/// edges. They live with the others sharing their inner eta bin, only until
+/// every bin that links to that bin has been built, and only the ones a
+/// triplet passes through are copied out as a @c DisplacedGbtsEdge.
+///
+/// The inner node is not held: a node's doublets are a contiguous range,
+/// found through the node, so whoever reads one already has it.
+struct DisplacedGbtsDoublet final {
   /// Constructor
   /// @param n2_ Outer node index
   /// @param chord_ Transverse length of the doublet's chord
@@ -188,9 +194,9 @@ constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
 //! [displaced doublet]
 
 //! [displaced edge]
-  /// A doublet at least one triplet passed through, which is all the graph
-  /// keeps: the two nodes, the links, and the level the links give it.
-  struct DisplacedGbtsEdge final {
+/// A doublet at least one triplet passed through, which is all the graph
+/// keeps: the two nodes, the links, and the level the links give it.
+struct DisplacedGbtsEdge final {
   DisplacedGbtsEdge() = default;
 
   /// Constructor
@@ -216,7 +222,6 @@ constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
 
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 };
-
 //! [displaced edge]
 
 /// exp(eta) of an edge, which the displaced edge keeps in a field of its own
@@ -227,4 +232,5 @@ constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
 inline float edgeExpEta(const DisplacedGbtsEdge& edge) {
   return edge.expEta;
 }
-}
+
+}  // namespace Acts::Experimental::detail

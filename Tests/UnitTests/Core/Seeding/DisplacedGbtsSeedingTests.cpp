@@ -162,9 +162,12 @@ struct Track {
     const std::array<float, 2> c = centre();
     const float vx = d0 * -std::sin(phi0) - c[0];
     const float vy = d0 * std::cos(phi0) - c[1];
-    const float a = static_cast<float>(sense) * t + 0.5f * std::numbers::pi_v<float>;
-    const float dx = static_cast<float>(sense) * (vx * std::cos(a) - vy * std::sin(a));
-    const float dy = static_cast<float>(sense) * (vx * std::sin(a) + vy * std::cos(a));
+    const float a =
+        static_cast<float>(sense) * t + 0.5f * std::numbers::pi_v<float>;
+    const float dx =
+        static_cast<float>(sense) * (vx * std::cos(a) - vy * std::sin(a));
+    const float dy =
+        static_cast<float>(sense) * (vx * std::sin(a) + vy * std::cos(a));
     return {dx / radius, dy / radius, tau};
   }
 
@@ -395,9 +398,9 @@ SeederSetup makeSeeder(const ToyDetector& detector,
           Experimental::GraphBasedTrackSeeder::DerivedConfig(config), geometry,
           makeLogger()),
       .graph = Experimental::DisplacedGbtsGraphBuilder(graphConfig, geometry,
-                                                makeLogger()),
+                                                       makeLogger()),
       .filter = Experimental::GbtsTrackingFilter(filterConfig, geometry,
-                                                makeLogger()),
+                                                 makeLogger()),
       .roi = Experimental::GbtsRoiDescriptor(-4.5, 4.5, -kZ0Max, kZ0Max),
       .options = Experimental::GraphBasedTrackSeeder::Options{.bFieldInZ = 2_T},
   };
@@ -581,8 +584,8 @@ SeedTally runSeeding(const SeederSetup& setup,
   }
 
   std::ostringstream detail;
-  detail << "seeds: " << seeds.size() << " for " << tracks.size()
-         << " tracks, " << tally.impure << " mixing tracks\n";
+  detail << "seeds: " << seeds.size() << " for " << tracks.size() << " tracks, "
+         << tally.impure << " mixing tracks\n";
   for (std::size_t track = 0; track < tracks.size(); ++track) {
     detail << "  track " << track << ": " << tally.seeds[track] << " seed(s)"
            << ", longest " << tally.longest[track] << " of "
@@ -733,7 +736,8 @@ BOOST_AUTO_TEST_CASE(MatchBeforeCreateKeepsEveryEdge) {
   const std::vector<Track> tracks = makeDenseDisplacedTracks();
   const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
 
-  const SeederSetup off = makeSeeder(detector, true, /*matchBeforeCreate=*/false);
+  const SeederSetup off =
+      makeSeeder(detector, true, /*matchBeforeCreate=*/false);
   const SeederSetup on = makeSeeder(detector, true, /*matchBeforeCreate=*/true);
 
   const GraphRun without = buildGraph(off, spacePoints);
@@ -800,11 +804,11 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeAmongDenseTracks) {
 
   const Completeness result = checkCompleteness(run, spacePoints, tracks);
 
-  BOOST_TEST_MESSAGE("dense graph: "
-                     << run.nDoublets << " doublets, " << run.nEdges
-                     << " edges (" << result.expectedEdges << " owed), "
-                     << run.nConnections << " connections ("
-                     << result.expectedLinks << " owed)");
+  BOOST_TEST_MESSAGE("dense graph: " << run.nDoublets << " doublets, "
+                                     << run.nEdges << " edges ("
+                                     << result.expectedEdges << " owed), "
+                                     << run.nConnections << " connections ("
+                                     << result.expectedLinks << " owed)");
   if (!result.report.empty()) {
     BOOST_TEST_MESSAGE("missing:\n" << result.report);
   }
