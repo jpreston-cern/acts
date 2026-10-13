@@ -763,6 +763,8 @@ detail::GbtsGraph<detail::GbtsEdge> PromptGbtsGraphBuilder::buildTheGraph(
                          << detail::kGbtsMaxEdgeNeighbours
                          << " neighbours - possible efficiency loss");
   }
+
+  graph.nDoublets = static_cast<std::uint32_t>(edgeStorage.size());
   graph.nConnections = nConnections;
   return graph;
 }

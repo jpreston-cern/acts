@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace Acts::Experimental::detail{
 
@@ -98,7 +99,97 @@ namespace Acts::Experimental::detail{
 
 //! [displaced triplet properties]
 
+/// What @c DisplacedGbtsDoublet::edge holds until the doublet is in a triplet.
+constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
+
+//! [displaced doublet]
+  /// A doublet that passed the doublet cuts, with what a triplet fit through
+  /// it will ask for and nothing else.
+  ///
+  /// Most displaced doublets never pass a triplet, so they are not graph
+  /// edges. They live with the others sharing their inner eta bin, only until
+  /// every bin that links to that bin has been built, and only the ones a
+  /// triplet passes through are copied out as a @c DisplacedGbtsEdge.
+  ///
+  /// The inner node is not held: a node's doublets are a contiguous range,
+  /// found through the node, so whoever reads one already has it.
+  struct DisplacedGbtsDoublet final {
+  /// Constructor
+  /// @param n2_ Outer node index
+  /// @param chord_ Transverse length of the doublet's chord
+  /// @param cosAlpha_ Cosine of the azimuth of that chord
+  /// @param sinAlpha_ Sine of the azimuth of that chord
+  /// @param firstProperty_ Where the doublet's triplet properties will start
+  /// @param n2Depth_ Barrel depth of the outer node's layer
+  /// @param n2Type_ Type of the outer node's layer
+  /// @param n2Technology_ Technology of the outer node's layer
+  DisplacedGbtsDoublet(SpacePointIndex n2_, float chord_, float cosAlpha_,
+                       float sinAlpha_, std::uint32_t firstProperty_,
+                       std::int32_t n2Depth_, GbtsLayerType n2Type_,
+                       GbtsLayerTechnology n2Technology_)
+      : n2{n2_},
+        chord(chord_),
+        cosAlpha(cosAlpha_),
+        sinAlpha(sinAlpha_),
+        firstProperty{firstProperty_},
+        n2Depth{n2Depth_},
+        n2Type{n2Type_},
+        n2Technology{n2Technology_} {}
+
+  /// Outer node of the doublet
+  SpacePointIndex n2{kSpacePointIndexInvalid};
+
+  /// Index of the doublet's graph edge, @c kNoGbtsEdge until the first
+  /// triplet passes through it.
+  std::uint32_t edge{kNoGbtsEdge};
+
+  /// Transverse length of the doublet's own chord.
+  ///
+  /// Two doublets meeting at a node bound the triplet's outer chord between
+  /// them, L13 <= L12 + L23, which is what lets the turn below be cut against
+  /// this pair's own reach rather than the whole detector's.
+  float chord{};
+
+  /// The doublet's own chord direction in the transverse plane, (dx, dy) /
+  /// chord.
+  ///
+  /// The turn from one doublet to another is asin(curvature * L13), so it
+  /// falls with pT and a wide turn is not worth fitting. Holding the direction
+  /// as a unit vector rather than as an angle gives that turn's sine and
+  /// cosine from a dot and a cross of two cached pairs, so the innermost loop
+  /// reaches the cut without trigonometry, a wrap, or a square root.
+  float cosAlpha{};
+  /// @copydoc cosAlpha
+  float sinAlpha{};
+
+  /// Where this doublet's @c TripletProperties start among its bin's, one per
+  /// triplet it is the inner doublet of. A doublet is given all of its own
+  /// before the next one is made, so they are contiguous.
+  std::uint32_t firstProperty{};
+
+  /// How deep the outer node's layer sits in the barrel, -1 for an endcap.
+  std::int32_t n2Depth{-1};
+
+  /// Type and technology of the outer node's layer, which together say
+  /// whether that node is an endcap strip the turn cut must not trust.
+  GbtsLayerType n2Type{};
+  /// @copydoc n2Type
+  GbtsLayerTechnology n2Technology{};
+
+  /// How many triplets this is the outer doublet of, i.e. the @c nNei of its
+  /// edge, kept here too so the innermost loop need not go and find the edge.
+  std::uint8_t nNei{0};
+
+  /// How many triplets this is the inner doublet of, at most
+  /// @c kGbtsMaxEdgeNeighbours. Zero while the doublet is the outermost pair
+  /// of every chain it could start.
+  std::uint8_t nProperties{0};
+};
+//! [displaced doublet]
+
 //! [displaced edge]
+  /// A doublet at least one triplet passed through, which is all the graph
+  /// keeps: the two nodes, the links, and the level the links give it.
   struct DisplacedGbtsEdge final {
   DisplacedGbtsEdge() = default;
 
@@ -106,27 +197,8 @@ namespace Acts::Experimental::detail{
   /// @param n1_ Inner node index
   /// @param n2_ Outer node index
   /// @param expEta_ exp(eta) of the edge, the first fit parameter
-  /// @param chord_ Transverse length of the edge's own chord
-  /// @param cosAlpha_ Cosine of the azimuth of that chord
-  /// @param sinAlpha_ Sine of the azimuth of that chord
-  /// @param n2Depth_ Barrel depth of the outer node's layer
-  /// @param n2Type_ Type of the outer node's layer
-  /// @param n2Technology_ Technology of the outer node's layer
-  DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_,
-           float chord_, float cosAlpha_, float sinAlpha_,
-           std::int32_t n2Depth_, GbtsLayerType n2Type_,
-           GbtsLayerTechnology n2Technology_)
-      : n1{n1_},
-        n2{n2_},
-        level{1},
-        next{1},
-        n2Type{n2Type_},
-        n2Technology{n2Technology_},
-        expEta(expEta_),
-        chord(chord_),
-        cosAlpha(cosAlpha_),
-        sinAlpha(sinAlpha_),
-        n2Depth{n2Depth_} {}
+  DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_)
+      : n1{n1_}, n2{n2_}, level{1}, next{1}, expEta(expEta_) {}
 
   /// Inner node of the edge
   SpacePointIndex n1{kSpacePointIndexInvalid};
@@ -138,59 +210,11 @@ namespace Acts::Experimental::detail{
 
   std::uint8_t nNei{0};
 
-  /// How many of @ref properties are filled. Zero while the edge is the
-  /// outermost pair of every chain it could start.
-  std::uint8_t nProperties{0};
-
-  /// Type and technology of the outer node's layer, which together say
-  /// whether that node is an endcap strip the turn cut must not trust. Both
-  /// are a byte and sit in what would be padding here.
-  GbtsLayerType n2Type{};
-  /// @copydoc n2Type
-  GbtsLayerTechnology n2Technology{};
-
   /// exp(eta) of the doublet, from the chord between its two nodes. All a
   /// displaced edge knows about itself before a triplet fit.
   float expEta{};
 
-  /// Transverse length of the edge's own chord.
-  ///
-  /// Two edges meeting at a node bound the triplet's outer chord between them,
-  /// L13 <= L12 + L23, which is what lets the turn below be cut against this
-  /// pair's own reach rather than the whole detector's.
-  float chord{};
-
-  /// The edge's own chord direction in the transverse plane, (dx, dy) / chord.
-  ///
-  /// The turn from one edge to another is asin(curvature * L13), so it falls
-  /// with pT and a wide turn is not worth fitting. Holding the direction as a
-  /// unit vector rather than as an angle gives that turn's sine and cosine
-  /// from a dot and a cross of two cached pairs, so the innermost loop reaches
-  /// the cut without trigonometry, a wrap, or a square root.
-  float cosAlpha{};
-  /// @copydoc cosAlpha
-  float sinAlpha{};
-
-  /// How deep the outer node's layer sits in the barrel, -1 for an endcap.
-  /// It is also all the innermost neighbour loop asks about the outer node's
-  /// layer, so it is cached beside the rest rather than chased through the
-  /// node's bin.
-  std::int32_t n2Depth{-1};
-
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
-
-  /// One entry per triplet this edge is the inner edge of, at most
-  /// @c kGbtsMaxEdgeNeighbours of them.
-  ///
-  /// Held inline and counted, exactly as @ref vNei is, and for the same
-  /// reason: the cap is a small constant, so a vector here would be a heap
-  /// allocation for every edge in the graph and a pointer chase to read one
-  /// back.
-  ///
-  /// Last, and on purpose. It is over half the edge and only a triplet ever
-  /// reads it, so everything the innermost loop wants is packed ahead of it
-  /// into a single cache line.
-  std::array<TripletProperties, kGbtsMaxEdgeNeighbours> properties{};
 };
 
 //! [displaced edge]

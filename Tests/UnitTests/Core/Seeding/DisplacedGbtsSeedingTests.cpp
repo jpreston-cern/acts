@@ -407,6 +407,8 @@ SeederSetup makeSeeder(const ToyDetector& detector,
 struct GraphRun {
   std::vector<DisplacedGbtsEdge> edges;
   std::uint32_t nEdges{};
+  /// Doublets the graph made on the way, most of which are no edge of it.
+  std::uint32_t nDoublets{};
   std::uint32_t nConnections{};
   /// Node index of each space point, by space point index.
   std::vector<std::uint32_t> nodeOfSpacePoint;
@@ -431,6 +433,7 @@ GraphRun buildGraph(const SeederSetup& setup,
       setup.graph.buildTheGraph(setup.roi, storage, setup.options.bFieldInZ);
   run.edges = std::move(graph.edgeStorage);
   run.nEdges = static_cast<std::uint32_t>(run.edges.size());
+  run.nDoublets = graph.nDoublets;
   run.nConnections = graph.nConnections;
 
   run.nodeOfSpacePoint.assign(spacePoints.size(), 0);
@@ -736,15 +739,16 @@ BOOST_AUTO_TEST_CASE(MatchBeforeCreateKeepsEveryEdge) {
   const GraphRun without = buildGraph(off, spacePoints);
   const GraphRun with = buildGraph(on, spacePoints);
 
-  BOOST_TEST_MESSAGE("matchBeforeCreate off: " << without.nEdges << " edges, "
-                                               << without.nConnections
-                                               << " connections");
-  BOOST_TEST_MESSAGE("matchBeforeCreate on : " << with.nEdges << " edges, "
-                                               << with.nConnections
-                                               << " connections");
+  BOOST_TEST_MESSAGE("matchBeforeCreate off: "
+                     << without.nDoublets << " doublets, " << without.nEdges
+                     << " edges, " << without.nConnections << " connections");
+  BOOST_TEST_MESSAGE("matchBeforeCreate on : "
+                     << with.nDoublets << " doublets, " << with.nEdges
+                     << " edges, " << with.nConnections << " connections");
 
-  // it has to actually engage, or the test below proves nothing
-  BOOST_CHECK_LT(with.nEdges, without.nEdges);
+  // it has to actually engage, or the test below proves nothing. It filters
+  // doublets, and the graph only keeps the ones in a triplet as edges.
+  BOOST_CHECK_LT(with.nDoublets, without.nDoublets);
 
   // and every edge and connection the tracks owe is still there
   const Completeness result = checkCompleteness(with, spacePoints, tracks);
@@ -797,8 +801,9 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeAmongDenseTracks) {
   const Completeness result = checkCompleteness(run, spacePoints, tracks);
 
   BOOST_TEST_MESSAGE("dense graph: "
-                     << run.nEdges << " edges (" << result.expectedEdges
-                     << " owed), " << run.nConnections << " connections ("
+                     << run.nDoublets << " doublets, " << run.nEdges
+                     << " edges (" << result.expectedEdges << " owed), "
+                     << run.nConnections << " connections ("
                      << result.expectedLinks << " owed)");
   if (!result.report.empty()) {
     BOOST_TEST_MESSAGE("missing:\n" << result.report);
@@ -807,9 +812,47 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeAmongDenseTracks) {
   BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
   BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
 
-  // the point of the fixture: the graph is carrying real combinatorics here,
-  // not just the tracks' own edges
-  BOOST_CHECK_GT(run.nEdges, 2 * result.expectedEdges);
+  // the point of the fixture: the graph is working through real combinatorics
+  // here, not just the tracks' own doublets
+  BOOST_CHECK_GT(run.nDoublets, 2 * result.expectedEdges);
+}
+
+// A doublet only becomes an edge of the graph when a triplet passes through
+// it, so under combinatorics the graph holds far fewer edges than doublets
+// were made, and every one of them is in a connection.
+BOOST_AUTO_TEST_CASE(GraphKeepsOnlyTheDoubletsInATriplet) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeederSetup setup = makeSeeder(detector);
+  const GraphRun run = buildGraph(setup, spacePoints);
+
+  BOOST_REQUIRE_EQUAL(run.edges.size(), run.nEdges);
+  BOOST_CHECK_LT(run.nEdges, run.nDoublets);
+  // two edges to a connection, and no more if no two connections share one
+  BOOST_CHECK_LE(run.nEdges, 2 * run.nConnections);
+
+  // an edge is the outer one of a connection if it has a neighbour, and the
+  // inner one if it is a neighbour
+  std::vector<bool> connected(run.nEdges, false);
+  std::uint32_t nNeighbours = 0;
+  for (std::uint32_t e = 0; e < run.nEdges; ++e) {
+    const DisplacedGbtsEdge& edge = run.edges[e];
+    for (std::uint32_t k = 0; k < edge.nNei; ++k) {
+      BOOST_REQUIRE_LT(edge.vNei[k], run.nEdges);
+      // the neighbour is the inner edge, ending on the node this one starts at
+      BOOST_CHECK_EQUAL(run.edges[edge.vNei[k]].n2, edge.n1);
+      connected[e] = true;
+      connected[edge.vNei[k]] = true;
+      ++nNeighbours;
+    }
+  }
+  BOOST_CHECK_EQUAL(nNeighbours, run.nConnections);
+  BOOST_CHECK(std::ranges::all_of(connected, [](const bool c) { return c; }));
+
+  // and no doublet was made an edge twice
+  BOOST_CHECK_EQUAL(run.edgeIndex.size(), run.nEdges);
 }
 
 // Everything above feeds seeds: one per track, holding all four hits.
