@@ -8,6 +8,7 @@
 
 #include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 
+#include "Acts/Seeding/GbtsLayerDescription.hpp"
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
@@ -15,7 +16,6 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <functional>
 #include <numbers>
 #include <optional>
 #include <span>
