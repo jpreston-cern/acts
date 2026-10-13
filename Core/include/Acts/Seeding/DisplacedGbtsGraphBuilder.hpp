@@ -8,10 +8,8 @@
 
 #pragma once
 
-#include "Acts/Definitions/Units.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
 #include "Acts/Seeding/GbtsGraphConfig.hpp"
-#include "Acts/Seeding/GbtsLayerDescription.hpp"
 #include "Acts/Seeding/GbtsNodeStorage.hpp"
 #include "Acts/Seeding/GbtsRoiDescriptor.hpp"
 #include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
@@ -19,11 +17,8 @@
 #include "Acts/Utilities/Logger.hpp"
 
 #include <array>
-#include <cstdint>
 #include <memory>
 #include <optional>
-#include <utility>
-#include <vector>
 
 namespace Acts::Experimental {
 
