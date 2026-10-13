@@ -376,8 +376,8 @@ outer one is @f$\arcsin(\kappa L_{13})@f$: it grows with curvature and so falls
 with @f$p_T@f$, and a wide turn is not worth fitting.
 
 @f$L_{13}@f$ is not measured — the two chords bound it, @f$L_{13} \le L_{12} +
-L_{23}@f$ — and each edge caches its own chord direction as a unit vector when it
-is built, so the turn's sine and cosine come from a dot and a cross of two cached
+L_{23}@f$ — and each doublet caches its own chord direction as a unit vector when
+it is built, so the turn's sine and cosine come from a dot and a cross of two cached
 pairs. No trigonometry, no square root, and the angle is never formed. On
 adjacent barrel layers it rejects between a third and two thirds of candidates
 before the fit sees them.
@@ -389,17 +389,13 @@ the fit would have kept is the one thing it must not do.
 ### Matching triplets {#gbts-lrt-matching}
 
 The prompt graph links two doublets by comparing the parameters each one carries.
-A displaced doublet carries none, so an edge instead records the triplets it is
-the **inner** edge of:
+A displaced doublet carries none, so it instead records the triplets it is the
+**inner** doublet of:
 
 @snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced triplet properties
 
-Held inline and counted, exactly as `vNei` is:
-
-@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced edge
-
-Bin groups are walked outer to inner, so when an edge @f$(n_1, n_2)@f$ is made,
-every edge hanging off @f$n_2@f$ already exists *and already carries its
+Bin groups are walked outer to inner, so when a doublet @f$(n_1, n_2)@f$ is made,
+every doublet hanging off @f$n_2@f$ already exists *and already carries its
 properties*. A candidate triplet @f$(n_1, n_2, n_3)@f$ is matched against the
 triplets its outer edge @f$(n_2, n_3)@f$ already belongs to. Those share a whole
 *doublet* with it, so they are the same track candidate seen one node apart, and
@@ -422,6 +418,30 @@ nothing to disagree with, so it passes. That is worth knowing when tuning: the
 **first triplet of every chain** is accepted on the absolute cuts alone —
 @f$d_0@f$, @f$p_T@f$, curvature and the @f$\tau@f$ ratio — with no relative test
 behind it.
+
+### Doublets and edges {#gbts-lrt-storage}
+
+Displaced, far more doublets pass the doublet cuts than ever pass a triplet, and
+a doublet in no triplet is in no chain. So the builder keeps the two apart. A
+doublet is held in a compact form, with what a triplet fit through it will ask
+for and nothing else:
+
+@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced doublet
+
+Doublets are stored per inner eta bin, each node's in a contiguous range that
+its `GbtsNodeEdgeInfo` gives as indices into that bin's doublets, with the
+triplet properties of the whole bin beside them. The only readers of a bin's
+doublets are the bin groups that link to it, so they are released as soon as the
+last of those is built.
+
+A doublet becomes an edge of the graph the first time a triplet passes through
+it, as either of the two doublets, and the graph holds nothing else:
+
+@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced edge
+
+The edge indices that `vNei` links by are handed out then, so the edges are in
+the order triplets found them and not in node order. `maxEdgesPerSP` caps
+these edges, not the doublets.
 
 ### Chain length
 
@@ -471,7 +491,7 @@ alone.
 | `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
 | `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |
 | `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have. Displaced, it also sets the @f$z_0@f$ band, the @f$\phi@f$ window and the curvature floor of a doublet, so it drives the combinatorics |
-| `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency |
+| `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency. Displaced, only a doublet in a triplet is an edge, see @ref gbts-lrt-storage |
 | `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth`, `matchBeforeCreateMaxEdges` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that depth in the barrel |
 | `z0HistogramMaxDepth`, `z0Resolution` | @ref gbts-graph | *prompt*: @f$z_0@f$ histogram cut, down to that depth in the barrel |
 
@@ -511,8 +531,8 @@ separately controls the chain-following filter of @ref gbts-extraction "seed ext
   which names its own edge type, so the call sites deduce it.
 - Graph builders: @ref Acts::Experimental::PromptGbtsGraphBuilder and
   @ref Acts::Experimental::DisplacedGbtsGraphBuilder. The displaced EDM -
-  `DisplacedGbtsEdge`, `TripletProperties` and the `TripletCircle` the fit
-  returns - lives in `Acts/Seeding/detail/DisplacedGraphTypes.hpp`.
+  `DisplacedGbtsDoublet`, `DisplacedGbtsEdge`, `TripletProperties` and the
+  `TripletCircle` the fit returns - lives in `Acts/Seeding/detail/DisplacedGraphTypes.hpp`.
 - Node storage: @ref Acts::Experimental::GbtsNodeStorage. The graph EDM it
   holds - `GbtsNodeParams`, `GbtsNodeEdgeInfo`, `GbtsEtaBinInfo`, `GbtsEdge` -
   is internal and lives in `Acts/Seeding/detail/GbtsGraphTypes.hpp`.

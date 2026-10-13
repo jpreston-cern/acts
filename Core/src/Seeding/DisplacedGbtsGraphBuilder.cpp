@@ -20,9 +20,39 @@ namespace Acts::Experimental{
 
 namespace {
 
+/// The doublets made with one eta bin as their inner bin.
+///
+/// Only the bins that link to this one ever read them, so they are released
+/// once the last of those is built, and the graph is left holding just the
+/// doublets a triplet passed through.
+struct BinDoublets {
+  /// The doublets, each node's in a contiguous range that the node's
+  /// `GbtsNodeEdgeInfo` gives.
+  std::vector<detail::DisplacedGbtsDoublet> doublets;
+  /// Every doublet's exp(eta), kept beside them so the first tau ratio cut
+  /// scans 4 bytes per doublet instead of loading whole ones. Same indices.
+  std::vector<float> expEta;
+  /// The triplets the doublets are the inner doublet of, each doublet's in a
+  /// contiguous range that the doublet gives.
+  std::vector<detail::TripletProperties> properties;
+  /// Bin groups not built yet that link to this bin.
+  std::uint32_t nPendingReaders{0};
+  /// Whether the bin's own group has been built.
+  bool built{false};
+
+  /// Give the memory back, which clearing alone would not.
+  void release() {
+    std::vector<detail::DisplacedGbtsDoublet>().swap(doublets);
+    std::vector<float>().swap(expEta);
+    std::vector<detail::TripletProperties>().swap(properties);
+  }
+};
+
 /// Sliding window in phi over one non-empty eta bin, holding its phi-ordered
 /// nodes directly so the innermost loop does not reach through the bin.
 struct SlidingWindow {
+  /// doublets with the bin as their inner bin, the candidates' outer doublets
+  BinDoublets* doublets{};
   /// phi-ordered nodes of the bin, including the wrap-around duplicates
   const std::pair<float, SpacePointIndex>* phiNodes{};
   /// number of entries in @c phiNodes
@@ -146,25 +176,86 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   std::uint32_t nSaturatedNeighbours = 0;
   std::uint32_t nSaturatedProperties = 0;
 
-  // Scales the maximum number of edges by the number of space points using the
-  // factor maxEdgesPerSP
+  // The most edges the graph may hold, scaling with the number of space
+  // points by the factor maxEdgesPerSP
   const auto nMaxEdges = static_cast<std::uint32_t>(
       m_cfg.maxEdgesPerSP * static_cast<float>(nodeStorage.numberOfNodes()));
 
-  edgeStorage.reserve(nMaxEdges);
+  // whether a triplet was dropped for want of room for its edges
+  bool graphFull = false;
 
-  // Every edge's exp(eta), kept beside the storage so the first tau ratio cut
-  // scans 4 bytes per edge instead of loading whole edges. Same indices.
-  std::vector<float> edgeExpEta;
-  edgeExpEta.reserve(nMaxEdges);
+  // doublets made, held at the moment, and the most held at any moment
+  std::uint32_t nDoublets = 0;
+  std::size_t nHeldDoublets = 0;
+  std::size_t maxHeldDoublets = 0;
 
-  std::uint32_t nEdges = 0;
+  const std::span<const GbtsBinGroup> binGroups = m_geometry->binGroups();
+
+  // Doublets are kept per inner bin, and only while a bin group still to be
+  // built links to that bin. A doublet becomes a graph edge when a triplet
+  // first passes through it, so the graph never holds the rest.
+  std::uint32_t numBins = 0;
+
+  for (const GbtsBinGroup& bg : binGroups) {
+    numBins = std::max(numBins, bg.bin + 1);
+    for (const std::uint32_t b2Idx : bg.links) {
+      numBins = std::max(numBins, b2Idx + 1);
+    }
+  }
+
+  std::vector<BinDoublets> binDoublets(numBins);
+
+  for (const GbtsBinGroup& bg : binGroups) {
+    for (const std::uint32_t b2Idx : bg.links) {
+      ++binDoublets[b2Idx].nPendingReaders;
+    }
+  }
+
+  // Release a bin's doublets if nothing is left to read them.
+  const auto releaseIfDone = [&binDoublets,
+                              &nHeldDoublets](const std::uint32_t binIdx) {
+    BinDoublets& bin = binDoublets[binIdx];
+
+    if (!bin.built || bin.nPendingReaders > 0) {
+      return;
+    }
+
+    nHeldDoublets -= bin.doublets.size();
+    bin.release();
+  };
+
+  // Called once per bin group, built or skipped: its own bin now has all of
+  // its doublets, and the bins it links to have one reader fewer.
+  const auto finishGroup = [&binDoublets, &releaseIfDone, &nHeldDoublets,
+                            &maxHeldDoublets](const GbtsBinGroup& bg) {
+    BinDoublets& bin = binDoublets[bg.bin];
+    bin.built = true;
+
+    nHeldDoublets += bin.doublets.size();
+    maxHeldDoublets = std::max(maxHeldDoublets, nHeldDoublets);
+
+    for (const std::uint32_t b2Idx : bg.links) {
+      --binDoublets[b2Idx].nPendingReaders;
+      releaseIfDone(b2Idx);
+    }
+
+    // a bin nothing links to, or one whose readers were all built before it
+    releaseIfDone(bg.bin);
+  };
 
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
   const std::span<const detail::GbtsNodeParams> params =
       nodeStorage.nodeParams();
   const std::span<detail::GbtsNodeEdgeInfo> edgeInfo =
       nodeStorage.nodeEdgeInfo();
+
+  // A node's doublets are read before its own bin is built where a bin links
+  // to itself or two link to each other, and the range read then indexes a
+  // bin's doublets, so nothing may be left of a graph built on these nodes
+  // before.
+  for (detail::GbtsNodeEdgeInfo& info : edgeInfo) {
+    info.numEdges = 0;
+  }
 
   // reused across bin groups so that the windows are allocated once
   std::vector<SlidingWindow> phiSlidingWindow;
@@ -179,13 +270,17 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   };
 
   // loop over bin groups
-  for (const auto& bg : m_geometry->binGroups()) {
+  for (const GbtsBinGroup& bg : binGroups) {
     // B1 is the inner bin of every pair in the group
     const detail::GbtsEtaBinInfo& B1 = nodeStorage.etaBin(bg.bin);
 
     if (B1.empty()) {
+      finishGroup(bg);
       continue;
     }
+
+    // the doublets this group makes
+    BinDoublets& inner = binDoublets[bg.bin];
 
     // used for the phi window width
     const float rb1 = B1.minRadius;
@@ -247,6 +342,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
       }
 
       SlidingWindow& window = phiSlidingWindow.emplace_back();
+      window.doublets = &binDoublets[b2Idx];
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
@@ -258,8 +354,9 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
     // outer loop over n1 nodes in the inner bin
     for (SpacePointIndex n1Idx = B1.nodes.first; n1Idx < B1.nodes.second;
          ++n1Idx) {
-      // initialization using the top watermark of the edge storage
-      edgeInfo[n1Idx].firstEdge = nEdges;
+      // initialization using the top watermark of the bin's doublets
+      edgeInfo[n1Idx].firstEdge =
+          static_cast<std::uint32_t>(inner.doublets.size());
 
       // incoming edges created for n1
       std::uint16_t numCreatedEdges = 0;
@@ -326,6 +423,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
           const SpacePointIndex n2Idx = slw.phiNodes[n2PhiIdx].second;
 
+          // n2's doublets, as indices into its own bin's
           const detail::GbtsNodeEdgeInfo& n2Info = edgeInfo[n2Idx];
 
           const std::uint32_t n2FirstEdge = n2Info.firstEdge;
@@ -448,8 +546,8 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
             if (!isGood) {
               for (std::uint32_t n2InIdx = n2FirstEdge; n2InIdx < n2LastEdge;
                    ++n2InIdx) {
-                // the doublet's own tau, as the edge has no fit of its own
-                const float tau2 = edgeStorage[n2InIdx].expEta;
+                // the doublet's own tau, as it has no fit of its own
+                const float tau2 = slw.doublets->expEta[n2InIdx];
                 const float tauRatio = tau2 * invExpEta - 1.0f;
 
                 if (std::abs(tauRatio) > m_cfg.tauRatioPrecut) {  // bad match
@@ -473,346 +571,382 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
           // middle node of every triplet tried below
           const std::array<float, 3> point2{position2[0], position2[1], z2};
 
-          // [CUT] edge storage full
-          if (nEdges < nMaxEdges) {
-            edgeStorage.emplace_back(n1Idx, n2Idx, expEta, chord, cosAlpha12,
-                                     sinAlpha12, depth2, slw.type,
-                                     slw.technology);
-            edgeExpEta.push_back(expEta);
+          // Kept whether or not a triplet passes through it now: it may yet
+          // be the outer doublet of one made from a bin further in.
+          inner.doublets.emplace_back(
+              n2Idx, chord, cosAlpha12, sinAlpha12,
+              static_cast<std::uint32_t>(inner.properties.size()), depth2,
+              slw.type, slw.technology);
+          inner.expEta.push_back(expEta);
 
-            ++numCreatedEdges;
+          ++numCreatedEdges;
+          ++nDoublets;
 
-            const std::uint32_t outEdgeIdx = nEdges;
+          // Both stay put for the loop below, which adds no doublet. Taken
+          // after the one above went in, as a bin that links to itself has
+          // `outer` and `inner` the same.
+          detail::DisplacedGbtsDoublet& newDoublet = inner.doublets.back();
+          BinDoublets& outer = *slw.doublets;
 
-            // safe to hold: the storage was reserved to nMaxEdges
-            detail::DisplacedGbtsEdge& newEdge = edgeStorage[outEdgeIdx];
+          // looking for neighbours of the new doublet using outer node
+          for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
+               ++inEdgeIdx) {
 
-            // looking for neighbours of the new edge using outer node
-            for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
-                 ++inEdgeIdx) {
+            // [CUT] new doublet's triplet count full: an unrecorded triplet
+            // could not be matched later anyway
+            if (newDoublet.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
+              break;
+            }
 
-              // [CUT] new edge's triplet store full: an unrecorded triplet
-              // could not be matched later anyway
-              if (newEdge.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
-                break;
-              }
+            const float absTauRatio =
+                std::abs(outer.expEta[inEdgeIdx] * invExpEta - 1.0f);
 
-              const float absTauRatio =
-                  std::abs(edgeExpEta[inEdgeIdx] * invExpEta - 1.0f);
+            // [CUT] loosest tau ratio, off the compact array
+            if (absTauRatio > maxTauRatioCut) {
+              continue;
+            }
 
-              // [CUT] loosest tau ratio, off the compact array
-              if (absTauRatio > maxTauRatioCut) {
+            detail::DisplacedGbtsDoublet* pS = &outer.doublets[inEdgeIdx];
+
+            // [CUT] outer edge's neighbour array full
+            if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
+              continue;
+            }
+
+            const bool skipTurn =
+                innerSkipTurn ||
+                (calibrate && slidesRadially(pS->n2Type, pS->n2Technology));
+
+            // Turn between the two chords, from the cached unit vectors.
+            // For a circle sin(turn) = curvature * L13 <= curvature *
+            // (L12 + L23). Per pair rather than hoisted: hoisting leaked 2%
+            // more candidates to the fit for 4% more time.
+            if (!skipTurn) {
+              const float sinDelta =
+                  cosAlpha12 * pS->sinAlpha - sinAlpha12 * pS->cosAlpha;
+              const float cosDelta =
+                  cosAlpha12 * pS->cosAlpha + sinAlpha12 * pS->sinAlpha;
+
+              // [CUT] turn past a quarter circle, where the sine test below
+              // stops meaning anything
+              if (cosDelta <= 0.0f) {
                 continue;
               }
 
-              detail::DisplacedGbtsEdge* pS = &edgeStorage[inEdgeIdx];
-
-              // [CUT] outer edge's neighbour array full
-              if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
+              // [CUT] turn angle against the loosest curvature limit
+              if (std::abs(sinDelta) >
+                  curvatureCutLoosest * (chord + pS->chord)) {
                 continue;
               }
+            }
 
-              const bool skipTurn =
-                  innerSkipTurn ||
-                  (calibrate && slidesRadially(pS->n2Type, pS->n2Technology));
+            // the candidate triplet, inside out
+            const std::array<SpacePointIndex, 3> tripletNodes{n1Idx, n2Idx,
+                                                              pS->n2};
 
-              // Turn between the two chords, from the cached unit vectors.
-              // For a circle sin(turn) = curvature * L13 <= curvature *
-              // (L12 + L23). Per pair rather than hoisted: hoisting leaked 2%
-              // more candidates to the fit for 4% more time.
-              if (!skipTurn) {
-                const float sinDelta =
-                    cosAlpha12 * pS->sinAlpha - sinAlpha12 * pS->cosAlpha;
-                const float cosDelta =
-                    cosAlpha12 * pS->cosAlpha + sinAlpha12 * pS->sinAlpha;
+            // whether each node's tau carries an along-strip coordinate
+            const std::array<bool, 3> isStrip{
+                !isPixel1, !isPixel2,
+                nodeView.strip(tripletNodes[2]) != nullptr};
 
-                // [CUT] turn past a quarter circle, where the sine test below
-                // stops meaning anything
-                if (cosDelta <= 0.0f) {
-                  continue;
-                }
+            const std::int32_t depth3 = pS->n2Depth;
 
-                // [CUT] turn angle against the loosest curvature limit
-                if (std::abs(sinDelta) >
-                    curvatureCutLoosest * (chord + pS->chord)) {
-                  continue;
-                }
-              }
+            float addTauRatioCorr = 0;
 
-              // the candidate triplet, inside out
-              const std::array<SpacePointIndex, 3> tripletNodes{n1Idx, n2Idx,
-                                                                pS->n2};
+            // Widen for material: a gap in barrel depth (over all barrel
+            // layers, strips included), or a third node that left the barrel.
+            if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
+              if (depth3 >= 0) {
+                const bool noGap =
+                    (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
 
-              // whether each node's tau carries an along-strip coordinate
-              const std::array<bool, 3> isStrip{
-                  !isPixel1, !isPixel2,
-                  nodeView.strip(tripletNodes[2]) != nullptr};
-
-              const std::int32_t depth3 = pS->n2Depth;
-
-              float addTauRatioCorr = 0;
-
-              // Widen for material: a gap in barrel depth (over all barrel
-              // layers, strips included), or a third node that left the barrel.
-              if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
-                if (depth3 >= 0) {
-                  const bool noGap =
-                      (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
-
-                  if (!noGap) {
-                    addTauRatioCorr = m_cfg.tauRatioCorr;
-                  }
-                } else {
+                if (!noGap) {
                   addTauRatioCorr = m_cfg.tauRatioCorr;
                 }
+              } else {
+                addTauRatioCorr = m_cfg.tauRatioCorr;
               }
+            }
 
-              // Widen for strips, whose along-strip coordinate is unresolved
-              // until the calibration below, which removes this again.
-              const float stripTauRatioCorr =
-                  (m_cfg.tauRatioCorrStrip > 0.f &&
-                   (isStrip[0] || isStrip[1] || isStrip[2]))
-                      ? m_cfg.tauRatioCorrStrip
-                      : 0.0f;
+            // Widen for strips, whose along-strip coordinate is unresolved
+            // until the calibration below, which removes this again.
+            const float stripTauRatioCorr =
+                (m_cfg.tauRatioCorrStrip > 0.f &&
+                 (isStrip[0] || isStrip[1] || isStrip[2]))
+                    ? m_cfg.tauRatioCorrStrip
+                    : 0.0f;
 
-              // [CUT] doublet tau ratio, loose; retaken tight after calibration
-              if (absTauRatio >
-                  m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr) {
-                continue;
-              }
+            // [CUT] doublet tau ratio, loose; retaken tight after calibration
+            if (absTauRatio >
+                m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr) {
+              continue;
+            }
 
-              std::array<std::array<float, 3>, 3> points{
-                  point1, point2, nodePoint(tripletNodes[2])};
+            std::array<std::array<float, 3>, 3> points{
+                point1, point2, nodePoint(tripletNodes[2])};
 
-              std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
+            std::optional<detail::TripletCircle> circle = fitTripletCircle(points);
 
-              // [CUT] degenerate circle fit
-              if (!circle.has_value()) {
-                continue;
-              }
+            // [CUT] degenerate circle fit
+            if (!circle.has_value()) {
+              continue;
+            }
 
-              // strip widening left over: kept unless every strip end resolved
-              float unresolvedStripCorr = stripTauRatioCorr;
+            // strip widening left over: kept unless every strip end resolved
+            float unresolvedStripCorr = stripTauRatioCorr;
 
-              // whether any end moved off its nominal position
-              bool moved = false;
+            // whether any end moved off its nominal position
+            bool moved = false;
 
-              // Slide each strip end to where the fitted track crosses it, then
-              // refit once; the slide is small enough for one pass.
-              if (calibrate) {
-                bool resolved = true;
-                bool allStripsResolved = true;
+            // Slide each strip end to where the fitted track crosses it, then
+            // refit once; the slide is small enough for one pass.
+            if (calibrate) {
+              bool resolved = true;
+              bool allStripsResolved = true;
 
-                for (std::uint32_t k = 0; k < 3; ++k) {
-                  const auto* strip = nodeView.strip(tripletNodes[k]);
+              for (std::uint32_t k = 0; k < 3; ++k) {
+                const auto* strip = nodeView.strip(tripletNodes[k]);
 
-                  if (strip == nullptr) {
-                    if (isStrip[k]) {
-                      allStripsResolved = false;
-                    }
-                    continue;
+                if (strip == nullptr) {
+                  if (isStrip[k]) {
+                    allStripsResolved = false;
                   }
-
-                  if (!Acts::detail::calibrateOuterStripSpacePoint(
-                          circle->direction(k), *strip, points[k],
-                          m_cfg.maxStripLengthFraction)) {
-                    resolved = false;
-                    break;
-                  }
-
-                  moved = true;
-                }
-
-                // [CUT] fitted direction misses a strip
-                if (!resolved) {
                   continue;
                 }
 
-                if (moved) {
-                  circle = fitTripletCircle(points);
-
-                  // [CUT] degenerate refit
-                  if (!circle.has_value()) {
-                    continue;
-                  }
-                }
-
-                if (allStripsResolved) {
-                  unresolvedStripCorr = 0.0f;
-                }
-              }
-
-              // Tau ratio retaken on the calibrated ends at the tight
-              // threshold. If nothing moved it equals the doublet one.
-              float resolvedTauRatio = absTauRatio;
-
-              if (moved) {
-                const std::optional<float> expEta12 =
-                    chordExpEta(points[0], points[1]);
-                const std::optional<float> expEta23 =
-                    chordExpEta(points[1], points[2]);
-
-                // [CUT] calibrated ends share a transverse position
-                if (!expEta12.has_value() || !expEta23.has_value()) {
-                  continue;
-                }
-
-                resolvedTauRatio = std::abs(*expEta23 / *expEta12 - 1.0f);
-              }
-
-              // [CUT] tight tau ratio on the calibrated ends
-              if (resolvedTauRatio >
-                  m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
-                continue;
-              }
-
-              const float tripletCurv = circle->curvature;
-
-              // [CUT] eta dependent curvature
-              if (std::abs(tripletCurv) >
-                  (std::abs(circle->tau) < m_cfg.curvatureSplitAbsTau
-                       ? curvatureCutLowEta
-                       : curvatureCutHighEta)) {
-                continue;
-              }
-
-              // With d0 fitted, z0 and z(rOut) are single values rather than
-              // the doublet's bands, from the calibrated inner end.
-              if (m_cfg.tripletFilterRZ) {
-                const float r1c = fastHypot(points[0][0], points[0][1]);
-                const std::optional<float> s1 =
-                    arcFromPerigee(r1c, circle->d0, tripletCurv);
-
-                // [CUT] triplet never reaches its own inner radius
-                if (!s1.has_value()) {
-                  continue;
-                }
-
-                const float z0 = points[0][2] - *s1 * circle->tau;
-
-                // [CUT] triplet z0
-                if (z0 < m_cfg.minZ0 || z0 > m_cfg.maxZ0) {
-                  continue;
-                }
-
-                // a track whose |d0| exceeds rOut never gets there, and has
-                // nothing to check
-                if (const std::optional<float> sOut =
-                        arcFromPerigee(rOut, circle->d0, tripletCurv);
-                    sOut.has_value()) {
-                  const float zOuter = points[0][2] + (*sOut - *s1) * circle->tau;
-
-                  // [CUT] triplet z(rOut)
-                  if (zOuter < cutZMinU || zOuter > cutZMaxU) {
-                    continue;
-                  }
-                }
-              }
-
-              if (m_cfg.validateTriplets) {
-                // [CUT] d0
-                if (std::abs(circle->d0) > m_cfg.d0Max) {
-                  continue;
-                }
-
-                if (tripletCurv != 0.0f) {  // straight-line track is OK
-                  // curvature is 1 / 2R, so pT = bFieldInZ * R
-                  const float pT = 0.5f * std::abs(bFieldInZ / tripletCurv);
-
-                  // [CUT] min pT
-                  if (pT < tripletPtMin) {
-                    continue;
-                  }
-
-                  // [CUT] tighter tau ratio for relatively high-pT tracks
-                  if (pT > 5 * tripletPtMin) {
-                    if (resolvedTauRatio > 0.9f * m_cfg.tauRatioCut) {
-                      continue;
-                    }
-                  }
-                }
-              }
-
-              // Match against the triplets the outer edge already belongs to,
-              // which share the (n2, n3) doublet: the displaced form of the
-              // prompt dphi/dcurv doublet match. An outer edge in no triplet
-              // yet is a chain end and passes.
-              if (pS->nProperties > 0) {
-                // tangent at n2, where the recorded ones were taken
-                const float phiShared = circle->tangentPhi(1);
-
-                bool matched = false;
-
-                for (std::uint8_t p = 0; p < pS->nProperties; ++p) {
-                  const detail::TripletProperties& prev = pS->properties[p];
-
-                  float dPhi = phiShared - prev.phi;
-
-                  if (dPhi < -std::numbers::pi_v<float>) {
-                    dPhi += 2 * std::numbers::pi_v<float>;
-                  } else if (dPhi > std::numbers::pi_v<float>) {
-                    dPhi -= 2 * std::numbers::pi_v<float>;
-                  }
-
-                  // [CUT] triplet match: tangent dphi
-                  if (std::abs(dPhi) > m_cfg.cutDPhiMax) {
-                    continue;
-                  }
-
-                  const float dcurv = tripletCurv - prev.curvature;
-
-                  // [CUT] triplet match: dcurv
-                  if (dcurv < -m_cfg.cutDCurvMax || dcurv > m_cfg.cutDCurvMax) {
-                    continue;
-                  }
-
-                  // [CUT] triplet match: tau ratio of the two fits
-                  if (std::abs(prev.expEta * circle->invExpEta - 1.0f) >
-                      m_cfg.tauRatioCut + addTauRatioCorr +
-                          unresolvedStripCorr) {
-                    continue;
-                  }
-
-                  matched = true;
+                if (!Acts::detail::calibrateOuterStripSpacePoint(
+                        circle->direction(k), *strip, points[k],
+                        m_cfg.maxStripLengthFraction)) {
+                  resolved = false;
                   break;
                 }
 
-                // [CUT] no recorded triplet matched
-                if (!matched) {
+                moved = true;
+              }
+
+              // [CUT] fitted direction misses a strip
+              if (!resolved) {
+                continue;
+              }
+
+              if (moved) {
+                circle = fitTripletCircle(points);
+
+                // [CUT] degenerate refit
+                if (!circle.has_value()) {
                   continue;
                 }
               }
 
-              // record the tangent at n1 for later triplets through (n1, n2)
-              newEdge.properties[newEdge.nProperties] =
-                  detail::TripletProperties{circle->expEta, tripletCurv,
-                                            circle->tangentPhi(0)};
-              ++newEdge.nProperties;
+              if (allStripsResolved) {
+                unresolvedStripCorr = 0.0f;
+              }
+            }
 
-              if (newEdge.nProperties == detail::kGbtsMaxEdgeNeighbours) {
-                ++nSaturatedProperties;
+            // Tau ratio retaken on the calibrated ends at the tight
+            // threshold. If nothing moved it equals the doublet one.
+            float resolvedTauRatio = absTauRatio;
+
+            if (moved) {
+              const std::optional<float> expEta12 =
+                  chordExpEta(points[0], points[1]);
+              const std::optional<float> expEta23 =
+                  chordExpEta(points[1], points[2]);
+
+              // [CUT] calibrated ends share a transverse position
+              if (!expEta12.has_value() || !expEta23.has_value()) {
+                continue;
               }
 
-              pS->vNei[pS->nNei] = outEdgeIdx;
-              ++pS->nNei;
+              resolvedTauRatio = std::abs(*expEta23 / *expEta12 - 1.0f);
+            }
 
-              if (pS->nNei == detail::kGbtsMaxEdgeNeighbours) {
-                ++nSaturatedNeighbours;
+            // [CUT] tight tau ratio on the calibrated ends
+            if (resolvedTauRatio >
+                m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
+              continue;
+            }
+
+            const float tripletCurv = circle->curvature;
+
+            // [CUT] eta dependent curvature
+            if (std::abs(tripletCurv) >
+                (std::abs(circle->tau) < m_cfg.curvatureSplitAbsTau
+                     ? curvatureCutLowEta
+                     : curvatureCutHighEta)) {
+              continue;
+            }
+
+            // With d0 fitted, z0 and z(rOut) are single values rather than
+            // the doublet's bands, from the calibrated inner end.
+            if (m_cfg.tripletFilterRZ) {
+              const float r1c = fastHypot(points[0][0], points[0][1]);
+              const std::optional<float> s1 =
+                  arcFromPerigee(r1c, circle->d0, tripletCurv);
+
+              // [CUT] triplet never reaches its own inner radius
+              if (!s1.has_value()) {
+                continue;
               }
 
-              nConnections++;
-            } // inEdgeIdx
-            nEdges++;
-          } // if (nEdges < nMaxEdges)
+              const float z0 = points[0][2] - *s1 * circle->tau;
+
+              // [CUT] triplet z0
+              if (z0 < m_cfg.minZ0 || z0 > m_cfg.maxZ0) {
+                continue;
+              }
+
+              // a track whose |d0| exceeds rOut never gets there, and has
+              // nothing to check
+              if (const std::optional<float> sOut =
+                      arcFromPerigee(rOut, circle->d0, tripletCurv);
+                  sOut.has_value()) {
+                const float zOuter = points[0][2] + (*sOut - *s1) * circle->tau;
+
+                // [CUT] triplet z(rOut)
+                if (zOuter < cutZMinU || zOuter > cutZMaxU) {
+                  continue;
+                }
+              }
+            }
+
+            if (m_cfg.validateTriplets) {
+              // [CUT] d0
+              if (std::abs(circle->d0) > m_cfg.d0Max) {
+                continue;
+              }
+
+              if (tripletCurv != 0.0f) {  // straight-line track is OK
+                // curvature is 1 / 2R, so pT = bFieldInZ * R
+                const float pT = 0.5f * std::abs(bFieldInZ / tripletCurv);
+
+                // [CUT] min pT
+                if (pT < tripletPtMin) {
+                  continue;
+                }
+
+                // [CUT] tighter tau ratio for relatively high-pT tracks
+                if (pT > 5 * tripletPtMin) {
+                  if (resolvedTauRatio > 0.9f * m_cfg.tauRatioCut) {
+                    continue;
+                  }
+                }
+              }
+            }
+
+            // Match against the triplets the outer edge already belongs to,
+            // which share the (n2, n3) doublet: the displaced form of the
+            // prompt dphi/dcurv doublet match. An outer edge in no triplet
+            // yet is a chain end and passes.
+            if (pS->nProperties > 0) {
+              // tangent at n2, where the recorded ones were taken
+              const float phiShared = circle->tangentPhi(1);
+
+              bool matched = false;
+
+              for (std::uint8_t p = 0; p < pS->nProperties; ++p) {
+                const detail::TripletProperties& prev =
+                    outer.properties[pS->firstProperty + p];
+
+                float dPhi = phiShared - prev.phi;
+
+                if (dPhi < -std::numbers::pi_v<float>) {
+                  dPhi += 2 * std::numbers::pi_v<float>;
+                } else if (dPhi > std::numbers::pi_v<float>) {
+                  dPhi -= 2 * std::numbers::pi_v<float>;
+                }
+
+                // [CUT] triplet match: tangent dphi
+                if (std::abs(dPhi) > m_cfg.cutDPhiMax) {
+                  continue;
+                }
+
+                const float dcurv = tripletCurv - prev.curvature;
+
+                // [CUT] triplet match: dcurv
+                if (dcurv < -m_cfg.cutDCurvMax || dcurv > m_cfg.cutDCurvMax) {
+                  continue;
+                }
+
+                // [CUT] triplet match: tau ratio of the two fits
+                if (std::abs(prev.expEta * circle->invExpEta - 1.0f) >
+                    m_cfg.tauRatioCut + addTauRatioCorr +
+                        unresolvedStripCorr) {
+                  continue;
+                }
+
+                matched = true;
+                break;
+              }
+
+              // [CUT] no recorded triplet matched
+              if (!matched) {
+                continue;
+              }
+            }
+
+            // The triplet passed, so both its doublets belong in the graph.
+            const std::size_t nNewEdges =
+                (pS->edge == detail::kNoGbtsEdge ? 1u : 0u) +
+                (newDoublet.edge == detail::kNoGbtsEdge ? 1u : 0u);
+
+            // [CUT] graph full
+            if (edgeStorage.size() + nNewEdges > nMaxEdges) {
+              graphFull = true;
+              continue;
+            }
+
+            if (pS->edge == detail::kNoGbtsEdge) {
+              pS->edge = static_cast<std::uint32_t>(edgeStorage.size());
+              edgeStorage.emplace_back(n2Idx, pS->n2,
+                                       outer.expEta[inEdgeIdx]);
+            }
+
+            if (newDoublet.edge == detail::kNoGbtsEdge) {
+              newDoublet.edge =
+                  static_cast<std::uint32_t>(edgeStorage.size());
+              edgeStorage.emplace_back(n1Idx, n2Idx, expEta);
+            }
+
+            // record the tangent at n1 for later triplets through (n1, n2)
+            inner.properties.emplace_back(circle->expEta, tripletCurv,
+                                          circle->tangentPhi(0));
+            ++newDoublet.nProperties;
+
+            if (newDoublet.nProperties == detail::kGbtsMaxEdgeNeighbours) {
+              ++nSaturatedProperties;
+            }
+
+            // the outer edge takes the inner one as a neighbour
+            detail::DisplacedGbtsEdge& outerEdge = edgeStorage[pS->edge];
+
+            outerEdge.vNei[outerEdge.nNei] = newDoublet.edge;
+            ++outerEdge.nNei;
+            ++pS->nNei;
+
+            if (pS->nNei == detail::kGbtsMaxEdgeNeighbours) {
+              ++nSaturatedNeighbours;
+            }
+
+            nConnections++;
+          } // inEdgeIdx
         } // n2PhiIdx
       } // slw
 
-      // makes n1's edges visible to the next bin group in
+      // makes n1's doublets visible to the next bin group in
       edgeInfo[n1Idx].numEdges = numCreatedEdges;
     } // n1Idx
+
+    finishGroup(bg);
   } // bin groups
 
-  if (nEdges >= nMaxEdges) {
+  const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
+
+  ACTS_DEBUG("Made " << nDoublets << " doublets, holding at most "
+                     << maxHeldDoublets << " at once, and kept " << nEdges
+                     << " as graph edges");
+
+  if (graphFull) {
     ACTS_WARNING(
         "Maximum number of graph edges exceeded - possible efficiency loss "
         << nEdges);
@@ -832,6 +966,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
                  << " edges - possible efficiency loss");
   }
 
+  graph.nDoublets = nDoublets;
   graph.nConnections = nConnections;
   return graph;
 }

@@ -68,6 +68,10 @@ struct GbtsGraphConfig {
   bool doubletFilterRZ = true;
 
   /// Maximum number of GBTS edges/doublets per space point.
+  ///
+  /// @note The displaced graph only keeps the doublets a triplet passed
+  ///       through as edges, and this caps those, not the doublets it makes
+  ///       on the way.
   float maxEdgesPerSP = 30.0f;
 
   /// Minimum delta radius between layers.

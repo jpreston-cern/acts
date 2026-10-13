@@ -33,10 +33,13 @@ namespace Acts::Experimental{
   /// along its strip, the fitted tangent being the first direction good enough
   /// to do it with.
   ///
-  /// An edge therefore carries the triplets it is the inner edge of rather
-  /// than parameters of its own, and two edges are matched through those. The
-  /// levels and chain heads it produces are the prompt graph's, so the rest of
-  /// the workflow is unchanged.
+  /// A doublet therefore carries the triplets it is the inner doublet of
+  /// rather than parameters of its own, and two doublets are matched through
+  /// those. Dropping the beamline also makes for many more doublets than
+  /// triplets, so a doublet is only held until the bins that link to its own
+  /// are built, and only becomes an edge of the graph once a triplet passes
+  /// through it. The levels and chain heads it produces are the prompt
+  /// graph's, so the rest of the workflow is unchanged.
   class DisplacedGbtsGraphBuilder{
 
     public:
@@ -67,7 +70,9 @@ namespace Acts::Experimental{
     /// @param roi Region of interest descriptor
     /// @param nodeStorage Data storage containing nodes
     /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
-    /// @return The graph, with its edges and their link counts
+    /// @return The graph, with its edges and their link counts. The edges are
+    ///         the doublets some triplet passed through, in no particular
+    ///         order.
     detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
                                               GbtsNodeStorage& nodeStorage,
                                               float bFieldInZ) const;

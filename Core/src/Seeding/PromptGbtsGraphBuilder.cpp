@@ -692,6 +692,7 @@ detail::GbtsGraph<detail::GbtsEdge> PromptGbtsGraphBuilder::buildTheGraph(
         "Maximum number of graph edges exceeded - possible efficiency loss "
         << edgeStorage.size());
   }
+  graph.nDoublets = static_cast<std::uint32_t>(edgeStorage.size());
   graph.nConnections = nConnections;
   return graph;
 }

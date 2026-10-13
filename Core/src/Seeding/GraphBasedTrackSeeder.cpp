@@ -100,7 +100,8 @@ void GraphBasedTrackSeeder::createSeeds(GbtsNodeStorage& nodeStorage,
       graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
 
   ACTS_DEBUG("Created graph with " << graph.edgeStorage.size() << " edges and "
-                                   << graph.nConnections << " edge links");
+                                   << graph.nConnections << " edge links from "
+                                   << graph.nDoublets << " doublets");
 
   if (graph.edgeStorage.empty() || graph.nConnections == 0) {
     ACTS_WARNING("Missing edges or edge connections");

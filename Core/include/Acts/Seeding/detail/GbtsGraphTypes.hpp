@@ -238,6 +238,10 @@ struct GbtsGraph {
   /// The graph edges, i.e. the doublets.
   std::vector<edge_t> edgeStorage;
 
+  /// Number of doublets that passed the doublet cuts. The prompt graph keeps
+  /// every one as an edge; the displaced graph only those in a triplet.
+  std::uint32_t nDoublets = 0;
+
   /// Number of links between edges.
   std::uint32_t nConnections = 0;
 
