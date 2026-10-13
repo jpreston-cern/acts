@@ -230,8 +230,8 @@ inline float edgeExpEta(const GbtsEdge& edge) {
   return edge.p[0];
 }
 
-/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder` or
-/// `DisplacedGbtsGraph`.
+/// The doublet graph of the GBTS workflow, as built by `PromptGbtsGraphBuilder`
+/// or `DisplacedGbtsGraphBuilder`.
 /// @tparam edge_t The edge the builder makes, its `EdgeType`
 template <typename edge_t>
 struct GbtsGraph {

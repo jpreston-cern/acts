@@ -11,7 +11,7 @@
 #include "Acts/Definitions/Units.hpp"
 #include "Acts/EventData/SeedContainer.hpp"
 #include "Acts/EventData/SpacePointContainer.hpp"
-#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
 #include "Acts/Seeding/GbtsLayerConnection.hpp"
 #include "Acts/Seeding/GbtsRoiDescriptor.hpp"
@@ -354,7 +354,7 @@ SpacePointContainer makeSpacePoints(const ToyDetector& detector,
 /// The seeder and everything the displaced graph needs.
 struct SeederSetup {
   Experimental::GraphBasedTrackSeeder seeder;
-  Experimental::DisplacedGbtsGraph graph;
+  Experimental::DisplacedGbtsGraphBuilder graph;
   Experimental::GbtsTrackingFilter filter;
   Experimental::GbtsRoiDescriptor roi;
   Experimental::GraphBasedTrackSeeder::Options options;
@@ -394,7 +394,7 @@ SeederSetup makeSeeder(const ToyDetector& detector,
       .seeder = Experimental::GraphBasedTrackSeeder(
           Experimental::GraphBasedTrackSeeder::DerivedConfig(config), geometry,
           makeLogger()),
-      .graph = Experimental::DisplacedGbtsGraph(graphConfig, geometry,
+      .graph = Experimental::DisplacedGbtsGraphBuilder(graphConfig, geometry,
                                                 makeLogger()),
       .filter = Experimental::GbtsTrackingFilter(filterConfig, geometry,
                                                 makeLogger()),

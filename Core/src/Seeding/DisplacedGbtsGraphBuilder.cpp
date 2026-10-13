@@ -1,4 +1,4 @@
-#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
@@ -88,14 +88,14 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
 }  // namespace
 
-  DisplacedGbtsGraph::DisplacedGbtsGraph(const Config& config,
+  DisplacedGbtsGraphBuilder::DisplacedGbtsGraphBuilder(const Config& config,
                      std::shared_ptr<const GbtsGeometry> geometry,
                      std::unique_ptr<const Acts::Logger> logger)
     : m_cfg(config),
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-  detail::GbtsGraph<detail::DisplacedGbtsEdge> DisplacedGbtsGraph::buildTheGraph(
+  detail::GbtsGraph<detail::DisplacedGbtsEdge> DisplacedGbtsGraphBuilder::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
     const float bFieldInZ) const {
   detail::GbtsGraph<detail::DisplacedGbtsEdge> graph;
@@ -785,7 +785,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   return graph;
 }
 
-std::optional<detail::TripletCircle> DisplacedGbtsGraph::fitTripletCircle(
+std::optional<detail::TripletCircle> DisplacedGbtsGraphBuilder::fitTripletCircle(
     const std::array<std::array<float, 3>, 3>& points) const {
   detail::TripletCircle circle{};
 

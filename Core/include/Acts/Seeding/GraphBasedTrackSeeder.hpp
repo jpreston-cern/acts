@@ -135,10 +135,10 @@ class GraphBasedTrackSeeder {
   /// Convenience wrapper that builds and finalizes the node storage itself. The
   /// container must carry the `gbtsLayerIndex`, `clusterWidth` and
   /// `localPositionY` columns.
-  /// @tparam graph_builder_t The graph builder, `GbtsGraphBuilder` for
-  ///                         prompt tracks or `DisplacedGbtsGraph` for large
-  ///                         radius ones. Its `EdgeType` says which edge the
-  ///                         two carry.
+  /// @tparam graph_builder_t The graph builder, `PromptGbtsGraphBuilder` for
+  ///                         prompt tracks or `DisplacedGbtsGraphBuilder` for
+  ///                         large radius ones. Its `EdgeType` says which edge
+  ///                         the two carry.
   /// @param spacePoints Space point container
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder

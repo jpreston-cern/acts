@@ -6,7 +6,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
+#include "Acts/Seeding/PromptGbtsGraphBuilder.hpp"
 
 #include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
 #include "Acts/SpacePointFormation/detail/StripSpacePointCalibrationImpl.hpp"
@@ -56,7 +56,7 @@ struct SlidingWindow {
 /// @param tauRatioCut Tau ratio cut threshold
 /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
 /// @return Whether the triplet is accepted
-bool validateTriplet(const GbtsGraphBuilder::Config& cfg,
+bool validateTriplet(const PromptGbtsGraphBuilder::Config& cfg,
                      const detail::GbtsNodeView& nodeView,
                      const std::array<SpacePointIndex, 3>& candidateTriplet,
                      const float tripletMinPt, const float tauRatio,
@@ -141,7 +141,7 @@ bool validateTriplet(const GbtsGraphBuilder::Config& cfg,
 /// @param z0 Estimated z0 of segments z value at beamspot
 /// @param z0HistoCoeff Scalfactor that converts z coodindate into bin index
 /// @return Whether segment is within beamspot range
-bool checkZ0BitMask(const GbtsGraphBuilder::Config& cfg,
+bool checkZ0BitMask(const PromptGbtsGraphBuilder::Config& cfg,
                     const std::uint16_t z0BitMask, const float z0,
                     const float z0HistoCoeff) {
   if (z0BitMask == 0) {
@@ -185,9 +185,9 @@ bool checkZ0BitMask(const GbtsGraphBuilder::Config& cfg,
 
 }  // namespace
 
-GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
-                                   std::shared_ptr<const GbtsGeometry> geometry,
-                                   std::unique_ptr<const Acts::Logger> logger)
+PromptGbtsGraphBuilder::PromptGbtsGraphBuilder(
+    const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
+    std::unique_ptr<const Acts::Logger> logger)
     : m_cfg(config),
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {
@@ -195,16 +195,16 @@ GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
   // which assumes the corrections only ever widen the cut.
   if (m_cfg.tauRatioCorr < 0) {
     throw std::invalid_argument(
-        "GbtsGraphBuilder: tauRatioCorr must not be negative");
+        "PromptGbtsGraphBuilder: tauRatioCorr must not be negative");
   }
 
   if (m_cfg.tauRatioCorrStrip < 0) {
     throw std::invalid_argument(
-        "GbtsGraphBuilder: tauRatioCorrStrip must not be negative");
+        "PromptGbtsGraphBuilder: tauRatioCorrStrip must not be negative");
   }
 }
 
-detail::GbtsGraph<detail::GbtsEdge> GbtsGraphBuilder::buildTheGraph(
+detail::GbtsGraph<detail::GbtsEdge> PromptGbtsGraphBuilder::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
     const float bFieldInZ) const {
   detail::GbtsGraph<detail::GbtsEdge> graph;

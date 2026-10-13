@@ -33,7 +33,7 @@ namespace Acts::Experimental {
 ///
 /// The phi binning is the node storage's, so the sliding windows and the
 /// indexing they slide over cannot disagree.
-class GbtsGraphBuilder {
+class PromptGbtsGraphBuilder {
  public:
   /// The edge this graph builds, so that the seeder and the filter can follow
   /// a graph to its edge type rather than being told both.
@@ -46,11 +46,10 @@ class GbtsGraphBuilder {
   /// @param config Configuration for the graph
   /// @param geometry GBTS geometry
   /// @param logger Logging instance
-  GbtsGraphBuilder(const Config& config,
-                   std::shared_ptr<const GbtsGeometry> geometry,
-                   std::unique_ptr<const Acts::Logger> logger =
-                       Acts::getDefaultLogger("GbtsGraphBuilder",
-                                              Acts::Logging::Level::INFO));
+  PromptGbtsGraphBuilder(
+      const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
+      std::unique_ptr<const Acts::Logger> logger = Acts::getDefaultLogger(
+          "PromptGbtsGraphBuilder", Acts::Logging::Level::INFO));
 
   /// Access the configuration.
   /// @return The configuration

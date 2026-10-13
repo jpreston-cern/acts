@@ -8,9 +8,9 @@
 
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
 
-#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
+#include "Acts/Seeding/PromptGbtsGraphBuilder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -388,23 +388,24 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 }
 
 // The seeder is written once and built for each graph builder that exists.
-template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
+template void GraphBasedTrackSeeder::createSeeds<PromptGbtsGraphBuilder>(
     const SpacePointContainer&, const GbtsRoiDescriptor&,
-    const GbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
+    const PromptGbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
     SeedContainer&) const;
 
-template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
-    GbtsNodeStorage&, const GbtsRoiDescriptor&, const GbtsGraphBuilder&,
+template void GraphBasedTrackSeeder::createSeeds<PromptGbtsGraphBuilder>(
+    GbtsNodeStorage&, const GbtsRoiDescriptor&, const PromptGbtsGraphBuilder&,
     const GbtsTrackingFilter&, const Options&, SeedContainer&) const;
 
-template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraph>(
+template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraphBuilder>(
     const SpacePointContainer&, const GbtsRoiDescriptor&,
-    const DisplacedGbtsGraph&, const GbtsTrackingFilter&, const Options&,
+    const DisplacedGbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
     SeedContainer&) const;
 
-template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraph>(
-    GbtsNodeStorage&, const GbtsRoiDescriptor&, const DisplacedGbtsGraph&,
-    const GbtsTrackingFilter&, const Options&, SeedContainer&) const;
+template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraphBuilder>(
+    GbtsNodeStorage&, const GbtsRoiDescriptor&,
+    const DisplacedGbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
+    SeedContainer&) const;
 
 float GraphBasedTrackSeeder::estimateCurvature(
     const detail::GbtsNodeView& nodeView,

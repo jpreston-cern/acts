@@ -100,13 +100,13 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   m_cfg.graphConfig.minZ0 = m_internalRoi->zMin();
 
   if (m_cfg.useDisplacedGraph) {
-    m_displacedGraph.emplace(
+    m_displacedGraphBuilder.emplace(
         m_cfg.graphConfig, m_geometry,
-        this->logger().cloneWithSuffix("DisplacedGbtsGraph"));
+        this->logger().cloneWithSuffix("DisplacedGbtsGraphBuilder"));
   } else {
-    m_gbtsGraphBuilder.emplace(
+    m_promptGraphBuilder.emplace(
         m_cfg.graphConfig, m_geometry,
-        this->logger().cloneWithSuffix("GbtsGraphBuilder"));
+        this->logger().cloneWithSuffix("PromptGbtsGraphBuilder"));
   }
 
   m_finder.emplace(Acts::Experimental::GraphBasedTrackSeeder::DerivedConfig(
@@ -161,12 +161,12 @@ ProcessCode GraphBasedSeedingAlgorithm::execute(
 
   // the seeder is written once over the graph builder, so the mode is just
   // which of the two it is handed
-  if (m_displacedGraph.has_value()) {
-    m_finder->createSeeds(nodeStorage, m_internalRoi.value(), *m_displacedGraph,
-                          *m_filter, options, seeds);
+  if (m_displacedGraphBuilder.has_value()) {
+    m_finder->createSeeds(nodeStorage, m_internalRoi.value(),
+                          *m_displacedGraphBuilder, *m_filter, options, seeds);
   } else {
     m_finder->createSeeds(nodeStorage, m_internalRoi.value(),
-                          *m_gbtsGraphBuilder, *m_filter, options, seeds);
+                          *m_promptGraphBuilder, *m_filter, options, seeds);
   }
 
   m_outputSeeds(ctx, std::move(seeds));
@@ -359,8 +359,8 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("minSeedLevel: " << static_cast<std::uint32_t>(cfg1.minSeedLevel));
   ACTS_DEBUG("addTriplets: " << cfg1.addTriplets);
   ACTS_DEBUG("maxAbsEtaAddTriplets: " << cfg1.maxAbsEtaAddTriplets);
-  ACTS_DEBUG((m_cfg.useDisplacedGraph ? "=====DisplacedGbtsGraph====="
-                                      : "=====GbtsGraphBuilder====="));
+  ACTS_DEBUG((m_cfg.useDisplacedGraph ? "=====DisplacedGbtsGraphBuilder====="
+                                      : "=====PromptGbtsGraphBuilder====="));
   const auto &cfg2 = m_cfg.graphConfig;
   ACTS_DEBUG("matchBeforeCreate: " << cfg2.matchBeforeCreate);
   ACTS_DEBUG("tauRatioCut: " << cfg2.tauRatioCut);

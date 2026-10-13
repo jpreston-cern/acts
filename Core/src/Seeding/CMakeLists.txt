@@ -18,12 +18,12 @@ target_sources(
         TripletSeedFinder.cpp
         TripletSeeder.cpp
         GbtsNodeStorage.cpp
-        GbtsGraphBuilder.cpp
+        PromptGbtsGraphBuilder.cpp
         GbtsGeometry.cpp
         GbtsTrackingFilter.cpp
         GraphBasedTrackSeeder.cpp
         GbtsRoiDescriptor.cpp
         GbtsLayerConnectionTool.cpp
         HoughAccumulatorSection.cpp
-        DisplacedGbtsGraph.cpp
+        DisplacedGbtsGraphBuilder.cpp
 )

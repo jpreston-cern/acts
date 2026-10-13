@@ -27,8 +27,8 @@ namespace Acts::Experimental {
 
 class GraphBasedTrackSeeder;
 class GbtsGeometry;
-class GbtsGraphBuilder;
-class DisplacedGbtsGraph;
+class PromptGbtsGraphBuilder;
+class DisplacedGbtsGraphBuilder;
 
 /// Storage for the GBTS graph nodes.
 ///
@@ -147,8 +147,8 @@ class GbtsNodeStorage final {
  private:
   // Only the seeder builds one, and only it and the graph walk the nodes.
   friend class GraphBasedTrackSeeder;
-  friend class GbtsGraphBuilder;
-  friend class DisplacedGbtsGraph;
+  friend class PromptGbtsGraphBuilder;
+  friend class DisplacedGbtsGraphBuilder;
 
   /// Configuration for node loading.
   struct Config {
