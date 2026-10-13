@@ -18,7 +18,7 @@ target_sources(
         TripletSeedFinder.cpp
         TripletSeeder.cpp
         GbtsNodeStorage.cpp
-        GbtsGraphBuilder.cpp
+        PromptGbtsGraphBuilder.cpp
         GbtsGeometry.cpp
         GbtsSeedFit.cpp
         GbtsTrackingFilter.cpp
@@ -26,5 +26,5 @@ target_sources(
         GbtsRoiDescriptor.cpp
         GbtsLayerConnectionTool.cpp
         HoughAccumulatorSection.cpp
-        DisplacedGbtsGraph.cpp
+        DisplacedGbtsGraphBuilder.cpp
 )

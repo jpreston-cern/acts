@@ -293,9 +293,9 @@ circle. Neither do they fix @f$z_0@f$, which the prompt form takes as @f$z_1 -
 r_1\tau@f$ — true only for a track leaving the beamline radially.
 
 For a track from a displaced vertex all of that is unavailable at doublet stage.
-@ref Acts::Experimental::DisplacedGbtsGraph builds the same kind of graph without
+@ref Acts::Experimental::DisplacedGbtsGraphBuilder builds the same kind of graph without
 it. It is a drop-in alternative to
-@ref Acts::Experimental::GbtsGraphBuilder "GbtsGraphBuilder" — same node
+@ref Acts::Experimental::PromptGbtsGraphBuilder "PromptGbtsGraphBuilder" — same node
 storage, same configuration object, same seed candidates and clone removal, and
 the seeder is written once over either. The one step it does differently is how
 it finds the paths through its graph, see @ref gbts-lrt-chains.
@@ -467,7 +467,7 @@ takes as `graphConfig` and exposes to Python as `GbtsGraphBuilderConfig`.
 it to whichever it runs; what differs is not which knobs exist but where each
 one bites, and the fields whose meaning moves say so.
 
-Fields marked *prompt* are read by @ref Acts::Experimental::GbtsGraphBuilder
+Fields marked *prompt* are read by @ref Acts::Experimental::PromptGbtsGraphBuilder
 alone.
 
 | Option | Stage | Effect |
@@ -523,8 +523,8 @@ separately controls the chain-following filter of @ref gbts-extraction "seed ext
   @ref Acts::Experimental::GbtsGraphConfig, shared by both builders. The seeder
   and @ref Acts::Experimental::GbtsTrackingFilter are templated on the graph,
   which names its own edge type, so the call sites deduce it.
-- Graph builders: @ref Acts::Experimental::GbtsGraphBuilder and
-  @ref Acts::Experimental::DisplacedGbtsGraph. The displaced EDM -
+- Graph builders: @ref Acts::Experimental::PromptGbtsGraphBuilder and
+  @ref Acts::Experimental::DisplacedGbtsGraphBuilder. The displaced EDM -
   `DisplacedGbtsEdge`, `TripletProperties` and the `TripletCircle` the fit
   returns - lives in `Acts/Seeding/detail/DisplacedGraphTypes.hpp`.
 - Node storage: @ref Acts::Experimental::GbtsNodeStorage. The graph EDM it

@@ -23,7 +23,7 @@ namespace Acts::Experimental{
   /// The doublet graph of the GBTS workflow, built without assuming the track
   /// came from the beamline.
   ///
-  /// Does the same job as @c GbtsGraphBuilder and takes the same configuration, but
+  /// Does the same job as @c PromptGbtsGraphBuilder and takes the same configuration, but
   /// a doublet here cannot be read for a curvature, an azimuth at the perigee
   /// or a @c z0: all three of those come from treating the beamline as a third
   /// point on the circle, which is exactly the assumption large radius
@@ -36,7 +36,7 @@ namespace Acts::Experimental{
   /// than parameters of its own, and two edges are matched through those. The
   /// levels and chain heads it produces are the prompt graph's, so the rest of
   /// the workflow is unchanged.
-  class DisplacedGbtsGraph{
+  class DisplacedGbtsGraphBuilder{
 
     public:
 
@@ -53,9 +53,9 @@ namespace Acts::Experimental{
     /// @param config Configuration for the graph
     /// @param geometry GBTS geometry
     /// @param logger Logging instance
-    DisplacedGbtsGraph(const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
+    DisplacedGbtsGraphBuilder(const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
                        std::unique_ptr<const Acts::Logger> logger = Acts::getDefaultLogger(
-                           "DisplacedGbtsGraph", Acts::Logging::Level::INFO));
+                           "DisplacedGbtsGraphBuilder", Acts::Logging::Level::INFO));
 
     /// Access the configuration, which also carries the chain selection that
     /// seed extraction has to agree with.

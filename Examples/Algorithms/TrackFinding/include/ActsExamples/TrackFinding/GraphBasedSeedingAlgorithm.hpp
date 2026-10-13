@@ -16,9 +16,9 @@
 #include "Acts/Geometry/TrackingGeometry.hpp"
 #include "Acts/MagneticField/MagneticFieldProvider.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
-#include "Acts/Seeding/DisplacedGbtsGraph.hpp"
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsLayerConnection.hpp"
+#include "Acts/Seeding/PromptGbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
 #include "ActsExamples/EventData/Cluster.hpp"
@@ -159,10 +159,12 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
   /// graph used in creating and extracting edges, edge connections
   /// and valid chains. Exactly one of the two is engaged, by
   /// `Config::useDisplacedGraph`.
-  std::optional<Acts::Experimental::GbtsGraphBuilder> m_gbtsGraphBuilder;
+  std::optional<Acts::Experimental::PromptGbtsGraphBuilder>
+      m_promptGraphBuilder;
 
-  /// the large radius graph, engaged in place of `m_gbtsGraphBuilder`
-  std::optional<Acts::Experimental::DisplacedGbtsGraph> m_displacedGraph;
+  /// the large radius graph, engaged in place of `m_promptGraphBuilder`
+  std::optional<Acts::Experimental::DisplacedGbtsGraphBuilder>
+      m_displacedGraphBuilder;
 
   /// filter used to extract seed candidates from graph
   std::optional<Acts::Experimental::GbtsTrackingFilter> m_filter;
