@@ -81,7 +81,8 @@ struct GbtsGraphConfig {
   ///
   /// @note The displaced graph also reads this at doublet stage, where d0 is
   ///       still unknown: it sets the width of the z0 band and of the phi
-  ///       window. Opening it there costs combinatorics, not just acceptance.
+  ///       window, and how straight a circle through the doublet may be made.
+  ///       Opening it there costs combinatorics, not just acceptance.
   float d0Max = 3.0f * Acts::UnitConstants::mm;
 
   /// Maximum difference in allowed tangent between candidate edge
@@ -104,8 +105,20 @@ struct GbtsGraphConfig {
 
   /// Maximum |curvature| above `curvatureSplitAbsTau`, before that scaling.
   /// Applied to a doublet by the prompt graph and to a fitted triplet by the
-  /// displaced one, which has no curvature until then.
+  /// displaced one, which has no curvature until then. A displaced doublet is
+  /// held to the looser of the two limits, by the least curvature a circle
+  /// through it can have and still pass within `d0Max` of the beamline.
   float maxCurvatureHighEta = 4.75e-4f / Acts::UnitConstants::mm;
+
+  /// How much looser that doublet limit is where calibration is on and an end
+  /// is an endcap strip, which has still to slide along its strip and turns
+  /// the chord as it goes. It is the same as dividing `minPt` by this for
+  /// those doublets. The slide moves the chord's line rather than bending it,
+  /// so no value is both lossless and useful: around 2 loses few doublets and
+  /// still cuts, around 5 loses none and cuts nothing.
+  ///
+  /// @note Displaced only.
+  float curvatureScaleEndcapStrip = 2.0f;
 
   /// Maximum |curvature| below `curvatureSplitAbsTau`, before that scaling.
   float maxCurvatureLowEta = 3.75e-4f / Acts::UnitConstants::mm;

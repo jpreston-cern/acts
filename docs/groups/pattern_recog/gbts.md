@@ -291,12 +291,12 @@ once over either.
 | Quantity | Prompt | Displaced |
 | --- | --- | --- |
 | @f$\tau = \cot\theta@f$ | @f$\Delta z/\Delta r@f$ | @f$\Delta z/\mathrm{chord}@f$ |
-| curvature | from the pair | **not determined** |
+| curvature | from the pair | **only a floor** |
 | azimuth at the perigee | from the pair | **not determined** |
 | @f$z_0@f$ | a value | **a band** |
 
-So the doublet stage keeps only the @f$r@f$–@f$z@f$ (non-bending) plane, and the
-cuts that lived there change shape:
+So the doublet stage keeps the @f$r@f$–@f$z@f$ (non-bending) plane, where the
+cuts change shape, and of the bending plane only what `d0Max` leaves of it:
 
 - **The @f$z_0@f$ band.** @f$z@f$ is linear in the transverse path @f$S_1@f$ from
   the perigee to the inner hit, and @f$S_1 = \sqrt{r_1^2 - d_0^2}@f$ with
@@ -312,10 +312,31 @@ cuts that lived there change shape:
   difference. A layer inside the @f$d_0@f$ limit takes the limit down to its own
   radius, since a track only reaches radius @f$r@f$ if its @f$\lvert d_0\rvert@f$
   is below @f$r@f$.
-- **No curvature cut.** There is no curvature yet to cut on.
+- **A floor on the curvature.** There is no curvature yet to cut on, but of
+  the circles through two points that pass within @f$d_0^{\max}@f$ of the
+  beamline one bends least: not at all if the chord's own line already passes
+  that close, and otherwise the circle that just grazes the limit. A track inside
+  the curvature bound needs that floor inside it too, so a doublet whose floor is
+  above the looser of the two bounds is dropped. This is the interaction point
+  cut of `DoubletSeedFinder` taken exactly, as its small @f$d_0/r@f$ forms give
+  out once @f$d_0^{\max}@f$ nears the layer radius. The fitted circle of a
+  triplet that passes its own @f$d_0@f$ and curvature cuts is one of those
+  circles, so the floor never costs a doublet such a triplet needed.
+
+  An endcap strip end has still to slide along its strip, which is radial, and
+  turns the chord as it goes. Such a doublet is not skipped but held to a limit
+  `curvatureScaleEndcapStrip` times looser, which is the same as lowering
+  `minPt` by that factor for it. The guarantee above does not survive this: the
+  slide moves the chord's line, which reads as a shift in @f$d_0@f$ rather than
+  in @f$p_T@f$, so a straight track can be handed any curvature and no factor is
+  both lossless and useful. The factor is a trade to tune, not a bound.
 
 The price is combinatorics, and `d0Max` sets its scale: it widens the
-@f$\phi@f$ window and the @f$z_0@f$ band together.
+@f$\phi@f$ window and the @f$z_0@f$ band together, and lowers the curvature
+floor. The floor and the @f$\phi@f$ window read the same two quantities, so on a
+pair of barrel layers, whose nodes sit at the radii the window was sized for,
+the floor finds little left to reject. It earns its square root where a bin
+spans a range of radii and the window had to be sized for the widest pair in it.
 
 ### The triplet fit {#gbts-lrt-fit}
 
@@ -448,7 +469,8 @@ alone.
 | `tauRatioCorrStrip` | @ref gbts-graph | widen it again where an end is an unresolved strip. Displaced, this comes back off once the triplet has resolved it |
 | `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip. Prompt: per doublet, against the chord. Displaced: per triplet, against the fitted tangent |
 | `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
-| `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have. Displaced, it also sets the @f$z_0@f$ band and the @f$\phi@f$ window, so it drives the combinatorics |
+| `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |
+| `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have. Displaced, it also sets the @f$z_0@f$ band, the @f$\phi@f$ window and the curvature floor of a doublet, so it drives the combinatorics |
 | `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency |
 | `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth`, `matchBeforeCreateMaxEdges` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that depth in the barrel |
 | `z0HistogramMaxDepth`, `z0Resolution` | @ref gbts-graph | *prompt*: @f$z_0@f$ histogram cut, down to that depth in the barrel |

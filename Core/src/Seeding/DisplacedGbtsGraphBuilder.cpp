@@ -119,6 +119,12 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   // for the precuts that run before the fitted tau picks one of the two
   const float curvatureCutLoosest =
       std::max(curvatureCutLowEta, curvatureCutHighEta);
+  const float curvatureCutLoosestSquare =
+      curvatureCutLoosest * curvatureCutLoosest;
+  // the same for a doublet with an end that calibration will still slide
+  const float curvatureCutSlidingSquare = curvatureCutLoosestSquare *
+                                          m_cfg.curvatureScaleEndcapStrip *
+                                          m_cfg.curvatureScaleEndcapStrip;
 
   // the loosest tau ratio threshold the triplet matching can apply
   const float maxTauRatioCut =
@@ -283,13 +289,18 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
 
+        // Whether either end of the doublet will slide radially under
+        // calibration (an endcap strip), taking the chord with it. The
+        // doublet curvature cut is then loosened, and the turn cut waits for
+        // the ends to settle.
+        const bool doubletSlides =
+            calibrate && (slidesRadially(B1.type, B1.technology) ||
+                          slidesRadially(slw.type, slw.technology));
+
         // The turn cut is skipped when switched off, or when an end will
-        // slide radially under calibration (an endcap strip). Settled here for
-        // the inner two nodes; the third is checked per candidate.
-        const bool innerSkipTurn =
-            !m_cfg.useTurnAngleCut ||
-            (calibrate && (slidesRadially(B1.type, B1.technology) ||
-                           slidesRadially(slw.type, slw.technology)));
+        // slide. Settled here for the inner two nodes; the third is checked
+        // per candidate.
+        const bool innerSkipTurn = !m_cfg.useTurnAngleCut || doubletSlides;
 
         // deltaPhi is the half width: displacement and charge are both
         // symmetric about phi1
@@ -380,6 +391,46 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
             // may pass on different d0; `tripletFilterRZ` tightens this.
             if (std::max(zOutA, zOutB) < cutZMinU ||
                 std::min(zOutA, zOutB) > cutZMaxU) {
+              continue;
+            }
+          }
+
+          // Two points fix no circle, but of the circles through them that
+          // pass within d0Max of the beamline one bends least, and a track
+          // inside the curvature limit needs that one inside it too. This is
+          // the interaction point cut of `DoubletSeedFinder`, taken exactly:
+          // its small d0Max / r forms do not hold where d0Max nears r1.
+          //
+          // A chord whose own line passes within d0Max is straight enough for
+          // any limit. Otherwise, with the centre a distance t along the
+          // chord's bisector, |d0| = d0Max is a quadratic in t and its larger
+          // root is the widest circle. Lengths are carried times the chord, so
+          // there is no division. Costs a square root, hence after the RZ cuts.
+          //
+          // Nominal positions: an endcap strip end has still to slide, which
+          // turns the chord, so such a doublet is held to a limit
+          // `curvatureScaleEndcapStrip` times looser instead.
+
+          // chord times the distance from the beamline to the chord's line
+          const float chordTimesMiss = std::abs(x1 * dy - y1 * dx);
+          const float chordTimesD0Max = m_cfg.d0Max * chord;
+
+          if (chordTimesMiss > chordTimesD0Max) {
+            const float delta = chordTimesMiss * chordTimesMiss -
+                                chordTimesD0Max * chordTimesD0Max;
+            const float dot =
+                x1 * position2[0] + y1 * position2[1] - d0MaxSquare;
+            // 2 * t * delta / chord, for the larger root
+            const float root = std::abs(dot) * chordTimesMiss +
+                               chordTimesD0Max * std::sqrt(dot * dot + delta);
+
+            // [CUT] doublet curvature: the least any circle through the
+            // doublet can have, delta / (chord * hypot(delta, root)), against
+            // the loosest limit
+            if ((doubletSlides ? curvatureCutSlidingSquare
+                               : curvatureCutLoosestSquare) *
+                    chord * chord * (delta * delta + root * root) <
+                delta * delta) {
               continue;
             }
           }

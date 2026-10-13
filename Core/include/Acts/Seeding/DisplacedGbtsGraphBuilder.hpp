@@ -27,10 +27,11 @@ namespace Acts::Experimental{
   /// a doublet here cannot be read for a curvature, an azimuth at the perigee
   /// or a @c z0: all three of those come from treating the beamline as a third
   /// point on the circle, which is exactly the assumption large radius
-  /// tracking drops. So the doublet stage keeps to the non-bending plane and
-  /// everything else waits for a triplet fit, which is also where a strip end
-  /// is resolved along its strip, the fitted tangent being the first direction
-  /// good enough to do it with.
+  /// tracking drops. So the doublet stage keeps to the non-bending plane, but
+  /// for a floor on the curvature that @c d0Max leaves it, and everything else
+  /// waits for a triplet fit, which is also where a strip end is resolved
+  /// along its strip, the fitted tangent being the first direction good enough
+  /// to do it with.
   ///
   /// An edge therefore carries the triplets it is the inner edge of rather
   /// than parameters of its own, and two edges are matched through those. The
