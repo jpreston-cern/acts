@@ -105,6 +105,14 @@ struct TripletCircle {
   }
 };
 
+/// Maximum number of neighbouring edges recorded per displaced graph edge, and
+/// of triplets a displaced doublet is the inner doublet of. Larger than the
+/// prompt @c kGbtsMaxEdgeNeighbours, as without the beamline constraint more
+/// doublets match. Must fit the @c std::uint8_t counters below.
+static constexpr std::uint32_t kDisplacedGbtsMaxEdgeNeighbours = 25;
+static_assert(kDisplacedGbtsMaxEdgeNeighbours <=
+              std::numeric_limits<std::uint8_t>::max());
+
 /// What @c DisplacedGbtsDoublet::edge holds until the doublet is in a triplet.
 constexpr std::uint32_t kNoGbtsEdge = std::numeric_limits<std::uint32_t>::max();
 
@@ -187,8 +195,8 @@ struct DisplacedGbtsDoublet final {
   std::uint8_t nNei{0};
 
   /// How many triplets this is the inner doublet of, at most
-  /// @c kGbtsMaxEdgeNeighbours. Zero while the doublet is the outermost pair
-  /// of every chain it could start.
+  /// @c kDisplacedGbtsMaxEdgeNeighbours. Zero while the doublet is the
+  /// outermost pair of every chain it could start.
   std::uint8_t nProperties{0};
 };
 //! [displaced doublet]
@@ -220,7 +228,7 @@ struct DisplacedGbtsEdge final {
   /// displaced edge knows about itself before a triplet fit.
   float expEta{};
 
-  std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
+  std::array<std::uint32_t, kDisplacedGbtsMaxEdgeNeighbours> vNei{};
 };
 //! [displaced edge]
 
