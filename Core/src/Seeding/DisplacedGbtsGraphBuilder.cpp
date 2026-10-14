@@ -608,7 +608,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                ++inEdgeIdx) {
             // [CUT] new doublet's triplet count full: an unrecorded triplet
             // could not be matched later anyway
-            if (newDoublet.nProperties >= detail::kGbtsMaxEdgeNeighbours) {
+            if (newDoublet.nProperties >=
+                detail::kDisplacedGbtsMaxEdgeNeighbours) {
               break;
             }
 
@@ -623,7 +624,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             detail::DisplacedGbtsDoublet* pS = &outer.doublets[inEdgeIdx];
 
             // [CUT] outer edge's neighbour array full
-            if (pS->nNei >= detail::kGbtsMaxEdgeNeighbours) {
+            if (pS->nNei >= detail::kDisplacedGbtsMaxEdgeNeighbours) {
               continue;
             }
 
@@ -925,7 +926,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                                           circle->tangentPhi(0));
             ++newDoublet.nProperties;
 
-            if (newDoublet.nProperties == detail::kGbtsMaxEdgeNeighbours) {
+            if (newDoublet.nProperties ==
+                detail::kDisplacedGbtsMaxEdgeNeighbours) {
               ++nSaturatedProperties;
             }
 
@@ -936,7 +938,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             ++outerEdge.nNei;
             ++pS->nNei;
 
-            if (pS->nNei == detail::kGbtsMaxEdgeNeighbours) {
+            if (pS->nNei == detail::kDisplacedGbtsMaxEdgeNeighbours) {
               ++nSaturatedNeighbours;
             }
 
@@ -966,14 +968,14 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
   if (nSaturatedNeighbours > 0) {
     ACTS_WARNING("Maximum number of edge connections ("
-                 << detail::kGbtsMaxEdgeNeighbours << ") reached on "
+                 << detail::kDisplacedGbtsMaxEdgeNeighbours << ") reached on "
                  << nSaturatedNeighbours << " of " << nEdges
                  << " edges - possible efficiency loss");
   }
 
   if (nSaturatedProperties > 0) {
     ACTS_WARNING("Maximum number of recorded triplets ("
-                 << detail::kGbtsMaxEdgeNeighbours << ") reached on "
+                 << detail::kDisplacedGbtsMaxEdgeNeighbours << ") reached on "
                  << nSaturatedProperties << " of " << nEdges
                  << " edges - possible efficiency loss");
   }
