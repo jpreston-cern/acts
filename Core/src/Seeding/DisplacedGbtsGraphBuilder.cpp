@@ -87,6 +87,31 @@ constexpr bool slidesRadially(GbtsLayerType type,
          technology == GbtsLayerTechnology::Strip;
 }
 
+/// The first of a node's doublets, sorted by exp(eta), that can lie within
+/// a tau ratio of `ratio` of a doublet with exp(eta) `expEta`, and the
+/// exp(eta) past which none can. The ends are padded a little so that the
+/// exact test, which the caller still makes, decides at the boundary.
+///
+/// @param sortedExpEta exp(eta) of the bin's doublets
+/// @param first The node's first doublet
+/// @param last One past the node's last doublet
+/// @param expEta exp(eta) of the doublet being matched
+/// @param ratio The tau ratio threshold
+/// @return The first doublet to try, and the exp(eta) to stop past
+std::pair<std::uint32_t, float> tauRatioWindow(
+    const std::vector<float>& sortedExpEta, const std::uint32_t first,
+    const std::uint32_t last, const float expEta, const float ratio) {
+  // |e / expEta - 1| <= ratio for e in expEta * [1 - ratio, 1 + ratio]
+  constexpr float pad = 1e-5f;
+  const float low = expEta * (1.0f - ratio) * (1.0f - pad);
+  const float high = expEta * (1.0f + ratio) * (1.0f + pad);
+
+  const auto begin = sortedExpEta.begin();
+  const auto it = std::lower_bound(begin + first, begin + last, low);
+
+  return {static_cast<std::uint32_t>(it - begin), high};
+}
+
 /// exp(eta) of the chord between two points.
 ///
 /// @param inner The inner point
@@ -123,6 +148,104 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
   const float sagittaTerm = curvature * chord;
 
   return chord * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
+}
+
+/// Fit the circle through the three nodes of a triplet.
+///
+/// The transverse plane is inverted about the middle node, which maps every
+/// circle through that node onto a straight line, so the fit is the line
+/// through the two remaining nodes and needs no iteration. Kept here rather
+/// than as a member so that the triplet loop, which calls it for every
+/// candidate, can have it inlined, which the compiler does not judge worth
+/// doing for a loop that size unless told.
+///
+/// @param points The three node positions, inside out
+/// @return The circle, or nothing if the nodes are degenerate
+[[gnu::always_inline]] inline std::optional<detail::TripletCircle>
+fitTripletCircle(
+    const std::array<std::array<float, 3>, 3>& points) {
+  detail::TripletCircle circle{};
+
+  const float x0 = points[1][0];
+  const float y0 = points[1][1];
+  const float r0 = fastHypot(x0, y0);
+
+  if (r0 == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float cosA = x0 / r0;
+  const float sinA = y0 / r0;
+
+  circle.cosMid = cosA;
+  circle.sinMid = sinA;
+
+  // conformal mapping with the center at the middle spacepoint
+  std::array<float, 2> u{};
+  std::array<float, 2> v{};
+
+  for (std::uint32_t k = 0; k < 2; k++) {
+    const std::uint32_t spIdx = (k == 1) ? 2 : 0;
+
+    const float dx = points[spIdx][0] - x0;
+    const float dy = points[spIdx][1] - y0;
+
+    const float d2 = dx * dx + dy * dy;
+
+    if (d2 == 0.0f) {
+      return std::nullopt;
+    }
+
+    const float r2Inv = 1.0f / d2;
+
+    const float xn = dx * cosA + dy * sinA;
+    const float yn = -dx * sinA + dy * cosA;
+
+    circle.local[spIdx] = {xn, yn};
+
+    u[k] = xn * r2Inv;
+    v[k] = yn * r2Inv;
+  }
+
+  const float du = u[0] - u[1];
+
+  if (du == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float A = (v[0] - v[1]) / du;
+  const float B = v[1] - A * u[1];
+
+  circle.slope = A;
+  circle.intercept = B;
+  circle.d0 = r0 * (B * r0 - A);
+  circle.curvature = B / fastHypot(1.0f, A);
+
+  // cot(theta) per unit transverse path, which is the arc and not the chord:
+  // the sagitta a displaced track turns through over three layers is small but
+  // it biases tau the same way for every triplet, so taking it out keeps the
+  // triplet tau comparable with the doublet one.
+  const float dx13 = points[2][0] - points[0][0];
+  const float dy13 = points[2][1] - points[0][1];
+  const float chord13 = fastHypot(dx13, dy13);
+
+  if (chord13 == 0.0f) {
+    return std::nullopt;
+  }
+
+  const float sagittaTerm = circle.curvature * chord13;
+  const float arc13 = chord13 * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
+
+  circle.tau = (points[2][2] - points[0][2]) / arc13;
+
+  const float hypotTau = fastHypot(1.0f, circle.tau);
+
+  circle.expEta = hypotTau - circle.tau;
+  // as in the doublet case, the sum is 1 / (hypotTau - tau) and the better
+  // conditioned form of it for large tau
+  circle.invExpEta = hypotTau + circle.tau;
+
+  return circle;
 }
 
 }  // namespace
@@ -170,6 +293,18 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   const float maxTauRatioCut =
       m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
       (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStrip : 0.0f);
+
+  // if doublet taus are taken with their strip ends settled, and the
+  // loosest threshold between two doublets that both are
+  const bool settleTau = m_cfg.settleDoubletTau && m_cfg.doubletStereoCut &&
+                         nodeStorage.hasStrips();
+  const float maxTauRatioCutSettled =
+      m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
+      (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStripSettled : 0.0f);
+
+  // whether every doublet made so far has a settled tau, which lets a doublet
+  // that has one search its partners with the tighter window
+  bool allTausSettled = true;
 
   // per-event parts of the doublet z0 band over d0 in [0, d0Max]
   const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
@@ -270,8 +405,42 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   // reused across bin groups so that the windows are allocated once
   std::vector<SlidingWindow> phiSlidingWindow;
 
+  // reused across nodes for putting each node's doublets in exp(eta) order
+  std::vector<std::uint32_t> sortOrder;
+  std::vector<detail::DisplacedGbtsDoublet> sortedDoublets;
+  std::vector<float> sortedExpEta;
+
   // if we apply calibration to the strips
   const bool calibrate = m_cfg.calibrateStrips && nodeStorage.hasStrips();
+
+  // if doublets are cut on their strip ends' stereo pairs
+  const bool stereoCut = m_cfg.doubletStereoCut && nodeStorage.hasStrips();
+
+  // if the stereo crossings settle an endcap strip end for the turn cut
+  const bool resolveSlides =
+      calibrate && stereoCut && m_cfg.turnCutEndcapStrip;
+
+  // the turn cut's limit where an end slides along a radial strip
+  const float curvatureCutSliding =
+      curvatureCutLoosest * m_cfg.curvatureScaleEndcapStrip;
+
+  // Per node, the two parts of the phi window that depend on one radius
+  // alone: acos(d0Max / r), the azimuth a straight track at d0Max has walked
+  // by r, and sqrt(r^2 - d0Max^2), its transverse path out to r. The window
+  // of a pair is then two differences.
+  const bool perPairWindow = m_cfg.useEtaBinning && m_cfg.perPairPhiWindow;
+  std::vector<std::array<float, 2>> nodeWindowTerms;
+
+  if (perPairWindow) {
+    nodeWindowTerms.resize(nodeStorage.numberOfNodes());
+
+    for (std::size_t node = 0; node < nodeWindowTerms.size(); ++node) {
+      const float r = params[node].r;
+      nodeWindowTerms[node] = {
+          std::acos(std::min(1.0f, m_cfg.d0Max / r)),
+          std::sqrt(std::max(0.0f, r * r - d0MaxSquare))};
+    }
+  }
 
   // nominal position of a node, before any strip calibration
   const auto nodePoint = [&nodeView](const SpacePointIndex node) {
@@ -391,6 +560,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       // this node as the triplet fit wants it, before any strip resolution
       const std::array<float, 3> point1{x1, y1, z1};
 
+      // the stereo pair n1 was formed from, null for a pixel node
+      const auto* strip1 = nodeView.strip(n1Idx);
+
+      // n1's share of the phi window of each pair it makes
+      const std::array<float, 2> windowTerms1 =
+          perPairWindow ? nodeWindowTerms[n1Idx] : std::array<float, 2>{};
+
       // Transverse path from the perigee to n1 at d0 = d0Max, and the lever
       // arms out to rOut at both ends of the d0 range, for the z0 band.
       const float s1Min = std::sqrt(std::max(0.f, r1 * r1 - d0MaxSquare));
@@ -412,9 +588,12 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                           slidesRadially(slw.type, slw.technology));
 
         // The turn cut is skipped when switched off, or when an end will
-        // slide. Settled here for the inner two nodes; the third is checked
-        // per candidate.
-        const bool innerSkipTurn = !m_cfg.useTurnAngleCut || doubletSlides;
+        // slide and the stereo crossings do not settle it. Settled here for
+        // the inner two nodes; the third is checked per candidate.
+        const bool slides1 = slidesRadially(B1.type, B1.technology);
+        const bool slides2 = slidesRadially(slw.type, slw.technology);
+        const bool innerSkipTurn =
+            !m_cfg.useTurnAngleCut || (doubletSlides && !resolveSlides);
 
         // deltaPhi is the half width: displacement and charge are both
         // symmetric about phi1
@@ -438,6 +617,26 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           }
 
           const SpacePointIndex n2Idx = slw.phiNodes[n2PhiIdx].second;
+
+          // [CUT] phi window of the pair's own radii, the bins' window having
+          // been sized for the extremes of both bins
+          if (perPairWindow) {
+            const std::array<float, 2>& windowTerms2 = nodeWindowTerms[n2Idx];
+            const float pairDr = std::abs(params[n2Idx].r - r1);
+            const bool near = pairDr < m_cfg.phiWindowSplitDeltaRadius;
+            const float pairOffset =
+                near ? m_cfg.phiWindowNearOffset : m_cfg.phiWindowFarOffset;
+            const float pairSlope =
+                near ? m_cfg.phiWindowNearSlope : m_cfg.phiWindowFarSlope;
+            const float pairDeltaPhi =
+                pairOffset + std::abs(windowTerms2[0] - windowTerms1[0]) +
+                std::abs(windowTerms2[1] - windowTerms1[1]) * pairSlope *
+                    ptScale;
+
+            if (std::abs(phi2 - phi1) > pairDeltaPhi) {
+              continue;
+            }
+          }
 
           // n2's doublets, as indices into its own bin's
           const detail::GbtsNodeEdgeInfo& n2Info = edgeInfo[n2Idx];
@@ -549,10 +748,103 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
           }
 
-          const float hypotTau = fastHypot(1, tau);
-          const float expEta = hypotTau - tau;
+          // [CUT] doublet stereo: the chord must cross both strips of the
+          // stereo pair at each strip end. The triplet fit makes the same
+          // check against the fitted tangent, at the tighter
+          // `maxStripLengthFraction`, and it rejects nearly every candidate
+          // there; taken here it spares the triplet loop those doublets.
+          // The chord the turn cut reads, which for an end sliding along a
+          // radial strip is taken from where the stereo check finds the
+          // chord crosses that strip rather than from the nominal end.
+          float turnDx = dx;
+          float turnDy = dy;
+          // whether the turn cut can trust this doublet's chord
+          bool turnSettled = !doubletSlides;
+
+          // the doublet's tau, with its strip ends settled if they can be,
+          // and whether they all were
+          float doubletTau = tau;
+          bool tauSettled = isPixel1 && isPixel2;
+
+          if (stereoCut) {
+            const std::array<float, 3> chordDirection{dx, dy, dz};
+            std::array<float, 3> crossing1{};
+            std::array<float, 3> crossing2{};
+
+            if (strip1 != nullptr &&
+                !Acts::detail::calibrateOuterStripSpacePoint(
+                    chordDirection, *strip1, crossing1,
+                    m_cfg.doubletStripLengthFraction)) {
+              continue;
+            }
+
+            const auto* strip2 = nodeView.strip(n2Idx);
+
+            if (strip2 != nullptr &&
+                !Acts::detail::calibrateOuterStripSpacePoint(
+                    chordDirection, *strip2, crossing2,
+                    m_cfg.doubletStripLengthFraction)) {
+              continue;
+            }
+
+            // a sliding end is settled only if it had a stereo pair to cross
+            if (resolveSlides && doubletSlides &&
+                (!slides1 || strip1 != nullptr) &&
+                (!slides2 || strip2 != nullptr)) {
+              const float settledX1 = slides1 ? crossing1[0] : x1;
+              const float settledY1 = slides1 ? crossing1[1] : y1;
+              const float settledX2 = slides2 ? crossing2[0] : position2[0];
+              const float settledY2 = slides2 ? crossing2[1] : position2[1];
+              turnDx = settledX2 - settledX1;
+              turnDy = settledY2 - settledY1;
+              turnSettled = true;
+            }
+
+            // Settle each strip end along its strip for the tau: a barrel
+            // strip runs along z, an endcap strip radially. The other
+            // coordinates stay nominal, as the crossing lies on the outer
+            // strip of the pair rather than at the space point.
+            if (settleTau && (isPixel1 || strip1 != nullptr) &&
+                (isPixel2 || strip2 != nullptr)) {
+              std::array<float, 3> settled1{x1, y1, z1};
+              std::array<float, 3> settled2{position2[0], position2[1], z2};
+
+              if (strip1 != nullptr) {
+                if (slides1) {
+                  settled1[0] = crossing1[0];
+                  settled1[1] = crossing1[1];
+                } else {
+                  settled1[2] = crossing1[2];
+                }
+              }
+
+              if (strip2 != nullptr) {
+                if (slides2) {
+                  settled2[0] = crossing2[0];
+                  settled2[1] = crossing2[1];
+                } else {
+                  settled2[2] = crossing2[2];
+                }
+              }
+
+              const float settledChord = fastHypot(settled2[0] - settled1[0],
+                                                   settled2[1] - settled1[1]);
+
+              if (settledChord > 0.0f) {
+                doubletTau = (settled2[2] - settled1[2]) / settledChord;
+                tauSettled = true;
+              }
+            }
+          }
+
+          if (!tauSettled) {
+            allTausSettled = false;
+          }
+
+          const float hypotTau = fastHypot(1, doubletTau);
+          const float expEta = hypotTau - doubletTau;
           // 1 / expEta, since (hypotTau - tau) * (hypotTau + tau) == 1
-          const float invExpEta = hypotTau + tau;
+          const float invExpEta = hypotTau + doubletTau;
 
           // [CUT] match before create: n2 must have an incoming edge that
           // agrees on tau, once it has enough edges to decide
@@ -560,10 +852,21 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             bool isGood = n2NumEdges <= m_cfg.matchBeforeCreateMaxEdges;
 
             if (!isGood) {
-              for (std::uint32_t n2InIdx = n2FirstEdge; n2InIdx < n2LastEdge;
+              // n2's doublets are in exp(eta) order, so only a window of
+              // them can match
+              const auto [n2InFirst, expEtaHigh] =
+                  tauRatioWindow(slw.doublets->expEta, n2FirstEdge,
+                                 n2LastEdge, expEta, m_cfg.tauRatioPrecut);
+
+              for (std::uint32_t n2InIdx = n2InFirst; n2InIdx < n2LastEdge;
                    ++n2InIdx) {
                 // the doublet's own tau, as it has no fit of its own
                 const float tau2 = slw.doublets->expEta[n2InIdx];
+
+                if (tau2 > expEtaHigh) {
+                  break;
+                }
+
                 const float tauRatio = tau2 * invExpEta - 1.0f;
 
                 if (std::abs(tauRatio) > m_cfg.tauRatioPrecut) {  // bad match
@@ -579,10 +882,16 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
           }
 
+          // [CUT] settled ends share a transverse position
+          const float turnChord = fastHypot(turnDx, turnDy);
+          if (turnChord == 0.0f) {
+            continue;
+          }
+
           // unit chord direction, for the turn cut and cached on the edge
-          const float invChord = 1.0f / chord;
-          const float cosAlpha12 = dx * invChord;
-          const float sinAlpha12 = dy * invChord;
+          const float invChord = 1.0f / turnChord;
+          const float cosAlpha12 = turnDx * invChord;
+          const float sinAlpha12 = turnDy * invChord;
 
           // middle node of every triplet tried below
           const std::array<float, 3> point2{position2[0], position2[1], z2};
@@ -590,9 +899,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // Kept whether or not a triplet passes through it now: it may yet
           // be the outer doublet of one made from a bin further in.
           inner.doublets.emplace_back(
-              n2Idx, chord, cosAlpha12, sinAlpha12,
+              n2Idx, turnChord, cosAlpha12, sinAlpha12,
               static_cast<std::uint32_t>(inner.properties.size()), depth2,
-              slw.type, slw.technology);
+              calibrate && slides2, turnSettled, tauSettled);
           inner.expEta.push_back(expEta);
 
           ++numCreatedEdges;
@@ -604,8 +913,18 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           detail::DisplacedGbtsDoublet& newDoublet = inner.doublets.back();
           BinDoublets& outer = *slw.doublets;
 
+          // n2's doublets are in exp(eta) order, so the loosest tau ratio
+          // cut leaves a window of them, found by bisection
+          // the tighter window holds only if no partner could be unsettled
+          const bool windowSettled = settleTau && tauSettled && allTausSettled;
+          const float windowTauRatioCut =
+              windowSettled ? maxTauRatioCutSettled : maxTauRatioCut;
+          const auto [inEdgeFirst, expEtaHigh] =
+              tauRatioWindow(outer.expEta, n2FirstEdge, n2LastEdge, expEta,
+                             windowTauRatioCut);
+
           // looking for neighbours of the new doublet using outer node
-          for (std::uint32_t inEdgeIdx = n2FirstEdge; inEdgeIdx < n2LastEdge;
+          for (std::uint32_t inEdgeIdx = inEdgeFirst; inEdgeIdx < n2LastEdge;
                ++inEdgeIdx) {
             // [CUT] new doublet's triplet count full: an unrecorded triplet
             // could not be matched later anyway
@@ -614,11 +933,16 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               break;
             }
 
+            // [CUT] past the tau ratio window, and so is every later one
+            if (outer.expEta[inEdgeIdx] > expEtaHigh) {
+              break;
+            }
+
             const float absTauRatio =
                 std::abs(outer.expEta[inEdgeIdx] * invExpEta - 1.0f);
 
             // [CUT] loosest tau ratio, off the compact array
-            if (absTauRatio > maxTauRatioCut) {
+            if (absTauRatio > windowTauRatioCut) {
               continue;
             }
 
@@ -629,9 +953,11 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               continue;
             }
 
+            // whether the third node slides radially, which loosens the cut
+            const bool outerSlides = pS->n2Slides;
+
             const bool skipTurn =
-                innerSkipTurn ||
-                (calibrate && slidesRadially(pS->n2Type, pS->n2Technology));
+                innerSkipTurn || !turnSettled || !pS->chordSettled;
 
             // Turn between the two chords, from the cached unit vectors.
             // For a circle sin(turn) = curvature * L13 <= curvature *
@@ -649,9 +975,12 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                 continue;
               }
 
-              // [CUT] turn angle against the loosest curvature limit
+              // [CUT] turn angle against the loosest curvature limit, looser
+              // still where an end was settled on a radial strip
               if (std::abs(sinDelta) >
-                  curvatureCutLoosest * (chord + pS->chord)) {
+                  ((doubletSlides || outerSlides) ? curvatureCutSliding
+                                                  : curvatureCutLoosest) *
+                      (turnChord + pS->chord)) {
                 continue;
               }
             }
@@ -685,11 +1014,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
 
             // Widen for strips, whose along-strip coordinate is unresolved
-            // until the calibration below, which removes this again.
+            // until the calibration below, which removes this again; less
+            // where both doublets already settled theirs.
             const float stripTauRatioCorr =
-                (m_cfg.tauRatioCorrStrip > 0.f &&
-                 (isStrip[0] || isStrip[1] || isStrip[2]))
-                    ? m_cfg.tauRatioCorrStrip
+                (isStrip[0] || isStrip[1] || isStrip[2])
+                    ? ((settleTau && tauSettled && pS->tauSettled)
+                           ? m_cfg.tauRatioCorrStripSettled
+                           : m_cfg.tauRatioCorrStrip)
                     : 0.0f;
 
             // [CUT] doublet tau ratio, loose; retaken tight after calibration
@@ -948,6 +1279,31 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         }  // n2PhiIdx
       }  // slw
 
+      // Put n1's doublets in exp(eta) order, so that whatever matches
+      // against them reads only the window its tau ratio cut leaves. Each
+      // doublet carries where its triplet properties and its edge are, and
+      // nothing else holds a doublet by its place, so moving them is safe.
+      if (numCreatedEdges > 1) {
+        const std::uint32_t first = edgeInfo[n1Idx].firstEdge;
+
+        sortOrder.resize(numCreatedEdges);
+        for (std::uint32_t k = 0; k < numCreatedEdges; ++k) {
+          sortOrder[k] = first + k;
+        }
+        std::ranges::sort(sortOrder, {}, [&inner](const std::uint32_t idx) {
+          return inner.expEta[idx];
+        });
+
+        sortedDoublets.clear();
+        sortedExpEta.clear();
+        for (const std::uint32_t idx : sortOrder) {
+          sortedDoublets.push_back(inner.doublets[idx]);
+          sortedExpEta.push_back(inner.expEta[idx]);
+        }
+        std::ranges::copy(sortedDoublets, inner.doublets.begin() + first);
+        std::ranges::copy(sortedExpEta, inner.expEta.begin() + first);
+      }
+
       // makes n1's doublets visible to the next bin group in
       edgeInfo[n1Idx].numEdges = numCreatedEdges;
     }  // n1Idx
@@ -984,92 +1340,6 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   graph.nDoublets = nDoublets;
   graph.nConnections = nConnections;
   return graph;
-}
-
-std::optional<detail::TripletCircle>
-DisplacedGbtsGraphBuilder::fitTripletCircle(
-    const std::array<std::array<float, 3>, 3>& points) const {
-  detail::TripletCircle circle{};
-
-  const float x0 = points[1][0];
-  const float y0 = points[1][1];
-  const float r0 = fastHypot(x0, y0);
-
-  if (r0 == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float cosA = x0 / r0;
-  const float sinA = y0 / r0;
-
-  circle.phiMid = std::atan2(y0, x0);
-
-  // conformal mapping with the center at the middle spacepoint
-  std::array<float, 2> u{};
-  std::array<float, 2> v{};
-
-  for (std::uint32_t k = 0; k < 2; k++) {
-    const std::uint32_t spIdx = (k == 1) ? 2 : 0;
-
-    const float dx = points[spIdx][0] - x0;
-    const float dy = points[spIdx][1] - y0;
-
-    const float d2 = dx * dx + dy * dy;
-
-    if (d2 == 0.0f) {
-      return std::nullopt;
-    }
-
-    const float r2Inv = 1.0f / d2;
-
-    const float xn = dx * cosA + dy * sinA;
-    const float yn = -dx * sinA + dy * cosA;
-
-    circle.local[spIdx] = {xn, yn};
-
-    u[k] = xn * r2Inv;
-    v[k] = yn * r2Inv;
-  }
-
-  const float du = u[0] - u[1];
-
-  if (du == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float A = (v[0] - v[1]) / du;
-  const float B = v[1] - A * u[1];
-
-  circle.slope = A;
-  circle.intercept = B;
-  circle.d0 = r0 * (B * r0 - A);
-  circle.curvature = B / fastHypot(1.0f, A);
-
-  // cot(theta) per unit transverse path, which is the arc and not the chord:
-  // the sagitta a displaced track turns through over three layers is small but
-  // it biases tau the same way for every triplet, so taking it out keeps the
-  // triplet tau comparable with the doublet one.
-  const float dx13 = points[2][0] - points[0][0];
-  const float dy13 = points[2][1] - points[0][1];
-  const float chord13 = fastHypot(dx13, dy13);
-
-  if (chord13 == 0.0f) {
-    return std::nullopt;
-  }
-
-  const float sagittaTerm = circle.curvature * chord13;
-  const float arc13 = chord13 * (1.0f + sagittaTerm * sagittaTerm / 6.0f);
-
-  circle.tau = (points[2][2] - points[0][2]) / arc13;
-
-  const float hypotTau = fastHypot(1.0f, circle.tau);
-
-  circle.expEta = hypotTau - circle.tau;
-  // as in the doublet case, the sum is 1 / (hypotTau - tau) and the better
-  // conditioned form of it for large tau
-  circle.invExpEta = hypotTau + circle.tau;
-
-  return circle;
 }
 
 template <typename edge_t>

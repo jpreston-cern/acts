@@ -69,8 +69,12 @@ struct TripletCircle {
   float curvature{};
   /// Signed transverse impact parameter with respect to the beamline.
   float d0{};
-  /// Azimuth of the middle node: the frame the local coordinates sit in.
-  float phiMid{};
+  /// Cosine of the middle node's azimuth: the frame the local coordinates
+  /// sit in. Kept as a cosine and sine rather than an angle, so that taking
+  /// a tangent back out of the frame is a rotation and not a trig call.
+  float cosMid{1.0f};
+  /// Sine of the middle node's azimuth, see @ref cosMid.
+  float sinMid{};
   /// cot(theta) along the fitted arc rather than along the chord.
   float tau{};
   /// exp(eta) from @ref tau.
@@ -81,27 +85,40 @@ struct TripletCircle {
   /// origin.
   std::array<std::array<float, 2>, 3> local{};
 
-  /// Azimuth of the track tangent at one of the three nodes, pointing
-  /// outwards. Two triplets sharing a doublet are matched through this, so
-  /// it has to describe the circle and not the frame it was fitted in.
+  /// Transverse track tangent at one of the three nodes, pointing outwards,
+  /// in global coordinates and not normalised.
   /// @param k Which node, inside out
-  /// @return The tangent azimuth, not wrapped
-  float tangentPhi(const std::uint32_t k) const {
+  /// @return The tangent's x and y
+  std::array<float, 2> tangent(const std::uint32_t k) const {
     // The tangent to x^2 + y^2 = 2ax + 2by at (x, y) is (b - y, x - a), and
     // 2b*intercept = 1, 2a*intercept = -slope. Scaling by 2|intercept| keeps
     // the direction and takes the straight track out of being a special
     // case.
-    return phiMid + std::atan2(slope + 2.0f * intercept * local[k][0],
-                               1.0f - 2.0f * intercept * local[k][1]);
+    const float tx = 1.0f - 2.0f * intercept * local[k][1];
+    const float ty = slope + 2.0f * intercept * local[k][0];
+    // back out of the frame of the middle node
+    return {cosMid * tx - sinMid * ty, sinMid * tx + cosMid * ty};
+  }
+
+  /// Azimuth of the track tangent at one of the three nodes, pointing
+  /// outwards. Two triplets sharing a doublet are matched through this, so
+  /// it has to describe the circle and not the frame it was fitted in.
+  /// @param k Which node, inside out
+  /// @return The tangent azimuth, in [-pi, pi]
+  float tangentPhi(const std::uint32_t k) const {
+    const std::array<float, 2> t = tangent(k);
+    return std::atan2(t[1], t[0]);
   }
 
   /// Track direction at one of the three nodes. Not normalised: the strip
-  /// calibration only reads ratios of it.
+  /// calibration only reads ratios of it, so the transverse part is the bare
+  /// tangent and the longitudinal part is scaled to match, which needs no
+  /// trig call.
   /// @param k Which node, inside out
   /// @return The direction in global coordinates
   std::array<float, 3> direction(const std::uint32_t k) const {
-    const float phi = tangentPhi(k);
-    return {std::cos(phi), std::sin(phi), tau};
+    const std::array<float, 2> t = tangent(k);
+    return {t[0], t[1], tau * std::sqrt(t[0] * t[0] + t[1] * t[1])};
   }
 };
 
@@ -135,20 +152,22 @@ struct DisplacedGbtsDoublet final {
   /// @param sinAlpha_ Sine of the azimuth of that chord
   /// @param firstProperty_ Where the doublet's triplet properties will start
   /// @param n2Depth_ Barrel depth of the outer node's layer
-  /// @param n2Type_ Type of the outer node's layer
-  /// @param n2Technology_ Technology of the outer node's layer
+  /// @param n2Slides_ Whether the outer node slides radially under calibration
+  /// @param chordSettled_ Whether the turn cut can trust the chord
+  /// @param tauSettled_ Whether the doublet's tau has its strip ends settled
   DisplacedGbtsDoublet(SpacePointIndex n2_, float chord_, float cosAlpha_,
                        float sinAlpha_, std::uint32_t firstProperty_,
-                       std::int32_t n2Depth_, GbtsLayerType n2Type_,
-                       GbtsLayerTechnology n2Technology_)
+                       std::int32_t n2Depth_, bool n2Slides_,
+                       bool chordSettled_, bool tauSettled_)
       : n2{n2_},
         chord(chord_),
         cosAlpha(cosAlpha_),
         sinAlpha(sinAlpha_),
         firstProperty{firstProperty_},
         n2Depth{n2Depth_},
-        n2Type{n2Type_},
-        n2Technology{n2Technology_} {}
+        n2Slides{n2Slides_},
+        chordSettled{chordSettled_},
+        tauSettled{tauSettled_} {}
 
   /// Outer node of the doublet
   SpacePointIndex n2{kSpacePointIndexInvalid};
@@ -184,11 +203,20 @@ struct DisplacedGbtsDoublet final {
   /// How deep the outer node's layer sits in the barrel, -1 for an endcap.
   std::int32_t n2Depth{-1};
 
-  /// Type and technology of the outer node's layer, which together say
-  /// whether that node is an endcap strip the turn cut must not trust.
-  GbtsLayerType n2Type{};
-  /// @copydoc n2Type
-  GbtsLayerTechnology n2Technology{};
+  /// Whether the outer node is an endcap strip that calibration slides
+  /// radially, which loosens the turn cut of any triplet it ends.
+  bool n2Slides : 1 = false;
+
+  /// Whether the turn cut can trust @ref cosAlpha, @ref sinAlpha and
+  /// @ref chord: always, unless an end slides radially and the stereo
+  /// crossings did not settle it. Worked out once here, where the doublet's
+  /// strips are to hand, so the innermost loop need not go and look them up.
+  bool chordSettled : 1 = true;
+
+  /// Whether the doublet's exp(eta) was taken with every strip end settled
+  /// along its strip, so that the tighter `tauRatioCorrStripSettled` applies
+  /// to it. Always for a pixel doublet.
+  bool tauSettled : 1 = true;
 
   /// How many triplets this is the outer doublet of, i.e. the @c nNei of its
   /// edge, kept here too so the innermost loop need not go and find the edge.

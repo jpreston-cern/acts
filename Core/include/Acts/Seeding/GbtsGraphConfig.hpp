@@ -220,6 +220,51 @@ struct GbtsGraphConfig {
   /// @note Displaced only.
   bool useTurnAngleCut = true;
 
+  /// Cut a doublet whose chord cannot cross both strips of the stereo pair at
+  /// either of its strip ends. This is the strip check the triplet fit makes,
+  /// taken early against the chord, so that the many doublets no triplet
+  /// could pass never reach the triplet loop.
+  ///
+  /// @note Displaced only.
+  bool doubletStereoCut = true;
+
+  /// Tolerance of `doubletStereoCut`, in the units of
+  /// `maxStripLengthFraction`. Looser than that one, as the chord only stands
+  /// in for the fitted tangent and its ends are still nominal.
+  float doubletStripLengthFraction = 3.0f;
+
+  /// Apply the turn cut to triplets with an endcap strip end too, rather than
+  /// skipping them. The chord of a doublet with such an end is taken between
+  /// the crossings `doubletStereoCut` finds, which settles the slide along the
+  /// strip well enough for the turn, and the cut is then held to a limit
+  /// `curvatureScaleEndcapStrip` times looser. Needs `doubletStereoCut`.
+  ///
+  /// @note Displaced only.
+  bool turnCutEndcapStrip = true;
+
+  /// Cut each doublet on the phi window of its own two radii, after the
+  /// sliding window, which has to cover the whole of both bins, has found it.
+  /// Same window as the bins', only no wider than the pair needs.
+  ///
+  /// @note Displaced only, and only with `useEtaBinning`.
+  bool perPairPhiWindow = true;
+
+  /// Take a doublet's tau with each strip end at the crossing
+  /// `doubletStereoCut` finds rather than at its nominal position: z for a
+  /// barrel strip, the transverse position for an endcap strip. Two doublets
+  /// whose strip ends are all settled this way are then compared with
+  /// `tauRatioCorrStripSettled` instead of `tauRatioCorrStrip`. Needs
+  /// `doubletStereoCut`.
+  ///
+  /// @note Displaced only.
+  bool settleDoubletTau = false;
+
+  /// The strip widening of the tau ratio cuts between two doublets whose
+  /// taus are both settled, in place of `tauRatioCorrStrip`.
+  ///
+  /// @note Displaced only.
+  float tauRatioCorrStripSettled = 0.03f;
+
   /// Cut a fitted triplet on its z0 against [minZ0, maxZ0] and its z at
   /// `maxOuterRadius` against the RoI, using the fitted d0. Gated apart from
   /// `doubletFilterRZ`, which applies the same ranges to doublets as bands
