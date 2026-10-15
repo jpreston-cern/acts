@@ -230,8 +230,11 @@ struct GbtsGraphConfig {
 
   /// Tolerance of `doubletStereoCut`, in the units of
   /// `maxStripLengthFraction`. Looser than that one, as the chord only stands
-  /// in for the fitted tangent and its ends are still nominal.
-  float doubletStripLengthFraction = 3.0f;
+  /// in for the fitted tangent and its ends are still nominal. On the
+  /// ggH->aa->4b (ctau 100 mm) LRT sample, 2 against 3 halves the doublets
+  /// and cuts the triplet fits by 70% for 12 of 9055 adjacent true triplets;
+  /// below 2 the losses grow quickly.
+  float doubletStripLengthFraction = 2.0f;
 
   /// Apply the turn cut to triplets with an endcap strip end too, rather than
   /// skipping them. The chord of a doublet with such an end is taken between
