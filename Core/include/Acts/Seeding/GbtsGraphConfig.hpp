@@ -257,13 +257,13 @@ struct GbtsGraphConfig {
   /// `doubletStereoCut`.
   ///
   /// @note Displaced only.
-  bool settleDoubletTau = false;
+  bool settleDoubletTau = true;
 
   /// The strip widening of the tau ratio cuts between two doublets whose
   /// taus are both settled, in place of `tauRatioCorrStrip`.
   ///
   /// @note Displaced only.
-  float tauRatioCorrStripSettled = 0.03f;
+  float tauRatioCorrStripSettled = 0.015f;
 
   /// Cut a fitted triplet on its z0 against [minZ0, maxZ0] and its z at
   /// `maxOuterRadius` against the RoI, using the fitted d0. Gated apart from
