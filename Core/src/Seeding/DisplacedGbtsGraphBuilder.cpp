@@ -424,6 +424,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   const float curvatureCutSliding =
       curvatureCutLoosest * m_cfg.curvatureScaleEndcapStrip;
 
+  // the |tau| below which a doublet's triplets are all held to the low-eta
+  // curvature limit, negative if the turn cut does not look
+  const float lowEtaTauBound =
+      m_cfg.curvatureFromDoubletTau
+          ? m_cfg.curvatureSplitAbsTau * (1.0f - m_cfg.curvatureSplitTauMargin)
+          : -1.0f;
+
   // Per node, the two parts of the phi window that depend on one radius
   // alone: acos(d0Max / r), the azimuth a straight track at d0Max has walked
   // by r, and sqrt(r^2 - d0Max^2), its transverse path out to r. The window
@@ -923,6 +930,17 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               tauRatioWindow(outer.expEta, n2FirstEdge, n2LastEdge, expEta,
                              windowTauRatioCut);
 
+          // The curvature limit the turn cut holds this doublet's triplets
+          // to: the low-eta one where its tau keeps them all below the split.
+          const bool lowEtaTurn =
+              lowEtaTauBound > 0.0f && std::abs(doubletTau) < lowEtaTauBound;
+          const float turnCurvatureCut =
+              lowEtaTurn ? curvatureCutLowEta : curvatureCutLoosest;
+          const float turnCurvatureCutSliding =
+              lowEtaTurn
+                  ? curvatureCutLowEta * m_cfg.curvatureScaleEndcapStrip
+                  : curvatureCutSliding;
+
           // looking for neighbours of the new doublet using outer node
           for (std::uint32_t inEdgeIdx = inEdgeFirst; inEdgeIdx < n2LastEdge;
                ++inEdgeIdx) {
@@ -978,8 +996,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               // [CUT] turn angle against the loosest curvature limit, looser
               // still where an end was settled on a radial strip
               if (std::abs(sinDelta) >
-                  ((doubletSlides || outerSlides) ? curvatureCutSliding
-                                                  : curvatureCutLoosest) *
+                  ((doubletSlides || outerSlides) ? turnCurvatureCutSliding
+                                                  : turnCurvatureCut) *
                       (turnChord + pS->chord)) {
                 continue;
               }

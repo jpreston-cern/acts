@@ -23,6 +23,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <numbers>
@@ -365,7 +366,9 @@ struct SeederSetup {
 
 SeederSetup makeSeeder(const ToyDetector& detector,
                        const bool calibrateStrips = true,
-                       const bool matchBeforeCreate = false) {
+                       const bool matchBeforeCreate = false,
+                       const std::function<void(Experimental::GbtsGraphConfig&)>&
+                           tweak = {}) {
   auto geometry = makeGeometry(detector);
 
   const auto makeLogger = []() -> std::unique_ptr<const Logger> {
@@ -386,6 +389,9 @@ SeederSetup makeSeeder(const ToyDetector& detector,
   graphConfig.maxOuterRadius = kMaxOuterRadius;
   graphConfig.calibrateStrips = calibrateStrips;
   graphConfig.matchBeforeCreate = matchBeforeCreate;
+  if (tweak) {
+    tweak(graphConfig);
+  }
 
   // The filter walks the chains the graph found and has its own beamspot
   // assumption, defaulting to 170mm. Left there it would throw away the
@@ -857,6 +863,28 @@ BOOST_AUTO_TEST_CASE(GraphKeepsOnlyTheDoubletsInATriplet) {
 
   // and no doublet was made an edge twice
   BOOST_CHECK_EQUAL(run.edgeIndex.size(), run.nEdges);
+}
+
+// The turn cut held to the low-eta limit where the doublet's tau allows still
+// finds every doublet and connection the tracks owe.
+BOOST_AUTO_TEST_CASE(CurvatureFromDoubletTauKeepsEveryEdge) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeederSetup setup =
+      makeSeeder(detector, true, false,
+                 [](Experimental::GbtsGraphConfig& config) {
+                   config.curvatureFromDoubletTau = true;
+                 });
+  const GraphRun run = buildGraph(setup, spacePoints);
+  const Completeness result = checkCompleteness(run, spacePoints, tracks);
+
+  if (!result.report.empty()) {
+    BOOST_TEST_MESSAGE("missing:\n" << result.report);
+  }
+  BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
+  BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
 }
 
 // Everything above feeds seeds: one per track, holding all four hits.

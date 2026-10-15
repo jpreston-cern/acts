@@ -272,6 +272,20 @@ struct GbtsGraphConfig {
   ///
   /// @note Displaced only.
   bool tripletFilterRZ = true;
+
+  /// Hold the turn cut of a triplet candidate to the low-eta curvature limit
+  /// where the inner doublet's settled tau sits far enough below
+  /// `curvatureSplitAbsTau` that the fitted triplet will too, rather than to
+  /// the looser of the two limits.
+  ///
+  /// @note Displaced only.
+  bool curvatureFromDoubletTau = true;
+
+  /// How far below `curvatureSplitAbsTau` a doublet's |tau| has to sit for
+  /// `curvatureFromDoubletTau`, as a fraction of it.
+  ///
+  /// @note Displaced only.
+  float curvatureSplitTauMargin = 0.1f;
 };
 
 }  // namespace Acts::Experimental
