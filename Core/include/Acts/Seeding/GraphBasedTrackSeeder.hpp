@@ -90,6 +90,17 @@ class GraphBasedTrackSeeder {
     /// that shares any space point with a kept better candidate of four or
     /// more: most often the same track, seeded again from a piece of it.
     bool dropTripletsSharingLonger = false;
+    /// Before clone removal, keep at most this many three space point
+    /// candidates per middle node, those whose helix through the three passes
+    /// closest to the beamline and the interaction region by
+    /// `tripletD0Weight` |d0| + `tripletZ0Weight` |z0|. The filter's quality
+    /// barely tells a true triplet from a fake one, which this does better.
+    /// Zero for no limit.
+    std::uint32_t maxTripletsPerMiddleNode = 0;
+    /// See `maxTripletsPerMiddleNode`.
+    float tripletD0Weight = 0.01f / UnitConstants::mm;
+    /// See `maxTripletsPerMiddleNode`.
+    float tripletZ0Weight = 0.005f / UnitConstants::mm;
     /// Max seed eta value considered for splitting.
     float maxSeedSplitEta = 0.6;
     /// Max allowed curvature for seed self consistency check.
@@ -276,6 +287,18 @@ class GraphBasedTrackSeeder {
       const detail::GbtsNodeView& nodeView, std::vector<edge_t>& edgeStorage,
       const std::vector<edge_t*>& vChainHeads,
       const GbtsTrackingFilter& filter) const;
+
+  /// Mark as clones the three space point candidates beyond
+  /// `maxTripletsPerMiddleNode` on their middle node, and take them out of
+  /// the ranking clone removal reads.
+  /// @param nodeView View of the node positions
+  /// @param nNodes Number of graph nodes
+  /// @param vArgSort Quality and index of each candidate, best first
+  /// @param vSeedCandidates The candidates, whose clone flags are set
+  void capTripletsPerMiddleNode(
+      const detail::GbtsNodeView& nodeView, std::uint32_t nNodes,
+      std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+      std::vector<SeedCandidateProperties>& vSeedCandidates) const;
 
   /// Mark as clones the seed candidates that `pairwiseCloneRemoval` and the
   /// options alongside it remove.

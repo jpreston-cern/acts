@@ -29,6 +29,88 @@
 
 namespace Acts::Experimental {
 
+namespace {
+
+/// |d0| and |z0| of the helix through three nodes, inside out: the circle
+/// through all three in the transverse plane, and the straight line through
+/// them in z against the transverse path length from the point of closest
+/// approach to the beamline.
+std::array<float, 2> tripletImpact(
+    const detail::GbtsNodeView& nodeView,
+    const std::array<SpacePointIndex, 3>& nodes) {
+  std::array<std::array<float, 3>, 3> p{};
+  for (std::size_t k = 0; k < 3; ++k) {
+    const detail::GbtsNodeProxy node = nodeView[nodes[k]];
+    p[k] = {node.x(), node.y(), node.z()};
+  }
+
+  // twice the signed area of the triangle in the transverse plane
+  const float area2 =
+      2.f * (p[0][0] * (p[1][1] - p[2][1]) + p[1][0] * (p[2][1] - p[0][1]) +
+             p[2][0] * (p[0][1] - p[1][1]));
+  const float l01 = std::hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]);
+  const float l12 = std::hypot(p[2][0] - p[1][0], p[2][1] - p[1][1]);
+
+  float d0 = 0.f;
+  std::array<float, 3> s{};
+  if (std::abs(area2) <= 1e-6f * l01 * l12) {
+    // a straight line, through the outer two ends
+    const float dx = p[2][0] - p[0][0];
+    const float dy = p[2][1] - p[0][1];
+    const float length = std::hypot(dx, dy);
+    if (length == 0.f) {
+      return {std::numeric_limits<float>::max(),
+              std::numeric_limits<float>::max()};
+    }
+    const float ux = dx / length;
+    const float uy = dy / length;
+    d0 = std::abs(p[0][0] * uy - p[0][1] * ux);
+    for (std::size_t k = 0; k < 3; ++k) {
+      s[k] = p[k][0] * ux + p[k][1] * uy;
+    }
+  } else {
+    std::array<float, 3> r2{};
+    for (std::size_t k = 0; k < 3; ++k) {
+      r2[k] = p[k][0] * p[k][0] + p[k][1] * p[k][1];
+    }
+    const float cx =
+        (r2[0] * (p[1][1] - p[2][1]) + r2[1] * (p[2][1] - p[0][1]) +
+         r2[2] * (p[0][1] - p[1][1])) /
+        area2;
+    const float cy =
+        (r2[0] * (p[2][0] - p[1][0]) + r2[1] * (p[0][0] - p[2][0]) +
+         r2[2] * (p[1][0] - p[0][0])) /
+        area2;
+    const float radius = std::hypot(p[0][0] - cx, p[0][1] - cy);
+    d0 = std::abs(std::hypot(cx, cy) - radius);
+    // the point of closest approach lies on the line from the centre through
+    // the beamline
+    const float phi0 = std::atan2(-cy, -cx);
+    for (std::size_t k = 0; k < 3; ++k) {
+      float dphi = std::atan2(p[k][1] - cy, p[k][0] - cx) - phi0;
+      if (dphi > std::numbers::pi_v<float>) {
+        dphi -= 2 * std::numbers::pi_v<float>;
+      } else if (dphi < -std::numbers::pi_v<float>) {
+        dphi += 2 * std::numbers::pi_v<float>;
+      }
+      s[k] = radius * std::abs(dphi);
+    }
+  }
+
+  const float sMean = (s[0] + s[1] + s[2]) / 3.f;
+  const float zMean = (p[0][2] + p[1][2] + p[2][2]) / 3.f;
+  float sxx = 0.f;
+  float sxz = 0.f;
+  for (std::size_t k = 0; k < 3; ++k) {
+    sxx += (s[k] - sMean) * (s[k] - sMean);
+    sxz += (s[k] - sMean) * (p[k][2] - zMean);
+  }
+  const float tau = sxx > 0.f ? sxz / sxx : 0.f;
+  return {d0, std::abs(zMean - tau * sMean)};
+}
+
+}  // namespace
+
 GraphBasedTrackSeeder::DerivedConfig::DerivedConfig(const Config& config)
     : Config(config) {
   phiSliceWidth = 2 * std::numbers::pi_v<float> / config.nMaxPhiSlice;
@@ -265,6 +347,11 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
   // clone removal code goes below ...
 
   std::ranges::sort(vArgSort);
+
+  if (m_cfg.maxTripletsPerMiddleNode > 0) {
+    capTripletsPerMiddleNode(nodeView, nodeStorage.numberOfNodes(), vArgSort,
+                             vSeedCandidates);
+  }
 
   if (m_cfg.pairwiseCloneRemoval) {
     markClonesPairwise(nodeStorage.numberOfNodes(), vArgSort, vSeedCandidates);
@@ -594,6 +681,39 @@ template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraphBuilder>(
     GbtsNodeStorage&, const GbtsRoiDescriptor&,
     const DisplacedGbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
     SeedContainer&, std::vector<std::optional<GbtsSeedFit>>*) const;
+
+void GraphBasedTrackSeeder::capTripletsPerMiddleNode(
+    const detail::GbtsNodeView& nodeView, const std::uint32_t nNodes,
+    std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+    std::vector<SeedCandidateProperties>& vSeedCandidates) const {
+  // the three space point candidates, by weight
+  std::vector<std::pair<float, std::uint32_t>> triplets;
+  for (const auto& [quality, index] : vArgSort) {
+    const std::vector<SpacePointIndex>& nodes = vSeedCandidates[index].nodes;
+    if (nodes.size() != 3) {
+      continue;
+    }
+    const auto [d0, z0] =
+        tripletImpact(nodeView, {nodes[0], nodes[1], nodes[2]});
+    triplets.emplace_back(
+        m_cfg.tripletD0Weight * d0 + m_cfg.tripletZ0Weight * z0, index);
+  }
+  std::ranges::sort(triplets);
+
+  std::vector<std::uint32_t> perMiddleNode(nNodes, 0);
+  for (const auto& [weight, index] : triplets) {
+    std::uint32_t& n = perMiddleNode[vSeedCandidates[index].nodes[1]];
+    if (n >= m_cfg.maxTripletsPerMiddleNode) {
+      vSeedCandidates[index].isClone = true;
+    } else {
+      ++n;
+    }
+  }
+
+  std::erase_if(vArgSort, [&vSeedCandidates](const auto& args) {
+    return vSeedCandidates[args.second].isClone;
+  });
+}
 
 void GraphBasedTrackSeeder::markClonesPairwise(
     const std::uint32_t nNodes,

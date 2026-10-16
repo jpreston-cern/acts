@@ -1006,6 +1006,43 @@ BOOST_AUTO_TEST_CASE(DropTripletsSharingLongerKeepsEveryTrackWhole) {
   }
 }
 
+// Capping the three space point candidates per middle node leaves at most that
+// many triplets on each middle space point, and still every track whole: the
+// tracks' own triplets pass closest to the interaction region.
+BOOST_AUTO_TEST_CASE(TripletCapPerMiddleNodeKeepsEveryTrackWhole) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  for (const std::uint32_t cap : {1u, 2u}) {
+    const SeedTally tally = runSeeding(
+        makeSeeder(detector, true, false, {},
+                   [cap](Experimental::GraphBasedTrackSeeder::Config& cfg) {
+                     cfg.pairwiseCloneRemoval = true;
+                     cfg.maxTripletsPerMiddleNode = cap;
+                     // a split seed's halves are triplets the cap never saw
+                     cfg.maxSeedSplitEta = 0.f;
+                   }),
+        spacePoints, tracks);
+
+    BOOST_TEST_MESSAGE("cap " << cap << ": " << tally.report);
+
+    std::map<std::uint32_t, std::uint32_t> perMiddle;
+    for (const std::vector<std::uint32_t>& seed : tally.seedHits) {
+      if (seed.size() == 3) {
+        ++perMiddle[seed[1]];
+      }
+    }
+    for (const auto& [middle, n] : perMiddle) {
+      BOOST_CHECK_LE(n, cap);
+    }
+    for (std::size_t track = 0; track < tracks.size(); ++track) {
+      BOOST_CHECK_GE(tally.seeds[track], 1u);
+      BOOST_CHECK_EQUAL(tally.longest[track], tally.hits[track]);
+    }
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }  // namespace Acts::Test
