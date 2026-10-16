@@ -28,6 +28,7 @@
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -364,11 +365,12 @@ struct SeederSetup {
   Experimental::GraphBasedTrackSeeder::Options options;
 };
 
-SeederSetup makeSeeder(const ToyDetector& detector,
-                       const bool calibrateStrips = true,
-                       const bool matchBeforeCreate = false,
-                       const std::function<void(Experimental::GbtsGraphConfig&)>&
-                           tweak = {}) {
+SeederSetup makeSeeder(
+    const ToyDetector& detector, const bool calibrateStrips = true,
+    const bool matchBeforeCreate = false,
+    const std::function<void(Experimental::GbtsGraphConfig&)>& tweak = {},
+    const std::function<void(Experimental::GraphBasedTrackSeeder::Config&)>&
+        seederTweak = {}) {
   auto geometry = makeGeometry(detector);
 
   const auto makeLogger = []() -> std::unique_ptr<const Logger> {
@@ -380,6 +382,9 @@ SeederSetup makeSeeder(const ToyDetector& detector,
   config.useClusterWidthCuts = false;
   // a link here already cost a triplet fit, so three nodes are a seed
   config.minSeedLevel = 2;
+  if (seederTweak) {
+    seederTweak(config);
+  }
 
   Experimental::GbtsGraphConfig graphConfig;
   graphConfig.minPt = 1_GeV;
@@ -546,6 +551,8 @@ struct SeedTally {
   std::vector<std::size_t> hits;
   /// Seeds mixing hits of more than one track.
   std::size_t impure{};
+  /// The space point indices of every seed, in output order.
+  std::vector<std::vector<std::uint32_t>> seedHits;
   std::string report;
 };
 
@@ -572,6 +579,7 @@ SeedTally runSeeding(const SeederSetup& setup,
   for (const auto& seed : seeds) {
     const auto indices = seed.spacePointIndices();
     BOOST_REQUIRE_GE(indices.size(), 3u);
+    tally.seedHits.emplace_back(indices.begin(), indices.end());
     const std::uint32_t track = spacePoints.at(indices[0]).extra(trackColumn);
 
     float previousR = -1.f;
@@ -926,6 +934,75 @@ BOOST_AUTO_TEST_CASE(SeedsFromDenseDisplacedTracks) {
   for (std::size_t track = 0; track < tracks.size(); ++track) {
     BOOST_CHECK_GE(tally.seeds[track], 1u);
     BOOST_CHECK_EQUAL(tally.longest[track], tally.hits[track]);
+  }
+}
+
+// Pairwise clone removal calls a candidate a clone only where the default
+// would too: a single kept better candidate holding more than the threshold of
+// its hits means better candidates hold that many, and so does one holding all
+// three hits of a triplet. So it keeps every seed the default keeps.
+BOOST_AUTO_TEST_CASE(PairwiseCloneRemovalKeepsEverySeedTheDefaultKeeps) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const SeedTally byDefault =
+      runSeeding(makeSeeder(detector), spacePoints, tracks);
+
+  for (const bool dropFullyTaken : {false, true}) {
+    const SeederSetup setup = makeSeeder(
+        detector, true, false, {},
+        [dropFullyTaken](Experimental::GraphBasedTrackSeeder::Config& cfg) {
+          cfg.pairwiseCloneRemoval = true;
+          cfg.dropFullyTakenTriplets = dropFullyTaken;
+        });
+    const SeedTally pairwise = runSeeding(setup, spacePoints, tracks);
+
+    BOOST_TEST_MESSAGE("dropFullyTakenTriplets " << dropFullyTaken << ": "
+                                                 << pairwise.report);
+
+    std::multiset<std::vector<std::uint32_t>> kept(pairwise.seedHits.begin(),
+                                                   pairwise.seedHits.end());
+    for (const std::vector<std::uint32_t>& seed : byDefault.seedHits) {
+      const auto found = kept.find(seed);
+      BOOST_CHECK(found != kept.end());
+      if (found != kept.end()) {
+        kept.erase(found);
+      }
+    }
+  }
+}
+
+// Pairwise clone removal alone keeps the pieces of a track seeded again from
+// its end, and the triplets that share a single hit with a track. Dropping the
+// triplets that share a hit with a longer kept seed removes most of them, and
+// still leaves every track whole.
+BOOST_AUTO_TEST_CASE(DropTripletsSharingLongerKeepsEveryTrackWhole) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const auto pairwise = [&](const bool dropSharingLonger) {
+    return runSeeding(
+        makeSeeder(detector, true, false, {},
+                   [dropSharingLonger](
+                       Experimental::GraphBasedTrackSeeder::Config& cfg) {
+                     cfg.pairwiseCloneRemoval = true;
+                     cfg.dropTripletsSharingLonger = dropSharingLonger;
+                   }),
+        spacePoints, tracks);
+  };
+  const SeedTally alone = pairwise(false);
+  const SeedTally dropping = pairwise(true);
+
+  BOOST_TEST_MESSAGE("pairwise alone: " << alone.report);
+  BOOST_TEST_MESSAGE("dropping triplets sharing longer: " << dropping.report);
+
+  BOOST_CHECK_LT(dropping.seedHits.size(), alone.seedHits.size());
+  BOOST_CHECK_LT(dropping.impure, alone.impure);
+  for (std::size_t track = 0; track < tracks.size(); ++track) {
+    BOOST_CHECK_GE(dropping.seeds[track], 1u);
+    BOOST_CHECK_EQUAL(dropping.longest[track], dropping.hits[track]);
   }
 }
 

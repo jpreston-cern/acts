@@ -266,56 +266,60 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
   std::ranges::sort(vArgSort);
 
-  // hit to track associations, indexed by graph node index
-  std::vector<std::uint32_t> h2t(nodeStorage.numberOfNodes() + 1, 0);
+  if (m_cfg.pairwiseCloneRemoval) {
+    markClonesPairwise(nodeStorage.numberOfNodes(), vArgSort, vSeedCandidates);
+  } else {
+    // hit to track associations, indexed by graph node index
+    std::vector<std::uint32_t> h2t(nodeStorage.numberOfNodes() + 1, 0);
 
-  std::uint32_t trackId = 0;
+    std::uint32_t trackId = 0;
 
-  for (const auto& args : vArgSort) {
-    const auto& seed = vSeedCandidates[args.second];
-    ++trackId;
+    for (const auto& args : vArgSort) {
+      const auto& seed = vSeedCandidates[args.second];
+      ++trackId;
 
-    // loop over space points indices
-    for (const SpacePointIndex node : seed.nodes) {
-      const std::uint32_t hitId = node + 1;
+      // loop over space points indices
+      for (const SpacePointIndex node : seed.nodes) {
+        const std::uint32_t hitId = node + 1;
 
-      const std::uint32_t tid = h2t[hitId];
+        const std::uint32_t tid = h2t[hitId];
 
-      // unused hit or used by a lesser track
-      if (tid == 0 || tid > trackId) {
-        // overwrite
-        h2t[hitId] = trackId;
-      }
-    }
-  }
-
-  std::uint32_t trackIdx = 0;
-
-  for (const auto& args : vArgSort) {
-    const auto& seed = vSeedCandidates[args.second].nodes;
-
-    const auto nTotal = static_cast<std::uint32_t>(seed.size());
-
-    std::uint32_t nOther = 0;
-
-    trackId = trackIdx + 1;
-
-    ++trackIdx;
-
-    for (const SpacePointIndex node : seed) {
-      const std::uint32_t hitId = node + 1;
-
-      const std::uint32_t tid = h2t[hitId];
-
-      // taken by a better candidate
-      if (tid != trackId) {
-        nOther++;
+        // unused hit or used by a lesser track
+        if (tid == 0 || tid > trackId) {
+          // overwrite
+          h2t[hitId] = trackId;
+        }
       }
     }
 
-    if (nOther > m_cfg.hitShareThreshold * nTotal) {
-      // reject
-      vSeedCandidates[args.second].isClone = true;  // reject
+    std::uint32_t trackIdx = 0;
+
+    for (const auto& args : vArgSort) {
+      const auto& seed = vSeedCandidates[args.second].nodes;
+
+      const auto nTotal = static_cast<std::uint32_t>(seed.size());
+
+      std::uint32_t nOther = 0;
+
+      trackId = trackIdx + 1;
+
+      ++trackIdx;
+
+      for (const SpacePointIndex node : seed) {
+        const std::uint32_t hitId = node + 1;
+
+        const std::uint32_t tid = h2t[hitId];
+
+        // taken by a better candidate
+        if (tid != trackId) {
+          nOther++;
+        }
+      }
+
+      if (nOther > m_cfg.hitShareThreshold * nTotal) {
+        // reject
+        vSeedCandidates[args.second].isClone = true;  // reject
+      }
     }
   }
   vOutputSeeds.reserve(vSeedCandidates.size());
@@ -590,6 +594,65 @@ template void GraphBasedTrackSeeder::createSeeds<DisplacedGbtsGraphBuilder>(
     GbtsNodeStorage&, const GbtsRoiDescriptor&,
     const DisplacedGbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
     SeedContainer&, std::vector<std::optional<GbtsSeedFit>>*) const;
+
+void GraphBasedTrackSeeder::markClonesPairwise(
+    const std::uint32_t nNodes,
+    const std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+    std::vector<SeedCandidateProperties>& vSeedCandidates) const {
+  // the kept candidates holding each node, as lists threaded through
+  // `nextOwner`
+  constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
+  std::vector<std::uint32_t> firstOwner(nNodes, kNone);
+  std::vector<std::uint32_t> nextOwner;
+  std::vector<std::uint32_t> owner;
+
+  // the kept candidates sharing a node with the current one, and how many
+  std::vector<std::pair<std::uint32_t, std::uint32_t>> shared;
+
+  for (const auto& args : vArgSort) {
+    SeedCandidateProperties& seed = vSeedCandidates[args.second];
+    const auto nTotal = static_cast<std::uint32_t>(seed.nodes.size());
+
+    shared.clear();
+    std::uint32_t nTaken = 0;
+    for (const SpacePointIndex node : seed.nodes) {
+      for (std::uint32_t l = firstOwner[node]; l != kNone; l = nextOwner[l]) {
+        const auto it = std::ranges::find(
+            shared, owner[l], &std::pair<std::uint32_t, std::uint32_t>::first);
+        if (it == shared.end()) {
+          shared.emplace_back(owner[l], 1);
+        } else {
+          ++it->second;
+        }
+      }
+      if (firstOwner[node] != kNone) {
+        ++nTaken;
+      }
+    }
+
+    std::uint32_t maxShared = 0;
+    bool sharesWithLonger = false;
+    for (const auto& [other, n] : shared) {
+      maxShared = std::max(maxShared, n);
+      sharesWithLonger =
+          sharesWithLonger || vSeedCandidates[other].nodes.size() >= 4;
+    }
+
+    const bool isTriplet = nTotal == 3;
+    if (maxShared > m_cfg.hitShareThreshold * nTotal ||
+        (m_cfg.dropFullyTakenTriplets && isTriplet && nTaken == nTotal) ||
+        (m_cfg.dropTripletsSharingLonger && isTriplet && sharesWithLonger)) {
+      seed.isClone = true;
+      continue;
+    }
+
+    for (const SpacePointIndex node : seed.nodes) {
+      nextOwner.push_back(firstOwner[node]);
+      owner.push_back(args.second);
+      firstOwner[node] = static_cast<std::uint32_t>(owner.size() - 1);
+    }
+  }
+}
 
 float GraphBasedTrackSeeder::estimateCurvature(
     const detail::GbtsNodeView& nodeView,
