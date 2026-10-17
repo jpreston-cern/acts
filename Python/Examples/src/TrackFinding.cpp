@@ -97,6 +97,11 @@ void addTrackFinding(py::module& mex) {
     // One configuration serves both graphs, so this binds the prompt and the
     // displaced mode alike.
     using Config = Acts::Experimental::GbtsGraphConfig;
+    py::enum_<Acts::Experimental::GbtsTauRatioMode>(mex, "GbtsTauRatioMode")
+        .value("Fixed", Acts::Experimental::GbtsTauRatioMode::Fixed)
+        .value("Pull", Acts::Experimental::GbtsTauRatioMode::Pull)
+        .value("FixedOrPull",
+               Acts::Experimental::GbtsTauRatioMode::FixedOrPull);
     auto c =
         py::class_<Config>(mex, "GbtsGraphBuilderConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(
@@ -106,7 +111,9 @@ void addTrackFinding(py::module& mex) {
         doubletStereoCut, doubletStripLengthFraction, turnCutEndcapStrip,
         curvatureFromDoubletTau, curvatureSplitTauMargin, perPairPhiWindow,
         settleDoubletTau, tauRatioCorrStripSettled, maxOuterRadius, d0Max,
-        cutDPhiMax, cutDCurvMax, tauRatioCut, useSumRatioCut, sumRatioCutMax);
+        cutDPhiMax, cutDCurvMax, tauRatioCut, useSumRatioCut, sumRatioCutMax,
+        tauRatioMode, stripAlongResolution, tauRatioPullFloor, tauRatioPullCut,
+        tauRatioPullCutTight);
     patchKwargsConstructor(c);
   }
 

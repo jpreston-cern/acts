@@ -14,6 +14,18 @@
 
 namespace Acts::Experimental {
 
+/// How the displaced graph compares the slopes of two doublets that share a
+/// node: by a fixed tau ratio tolerance, by the slope difference over its own
+/// uncertainty from the strips the three nodes sit on, or by either.
+enum class GbtsTauRatioMode : std::uint8_t {
+  /// The fixed tolerance, `tauRatioCut` and its corrections.
+  Fixed,
+  /// The slope difference within `tauRatioPullCut` times its uncertainty.
+  Pull,
+  /// Either of the two.
+  FixedOrPull
+};
+
 /// Configuration for either GBTS graph builder.
 ///
 /// The prompt and displaced builders take the same settings, so they share one
@@ -289,6 +301,42 @@ struct GbtsGraphConfig {
   ///
   /// @note Displaced only.
   float curvatureSplitTauMargin = 0.1f;
+
+  /// How the tau ratio window, the loose and the tight tau ratio cuts and the
+  /// high-pT one compare two doublets' slopes. The uncertainty of the
+  /// difference in eta of the two is that of each strip node sliding along
+  /// its strip by `stripAlongResolution`, with `tauRatioPullFloor` added in
+  /// quadrature. A strip node's slide moves the eta of a chord it ends far
+  /// more where the chord is short and steep, which is what the fixed
+  /// tolerance cannot follow: endcap triplets need it widened, barrel ones
+  /// do not.
+  ///
+  /// @note Displaced only.
+  GbtsTauRatioMode tauRatioMode = GbtsTauRatioMode::Fixed;
+
+  /// Resolution of a strip space point along its strip, for `tauRatioMode`.
+  ///
+  /// @note Displaced only.
+  float stripAlongResolution = 0.5f * Acts::UnitConstants::mm;
+
+  /// Uncertainty in eta added in quadrature to the strip term, for
+  /// `tauRatioMode`.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullFloor = 0.004f;
+
+  /// Multiple of the uncertainty the window and the loose cut allow, for
+  /// `tauRatioMode`. The default is the most efficient of those scanned with
+  /// `FixedOrPull` on the ggH->aa->4b LRT sample.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullCut = 6.0f;
+
+  /// Multiple of the uncertainty the tight cut allows on the calibrated
+  /// ends, for `tauRatioMode`; 0.9 of it above five times the minimum pT.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullCutTight = 3.0f;
 };
 
 }  // namespace Acts::Experimental

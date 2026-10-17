@@ -1043,6 +1043,33 @@ BOOST_AUTO_TEST_CASE(TripletCapPerMiddleNodeKeepsEveryTrackWhole) {
   }
 }
 
+// The tau ratio cuts held to each triplet's own uncertainty, or to either it
+// or the fixed tolerance, still find every edge and connection the tracks owe
+// the graph, here after resolving the strips and among dense tracks.
+BOOST_AUTO_TEST_CASE(TauRatioPullModesKeepEveryEdge) {
+  const ToyDetector detector = stripBarrelDetector();
+  for (const bool dense : {false, true}) {
+    const std::vector<Track> tracks =
+        dense ? makeDenseDisplacedTracks() : makeDisplacedTracks();
+    const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+    for (const auto mode : {Experimental::GbtsTauRatioMode::Pull,
+                            Experimental::GbtsTauRatioMode::FixedOrPull}) {
+      const SeederSetup setup = makeSeeder(
+          detector, true, false, [mode](Experimental::GbtsGraphConfig& cfg) {
+            cfg.tauRatioMode = mode;
+          });
+      const Completeness result = checkCompleteness(
+          buildGraph(setup, spacePoints), spacePoints, tracks);
+
+      BOOST_TEST_MESSAGE("dense " << dense << ", mode "
+                                  << static_cast<int>(mode) << ":\n"
+                                  << result.report);
+      BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
+      BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
+    }
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }  // namespace Acts::Test

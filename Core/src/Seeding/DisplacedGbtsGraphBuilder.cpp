@@ -41,6 +41,9 @@ struct BinDoublets {
   /// Every doublet's exp(eta), kept beside them so the first tau ratio cut
   /// scans 4 bytes per doublet instead of loading whole ones. Same indices.
   std::vector<float> expEta;
+  /// Every doublet's `chordEtaGradient`, inner end first, for a tau ratio
+  /// mode with a pull; empty otherwise. Same indices.
+  std::vector<std::array<float, 2>> etaGradient;
   /// The triplets the doublets are the inner doublet of, each doublet's in a
   /// contiguous range that the doublet gives.
   std::vector<detail::TripletProperties> properties;
@@ -53,6 +56,7 @@ struct BinDoublets {
   void release() {
     std::vector<detail::DisplacedGbtsDoublet>().swap(doublets);
     std::vector<float>().swap(expEta);
+    std::vector<std::array<float, 2>>().swap(etaGradient);
     std::vector<detail::TripletProperties>().swap(properties);
   }
 };
@@ -110,6 +114,66 @@ std::pair<std::uint32_t, float> tauRatioWindow(
   const auto it = std::lower_bound(begin + first, begin + last, low);
 
   return {static_cast<std::uint32_t>(it - begin), high};
+}
+
+/// Unit axis of a strip node's outer strip, along which its space point is
+/// least well measured; zero for a pixel node.
+///
+/// @param strip The node's stereo pair, null for a pixel node
+/// @return The axis
+std::array<float, 3> stripAxis(
+    const OuterStripSpacePointCalibrationDetailsDerived* strip) {
+  if (strip == nullptr) {
+    return {0.f, 0.f, 0.f};
+  }
+  const std::array<float, 3>& h = strip->outerHalfVector;
+  const float norm = std::sqrt(h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
+  if (norm == 0.f) {
+    return {0.f, 0.f, 0.f};
+  }
+  return {h[0] / norm, h[1] / norm, h[2] / norm};
+}
+
+/// How fast the eta of the chord between two points moves per unit length
+/// either end slides along an axis: (u_z - tau (c . u)) / (c sqrt(1 + tau^2))
+/// for the outer end, with c the chord's transverse direction, and the
+/// negative of that for the inner one.
+///
+/// @param inner The inner point
+/// @param outer The outer point
+/// @param innerAxis The axis the inner end slides along, zero for none
+/// @param outerAxis The axis the outer end slides along, zero for none
+/// @return The rates for the inner and the outer end
+std::array<float, 2> chordEtaGradient(const std::array<float, 3>& inner,
+                                      const std::array<float, 3>& outer,
+                                      const std::array<float, 3>& innerAxis,
+                                      const std::array<float, 3>& outerAxis) {
+  const float dx = outer[0] - inner[0];
+  const float dy = outer[1] - inner[1];
+  const float chord = fastHypot(dx, dy);
+  if (chord == 0.f) {
+    return {0.f, 0.f};
+  }
+  const float cx = dx / chord;
+  const float cy = dy / chord;
+  const float tau = (outer[2] - inner[2]) / chord;
+  const float scale = 1.f / (chord * fastHypot(1.f, tau));
+  const auto rate = [&](const std::array<float, 3>& u) {
+    return (u[2] - tau * (cx * u[0] + cy * u[1])) * scale;
+  };
+  return {-rate(innerAxis), rate(outerAxis)};
+}
+
+/// Squared rate at which the difference in eta of two doublets sharing a
+/// node moves, summed over the three nodes sliding independently.
+///
+/// @param inner The inner doublet's rates, inner end first
+/// @param outer The outer doublet's rates, inner end first
+/// @return The squared rate
+float tripletEtaGradient2(const std::array<float, 2>& inner,
+                          const std::array<float, 2>& outer) {
+  const float shared = outer[0] - inner[1];
+  return inner[0] * inner[0] + shared * shared + outer[1] * outer[1];
 }
 
 /// exp(eta) of the chord between two points.
@@ -408,6 +472,28 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   // reused across nodes for putting each node's doublets in exp(eta) order
   std::vector<std::uint32_t> sortOrder;
   std::vector<detail::DisplacedGbtsDoublet> sortedDoublets;
+  std::vector<std::array<float, 2>> sortedEtaGradient;
+
+  // The pull modes of the tau ratio cuts, and per node the largest
+  // `chordEtaGradient` of its doublets, inner end and outer, to bound the
+  // window before reading any of them.
+  const bool tauPull = m_cfg.tauRatioMode != GbtsTauRatioMode::Fixed;
+  const bool tauFixed = m_cfg.tauRatioMode != GbtsTauRatioMode::Pull;
+  const float stripRes2 =
+      m_cfg.stripAlongResolution * m_cfg.stripAlongResolution;
+  const float pullFloor2 = m_cfg.tauRatioPullFloor * m_cfg.tauRatioPullFloor;
+  std::vector<std::array<float, 2>> maxEtaGradient;
+  if (tauPull) {
+    maxEtaGradient.assign(nodeStorage.numberOfNodes(), {0.f, 0.f});
+  }
+  // whether a candidate passes a tau ratio cut: its tau ratio against the
+  // fixed tolerance, its |log| against the pull's
+  const auto passesTau = [&](const float ratio, const float fixedTolerance,
+                             const float logRatio, const float pullTolerance) {
+    const bool fixedPass = tauFixed && ratio <= fixedTolerance;
+    const bool pullPass = tauPull && std::abs(logRatio) <= pullTolerance;
+    return fixedPass || pullPass;
+  };
   std::vector<float> sortedExpEta;
 
   // if we apply calibration to the strips
@@ -910,6 +996,11 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               static_cast<std::uint32_t>(inner.properties.size()), depth2,
               calibrate && slides2, turnSettled, tauSettled);
           inner.expEta.push_back(expEta);
+          if (tauPull) {
+            inner.etaGradient.push_back(chordEtaGradient(
+                point1, {position2[0], position2[1], z2}, stripAxis(strip1),
+                stripAxis(nodeView.strip(n2Idx))));
+          }
 
           ++numCreatedEdges;
           ++nDoublets;
@@ -926,9 +1017,25 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const bool windowSettled = settleTau && tauSettled && allTausSettled;
           const float windowTauRatioCut =
               windowSettled ? maxTauRatioCutSettled : maxTauRatioCut;
-          const auto [inEdgeFirst, expEtaHigh] =
-              tauRatioWindow(outer.expEta, n2FirstEdge, n2LastEdge, expEta,
-                             windowTauRatioCut);
+          // With a pull, widen to the largest uncertainty any of n2's
+          // doublets could give the pair; each candidate is held to its own
+          // below.
+          float windowRatio = windowTauRatioCut;
+          std::array<float, 2> newGradient{};
+          if (tauPull) {
+            newGradient = inner.etaGradient.back();
+            const std::array<float, 2>& most = maxEtaGradient[n2Idx];
+            const float shared = std::abs(newGradient[1]) + most[0];
+            const float bound2 = newGradient[0] * newGradient[0] +
+                                 shared * shared + most[1] * most[1];
+            const float pullRatio =
+                std::expm1(m_cfg.tauRatioPullCut *
+                           std::sqrt(stripRes2 * bound2 + pullFloor2));
+            windowRatio =
+                tauFixed ? std::max(windowTauRatioCut, pullRatio) : pullRatio;
+          }
+          const auto [inEdgeFirst, expEtaHigh] = tauRatioWindow(
+              outer.expEta, n2FirstEdge, n2LastEdge, expEta, windowRatio);
 
           // The curvature limit the turn cut holds this doublet's triplets
           // to: the low-eta one where its tau keeps them all below the split.
@@ -956,11 +1063,25 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               break;
             }
 
-            const float absTauRatio =
-                std::abs(outer.expEta[inEdgeIdx] * invExpEta - 1.0f);
+            const float tauRatio = outer.expEta[inEdgeIdx] * invExpEta;
+            const float absTauRatio = std::abs(tauRatio - 1.0f);
+
+            // the pull's tolerance on the doublets' difference in eta
+            float pullTolerance = 0.f;
+            float logTauRatio = 0.f;
+            if (tauPull) {
+              pullTolerance =
+                  m_cfg.tauRatioPullCut *
+                  std::sqrt(stripRes2 *
+                                tripletEtaGradient2(
+                                    newGradient, outer.etaGradient[inEdgeIdx]) +
+                            pullFloor2);
+              logTauRatio = std::log(tauRatio);
+            }
 
             // [CUT] loosest tau ratio, off the compact array
-            if (absTauRatio > windowTauRatioCut) {
+            if (!passesTau(absTauRatio, windowTauRatioCut, logTauRatio,
+                           pullTolerance)) {
               continue;
             }
 
@@ -1042,8 +1163,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                     : 0.0f;
 
             // [CUT] doublet tau ratio, loose; retaken tight after calibration
-            if (absTauRatio >
-                m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr) {
+            if (!passesTau(
+                    absTauRatio,
+                    m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr,
+                    logTauRatio, pullTolerance)) {
               continue;
             }
 
@@ -1112,6 +1235,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             // Tau ratio retaken on the calibrated ends at the tight
             // threshold. If nothing moved it equals the doublet one.
             float resolvedTauRatio = absTauRatio;
+            float resolvedLogRatio = logTauRatio;
+            float tightGradient2 = 0.f;
+
+            if (tauPull) {
+              tightGradient2 = tripletEtaGradient2(
+                  newGradient, outer.etaGradient[inEdgeIdx]);
+            }
 
             if (moved) {
               const std::optional<float> expEta12 =
@@ -1125,11 +1255,29 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               }
 
               resolvedTauRatio = std::abs(*expEta23 / *expEta12 - 1.0f);
+
+              if (tauPull) {
+                resolvedLogRatio = std::log(*expEta23 / *expEta12);
+                const std::array<std::array<float, 3>, 3> axes{
+                    stripAxis(nodeView.strip(tripletNodes[0])),
+                    stripAxis(nodeView.strip(tripletNodes[1])),
+                    stripAxis(nodeView.strip(tripletNodes[2]))};
+                tightGradient2 = tripletEtaGradient2(
+                    chordEtaGradient(points[0], points[1], axes[0], axes[1]),
+                    chordEtaGradient(points[1], points[2], axes[1], axes[2]));
+              }
             }
 
+            const float tightPullTolerance =
+                tauPull ? m_cfg.tauRatioPullCutTight *
+                              std::sqrt(stripRes2 * tightGradient2 + pullFloor2)
+                        : 0.f;
+
             // [CUT] tight tau ratio on the calibrated ends
-            if (resolvedTauRatio >
-                m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
+            if (!passesTau(
+                    resolvedTauRatio,
+                    m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr,
+                    resolvedLogRatio, tightPullTolerance)) {
               continue;
             }
 
@@ -1193,7 +1341,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
                 // [CUT] tighter tau ratio for relatively high-pT tracks
                 if (pT > 5 * tripletPtMin) {
-                  if (resolvedTauRatio > 0.9f * m_cfg.tauRatioCut) {
+                  if (!passesTau(resolvedTauRatio, 0.9f * m_cfg.tauRatioCut,
+                                 resolvedLogRatio, 0.9f * tightPullTolerance)) {
                     continue;
                   }
                 }
@@ -1314,12 +1463,31 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
         sortedDoublets.clear();
         sortedExpEta.clear();
+        sortedEtaGradient.clear();
         for (const std::uint32_t idx : sortOrder) {
           sortedDoublets.push_back(inner.doublets[idx]);
           sortedExpEta.push_back(inner.expEta[idx]);
+          if (tauPull) {
+            sortedEtaGradient.push_back(inner.etaGradient[idx]);
+          }
         }
         std::ranges::copy(sortedDoublets, inner.doublets.begin() + first);
         std::ranges::copy(sortedExpEta, inner.expEta.begin() + first);
+        if (tauPull) {
+          std::ranges::copy(sortedEtaGradient,
+                            inner.etaGradient.begin() + first);
+        }
+      }
+
+      // the largest rates of n1's doublets, for the windows of the doublets
+      // that will end on n1
+      if (tauPull && numCreatedEdges > 0) {
+        const std::uint32_t first = edgeInfo[n1Idx].firstEdge;
+        std::array<float, 2>& most = maxEtaGradient[n1Idx];
+        for (std::uint32_t k = first; k < first + numCreatedEdges; ++k) {
+          most[0] = std::max(most[0], std::abs(inner.etaGradient[k][0]));
+          most[1] = std::max(most[1], std::abs(inner.etaGradient[k][1]));
+        }
       }
 
       // makes n1's doublets visible to the next bin group in
