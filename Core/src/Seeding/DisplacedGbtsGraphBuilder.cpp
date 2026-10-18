@@ -44,6 +44,9 @@ struct BinDoublets {
   /// Every doublet's `chordEtaGradient`, inner end first, for a tau ratio
   /// mode with a pull; empty otherwise. Same indices.
   std::vector<std::array<float, 2>> etaGradient;
+  /// Every doublet's two ends as the stereo cut settled them, inner first,
+  /// for `settledTripletFit`; empty otherwise. Same indices.
+  std::vector<std::array<std::array<float, 3>, 2>> settledEnds;
   /// The triplets the doublets are the inner doublet of, each doublet's in a
   /// contiguous range that the doublet gives.
   std::vector<detail::TripletProperties> properties;
@@ -57,6 +60,7 @@ struct BinDoublets {
     std::vector<detail::DisplacedGbtsDoublet>().swap(doublets);
     std::vector<float>().swap(expEta);
     std::vector<std::array<float, 2>>().swap(etaGradient);
+    std::vector<std::array<std::array<float, 3>, 2>>().swap(settledEnds);
     std::vector<detail::TripletProperties>().swap(properties);
   }
 };
@@ -366,6 +370,12 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
       (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStripSettled : 0.0f);
 
+  // if the doublet cuts read the settled ends
+  const bool settledCuts = m_cfg.settledDoubletCuts && settleTau;
+
+  // if the first triplet fit starts from the settled ends
+  const bool settledFit = m_cfg.settledTripletFit && settleTau;
+
   // whether every doublet made so far has a settled tau, which lets a doublet
   // that has one search its partners with the tighter window
   bool allTausSettled = true;
@@ -374,6 +384,38 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   const float d0MaxSquare = m_cfg.d0Max * m_cfg.d0Max;
   const float rOut = m_cfg.maxOuterRadius;
   const float sOutMin = std::sqrt(std::max(0.f, rOut * rOut - d0MaxSquare));
+
+  // The doublet RZ cuts on an inner end (z1, r1) and a tau. z0 = z1 - S1 * tau,
+  // with S1 = sqrt(r1^2 - d0^2) the transverse path from the perigee. d0 is
+  // unknown for a doublet, so z0 and z(rOut) are bands over d0 in [0, d0Max],
+  // bracketed by the two ends; `s1Min` is S1 at d0Max.
+  const auto passesRZ = [&](const float z1, const float r1, const float s1Min,
+                            const float tau) {
+    // [CUT] max |tau|
+    if (std::fabs(tau) > m_cfg.maxAbsTau) {
+      return false;
+    }
+
+    if (!m_cfg.doubletFilterRZ) {
+      return true;
+    }
+
+    const float z0A = z1 - r1 * tau;     // d0 = 0
+    const float z0B = z1 - s1Min * tau;  // d0 = d0Max
+
+    // [CUT] doublet z0 band must overlap [minZ0, maxZ0]
+    if (std::max(z0A, z0B) < m_cfg.minZ0 || std::min(z0A, z0B) > m_cfg.maxZ0) {
+      return false;
+    }
+
+    const float zOutA = z1 + (rOut - r1) * tau;
+    const float zOutB = z1 + (sOutMin - s1Min) * tau;
+
+    // [CUT] doublet z(rOut) band must overlap the RoI. The two bands may pass
+    // on different d0; `tripletFilterRZ` tightens this.
+    return std::max(zOutA, zOutB) >= cutZMinU &&
+           std::min(zOutA, zOutB) <= cutZMaxU;
+  };
 
   // default phi half-window, from the node storage so the two cannot disagree
   const float deltaPhi0 = 0.5f * nodeStorage.m_cfg.phiSliceWidth;
@@ -473,6 +515,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   std::vector<std::uint32_t> sortOrder;
   std::vector<detail::DisplacedGbtsDoublet> sortedDoublets;
   std::vector<std::array<float, 2>> sortedEtaGradient;
+  std::vector<std::array<std::array<float, 3>, 2>> sortedSettledEnds;
 
   // The pull modes of the tau ratio cuts, and per node the largest
   // `chordEtaGradient` of its doublets, inner end and outer, to bound the
@@ -548,6 +591,26 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           stripAxis(nodeView.strip(static_cast<SpacePointIndex>(node)));
     }
   }
+
+  // The phi window of a pair of its own radii, from the two radii and each
+  // one's window terms.
+  const auto pairDeltaPhi = [&](const float r1, const std::array<float, 2>& t1,
+                                const float r2,
+                                const std::array<float, 2>& t2) {
+    const bool near = std::abs(r2 - r1) < m_cfg.phiWindowSplitDeltaRadius;
+    const float pairOffset =
+        near ? m_cfg.phiWindowNearOffset : m_cfg.phiWindowFarOffset;
+    const float pairSlope =
+        near ? m_cfg.phiWindowNearSlope : m_cfg.phiWindowFarSlope;
+    return pairOffset + std::abs(t2[0] - t1[0]) +
+           std::abs(t2[1] - t1[1]) * pairSlope * ptScale;
+  };
+
+  // the window terms of a radius, as `nodeWindowTerms` holds them per node
+  const auto windowTerms = [&](const float r) {
+    return std::array<float, 2>{std::acos(std::min(1.0f, m_cfg.d0Max / r)),
+                                std::sqrt(std::max(0.0f, r * r - d0MaxSquare))};
+  };
 
   // nominal position of a node, before any strip calibration
   const auto nodePoint = [&nodeView](const SpacePointIndex node) {
@@ -674,11 +737,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       const std::array<float, 2> windowTerms1 =
           perPairWindow ? nodeWindowTerms[n1Idx] : std::array<float, 2>{};
 
-      // Transverse path from the perigee to n1 at d0 = d0Max, and the lever
-      // arms out to rOut at both ends of the d0 range, for the z0 band.
+      // transverse path from the perigee to n1 at d0 = d0Max, for the z0 band
       const float s1Min = std::sqrt(std::max(0.f, r1 * r1 - d0MaxSquare));
-      const float outerLeverZeroD0 = rOut - r1;
-      const float outerLeverMaxD0 = sOutMin - s1Min;
 
       // loop over the sliding windows of the outer bins
       for (auto& slw : phiSlidingWindow) {
@@ -701,6 +761,14 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         const bool slides2 = slidesRadially(slw.type, slw.technology);
         const bool innerSkipTurn =
             !m_cfg.useTurnAngleCut || (doubletSlides && !resolveSlides);
+
+        // whether the RZ cuts wait for the stereo cut to settle the ends; two
+        // pixel nodes settle to where they are, so theirs need not
+        const bool settledRZ = settledCuts && !(isPixel1 && isPixel2);
+
+        // and the transverse ones: only an endcap strip end settles across
+        // the transverse plane, a barrel strip end along z
+        const bool settledXY = settledCuts && doubletSlides;
 
         // deltaPhi is the half width: displacement and charge are both
         // symmetric about phi1
@@ -726,23 +794,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const SpacePointIndex n2Idx = slw.phiNodes[n2PhiIdx].second;
 
           // [CUT] phi window of the pair's own radii, the bins' window having
-          // been sized for the extremes of both bins
-          if (perPairWindow) {
-            const std::array<float, 2>& windowTerms2 = nodeWindowTerms[n2Idx];
-            const float pairDr = std::abs(params[n2Idx].r - r1);
-            const bool near = pairDr < m_cfg.phiWindowSplitDeltaRadius;
-            const float pairOffset =
-                near ? m_cfg.phiWindowNearOffset : m_cfg.phiWindowFarOffset;
-            const float pairSlope =
-                near ? m_cfg.phiWindowNearSlope : m_cfg.phiWindowFarSlope;
-            const float pairDeltaPhi =
-                pairOffset + std::abs(windowTerms2[0] - windowTerms1[0]) +
-                std::abs(windowTerms2[1] - windowTerms1[1]) * pairSlope *
-                    ptScale;
-
-            if (std::abs(phi2 - phi1) > pairDeltaPhi) {
-              continue;
-            }
+          // been sized for the extremes of both bins; on the settled ends
+          // below instead where an end will settle radially
+          if (perPairWindow && !settledXY &&
+              std::abs(phi2 - phi1) > pairDeltaPhi(r1, windowTerms1,
+                                                   params[n2Idx].r,
+                                                   nodeWindowTerms[n2Idx])) {
+            continue;
           }
 
           // n2's doublets, as indices into its own bin's
@@ -762,8 +820,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const float chord = fastHypot(dx, dy);
 
           // [CUT] minimum chord. Shares `minDeltaRadius` with the prompt
-          // graph's radial step cut; nominal positions.
-          if (chord < m_cfg.minDeltaRadius) {
+          // graph's radial step cut; on the settled ends below instead where
+          // an end will settle radially, but never a chord of nothing.
+          if (settledXY ? chord == 0.0f : chord < m_cfg.minDeltaRadius) {
             continue;
           }
 
@@ -776,43 +835,19 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const float tau = dz / chord;
           const float ftau = std::fabs(tau);
 
-          // [CUT] max |tau|
-          if (ftau > m_cfg.maxAbsTau) {
-            continue;
-          }
-
           // [CUT] cluster width tau window, on both nodes. Only pixel barrel
           // nodes have a finite window; the rest pass.
-          if (ftau < n1pars.minTau || ftau > n1pars.maxTau) {
+          const auto passesClusterWidth = [&n1pars, &n2pars](const float t) {
+            return t >= n1pars.minTau && t <= n1pars.maxTau &&
+                   t >= n2pars.minTau && t <= n2pars.maxTau;
+          };
+
+          // [CUT] the cluster width tau window, max |tau|, the doublet z0 and
+          // z(rOut) bands, on the nominal ends unless they are to be taken on
+          // the settled ones below
+          if (!settledRZ &&
+              (!passesClusterWidth(ftau) || !passesRZ(z1, r1, s1Min, tau))) {
             continue;
-          }
-
-          if (ftau < n2pars.minTau || ftau > n2pars.maxTau) {
-            continue;
-          }
-
-          // z0 = z1 - S1 * tau, with S1 = sqrt(r1^2 - d0^2) the transverse path
-          // from the perigee. d0 is unknown for a doublet, so z0 and z(rOut)
-          // are bands over d0 in [0, d0Max], bracketed by the two ends.
-          if (m_cfg.doubletFilterRZ) {
-            const float z0A = z1 - r1 * tau;     // d0 = 0
-            const float z0B = z1 - s1Min * tau;  // d0 = d0Max
-
-            // [CUT] doublet z0 band must overlap [minZ0, maxZ0]
-            if (std::max(z0A, z0B) < m_cfg.minZ0 ||
-                std::min(z0A, z0B) > m_cfg.maxZ0) {
-              continue;
-            }
-
-            const float zOutA = z1 + outerLeverZeroD0 * tau;
-            const float zOutB = z1 + outerLeverMaxD0 * tau;
-
-            // [CUT] doublet z(rOut) band must overlap the RoI. The two bands
-            // may pass on different d0; `tripletFilterRZ` tightens this.
-            if (std::max(zOutA, zOutB) < cutZMinU ||
-                std::min(zOutA, zOutB) > cutZMaxU) {
-              continue;
-            }
           }
 
           // [CUT] doublet stereo: the chord must cross both strips of the
@@ -835,6 +870,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // and whether they all were
           float doubletTau = tau;
           bool tauSettled = isPixel1 && isPixel2;
+
+          // the ends that tau is taken between, nominal until settled
+          std::array<float, 3> settled1{x1, y1, z1};
+          std::array<float, 3> settled2{position2[0], position2[1], z2};
 
           if (stereoCut) {
             const std::array<float, 3> chordDirection{dx, dy, dz};
@@ -876,9 +915,6 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             // strip of the pair rather than at the space point.
             if (settleTau && (isPixel1 || strip1 != nullptr) &&
                 (isPixel2 || strip2 != nullptr)) {
-              std::array<float, 3> settled1{x1, y1, z1};
-              std::array<float, 3> settled2{position2[0], position2[1], z2};
-
               if (strip1 != nullptr) {
                 if (slides1) {
                   settled1[0] = crossing1[0];
@@ -907,6 +943,47 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
           }
 
+          // [CUT] max |tau|, the doublet z0 and z(rOut) bands, on the settled
+          // tau and inner end. An endcap strip inner end has moved radially,
+          // which moves its path from the perigee with it.
+          if (settledRZ) {
+            const bool moved1 = tauSettled && slides1 && strip1 != nullptr;
+            const float r1s = moved1 ? fastHypot(settled1[0], settled1[1]) : r1;
+            const float s1MinS =
+                moved1 ? std::sqrt(std::max(0.f, r1s * r1s - d0MaxSquare))
+                       : s1Min;
+
+            if (!passesClusterWidth(std::fabs(doubletTau)) ||
+                !passesRZ(settled1[2], r1s, s1MinS, doubletTau)) {
+              continue;
+            }
+          }
+
+          // [CUT] minimum chord and the pair's phi window, on the settled
+          // transverse ends, which an endcap strip end has moved
+          if (settledXY) {
+            const float sdx = settled2[0] - settled1[0];
+            const float sdy = settled2[1] - settled1[1];
+
+            if (fastHypot(sdx, sdy) < m_cfg.minDeltaRadius) {
+              continue;
+            }
+
+            if (perPairWindow) {
+              const float r1s = fastHypot(settled1[0], settled1[1]);
+              const float r2s = fastHypot(settled2[0], settled2[1]);
+              // the azimuth between the two ends, free of any wrap
+              const float dPhi = std::atan2(
+                  settled1[0] * settled2[1] - settled1[1] * settled2[0],
+                  settled1[0] * settled2[0] + settled1[1] * settled2[1]);
+
+              if (std::abs(dPhi) >
+                  pairDeltaPhi(r1s, windowTerms(r1s), r2s, windowTerms(r2s))) {
+                continue;
+              }
+            }
+          }
+
           // Two points fix no circle, but of the circles through them that
           // pass within d0Max of the beamline one bends least, and a track
           // inside the curvature limit needs that one inside it too. This is
@@ -920,19 +997,28 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // there is no division. Costs a square root, hence after the RZ and
           // stereo cuts.
           //
-          // Nominal positions: an endcap strip end has still to slide, which
+          // On nominal positions an endcap strip end has still to slide, which
           // turns the chord, so such a doublet is held to a limit
-          // `curvatureScaleEndcapStrip` times looser instead.
+          // `curvatureScaleEndcapStrip` times looser instead. With
+          // `settledDoubletCuts` the cut takes the settled transverse ends,
+          // and the plain limit where every end settled.
+          const bool curvatureSettled = settledCuts && tauSettled;
+          const float cx1 = curvatureSettled ? settled1[0] : x1;
+          const float cy1 = curvatureSettled ? settled1[1] : y1;
+          const float cx2 = curvatureSettled ? settled2[0] : position2[0];
+          const float cy2 = curvatureSettled ? settled2[1] : position2[1];
+          const float cdx = cx2 - cx1;
+          const float cdy = cy2 - cy1;
+          const float cChord = curvatureSettled ? fastHypot(cdx, cdy) : chord;
 
           // chord times the distance from the beamline to the chord's line
-          const float chordTimesMiss = std::abs(x1 * dy - y1 * dx);
-          const float chordTimesD0Max = m_cfg.d0Max * chord;
+          const float chordTimesMiss = std::abs(cx1 * cdy - cy1 * cdx);
+          const float chordTimesD0Max = m_cfg.d0Max * cChord;
 
           if (chordTimesMiss > chordTimesD0Max) {
             const float delta = chordTimesMiss * chordTimesMiss -
                                 chordTimesD0Max * chordTimesD0Max;
-            const float dot =
-                x1 * position2[0] + y1 * position2[1] - d0MaxSquare;
+            const float dot = cx1 * cx2 + cy1 * cy2 - d0MaxSquare;
             // 2 * t * delta / chord, for the larger root
             const float root = std::abs(dot) * chordTimesMiss +
                                chordTimesD0Max * std::sqrt(dot * dot + delta);
@@ -940,9 +1026,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             // [CUT] doublet curvature: the least any circle through the
             // doublet can have, delta / (chord * hypot(delta, root)), against
             // the loosest limit
-            if ((doubletSlides ? curvatureCutSlidingSquare
-                               : curvatureCutLoosestSquare) *
-                    chord * chord * (delta * delta + root * root) <
+            if ((doubletSlides && !curvatureSettled
+                     ? curvatureCutSlidingSquare
+                     : curvatureCutLoosestSquare) *
+                    cChord * cChord * (delta * delta + root * root) <
                 delta * delta) {
               continue;
             }
@@ -1015,9 +1102,16 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               calibrate && slides2, turnSettled, tauSettled);
           inner.expEta.push_back(expEta);
           if (tauPull) {
-            inner.etaGradient.push_back(chordEtaGradient(
-                point1, {position2[0], position2[1], z2}, nodeStripAxis[n1Idx],
-                nodeStripAxis[n2Idx]));
+            inner.etaGradient.push_back(
+                settledCuts
+                    ? chordEtaGradient(settled1, settled2, nodeStripAxis[n1Idx],
+                                       nodeStripAxis[n2Idx])
+                    : chordEtaGradient(point1, {position2[0], position2[1], z2},
+                                       nodeStripAxis[n1Idx],
+                                       nodeStripAxis[n2Idx]));
+          }
+          if (settledFit) {
+            inner.settledEnds.push_back({settled1, settled2});
           }
 
           ++numCreatedEdges;
@@ -1027,6 +1121,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // after the one above went in, as a bin that links to itself has
           // `outer` and `inner` the same.
           detail::DisplacedGbtsDoublet& newDoublet = inner.doublets.back();
+          const auto newDoubletIdx =
+              static_cast<std::uint32_t>(inner.doublets.size() - 1);
           BinDoublets& outer = *slw.doublets;
 
           // n2's doublets are in exp(eta) order, so the loosest tau ratio
@@ -1195,8 +1291,22 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               continue;
             }
 
+            // The fit starts from the nominal nodes, or from where the two
+            // doublets settled them: the inner end of the inner doublet, the
+            // outer end of the outer one, and the middle node between the two
+            // places its two chords cross its strip.
             std::array<std::array<float, 3>, 3> points{
                 point1, point2, nodePoint(tripletNodes[2])};
+
+            if (settledFit) {
+              const auto& innerEnds = inner.settledEnds[newDoubletIdx];
+              const auto& outerEnds = outer.settledEnds[inEdgeIdx];
+              points[0] = innerEnds[0];
+              for (std::uint32_t c = 0; c < 3; ++c) {
+                points[1][c] = 0.5f * (innerEnds[1][c] + outerEnds[0][c]);
+              }
+              points[2] = outerEnds[1];
+            }
 
             std::optional<detail::TripletCircle> circle =
                 fitTripletCircle(points);
@@ -1488,11 +1598,15 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         sortedDoublets.clear();
         sortedExpEta.clear();
         sortedEtaGradient.clear();
+        sortedSettledEnds.clear();
         for (const std::uint32_t idx : sortOrder) {
           sortedDoublets.push_back(inner.doublets[idx]);
           sortedExpEta.push_back(inner.expEta[idx]);
           if (tauPull) {
             sortedEtaGradient.push_back(inner.etaGradient[idx]);
+          }
+          if (settledFit) {
+            sortedSettledEnds.push_back(inner.settledEnds[idx]);
           }
         }
         std::ranges::copy(sortedDoublets, inner.doublets.begin() + first);
@@ -1500,6 +1614,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         if (tauPull) {
           std::ranges::copy(sortedEtaGradient,
                             inner.etaGradient.begin() + first);
+        }
+        if (settledFit) {
+          std::ranges::copy(sortedSettledEnds,
+                            inner.settledEnds.begin() + first);
         }
       }
 

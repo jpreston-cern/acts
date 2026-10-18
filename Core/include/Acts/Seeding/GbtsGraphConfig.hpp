@@ -274,6 +274,32 @@ struct GbtsGraphConfig {
   /// @note Displaced only.
   bool settleDoubletTau = true;
 
+  /// Cut a doublet with a strip end on its settled ends rather than its
+  /// nominal ones, as `DoubletSeedFinder` cuts on its calibrated space
+  /// points. The cluster width tau window, max |tau| and the z0 and z(rOut)
+  /// bands of `doubletFilterRZ` read the settled tau and inner end; the
+  /// minimum chord and the pair's phi window the settled transverse ends,
+  /// which only an endcap strip end moves; the doublet curvature cut the
+  /// settled transverse ends too, held to the unloosened limit where every
+  /// end settled; and the pull of `tauRatioMode` the eta rates of the settled
+  /// chord. Each of those cuts then waits for `doubletStereoCut`, which finds
+  /// the crossings, where the doublet has an end it would move. Needs
+  /// `settleDoubletTau`.
+  ///
+  /// @note Displaced only.
+  bool settledDoubletCuts = false;
+
+  /// Start the triplet fit from the doublets' settled ends rather than the
+  /// nominal nodes: the inner node where the inner doublet settled it, the
+  /// outer where the outer doublet did, and the middle node halfway between
+  /// the two places its two chords cross its strip. The strips are then
+  /// resolved against that fit and refitted as before, so this changes which
+  /// tangent they are resolved against, and with it which triplets the
+  /// strip check of `maxStripLengthFraction` keeps. Needs `settleDoubletTau`.
+  ///
+  /// @note Displaced only.
+  bool settledTripletFit = false;
+
   /// The strip widening of the tau ratio cuts between two doublets whose
   /// taus are both settled, in place of `tauRatioCorrStrip`.
   ///

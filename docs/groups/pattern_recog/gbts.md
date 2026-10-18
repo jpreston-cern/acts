@@ -345,6 +345,23 @@ cuts change shape, and of the bending plane only what `d0Max` leaves of it:
   in @f$p_T@f$, so a straight track can be handed any curvature and no factor is
   both lossless and useful. The factor is a trade to tune, not a bound.
 
+With `settledDoubletCuts` these cuts read the doublet's settled ends instead,
+as `DoubletSeedFinder` cuts on strip space points calibrated against their
+chord. The stereo check finds where the chord crosses each strip, and each strip
+end is moved along its strip to that crossing: in @f$z@f$ for a barrel strip,
+radially for an endcap one. The cluster width @f$\tau@f$ window, the
+@f$|\tau|@f$ cut and the @f$z_0@f$ and @f$z(r_\mathrm{out})@f$ bands then take
+the settled @f$\tau@f$ and inner end, and the minimum chord and the pair's
+@f$\phi@f$ window the settled transverse ends. Each waits for the stereo check
+rather than running ahead of it wherever the doublet has an end it would move:
+any strip end for the first group, an endcap strip end for the second, as a
+barrel strip only settles in @f$z@f$. The curvature floor takes the settled
+transverse ends, and where every end settled it drops the
+`curvatureScaleEndcapStrip` loosening, the slide it stood in for having been
+made. A settled end is still only where the chord, not the track, crosses the
+strip, so the guarantee of the floor holds no better than the chord stands in
+for the tangent.
+
 The price is combinatorics, and `d0Max` sets its scale: it widens the
 @f$\phi@f$ window and the @f$z_0@f$ band together, and lowers the curvature
 floor. The floor and the @f$\phi@f$ window read the same two quantities, so on a
@@ -365,6 +382,12 @@ fitted arc, and the track tangent at each of the three nodes.
 Curvature is reported in the prompt graph's @f$\mathrm{d}\phi/\mathrm{d}r@f$
 convention — half the geometric @f$1/R@f$ — so the tuned cut values carry over
 unchanged.
+
+With `settledTripletFit` the first fit starts from the doublets' settled ends
+instead of the nominal nodes: the inner node where the inner doublet settled it,
+the outer where the outer doublet did, and the middle node halfway between the
+crossings of its two chords, which brackets the tangent there. Everything the
+calibration below does is unchanged; only the tangent it starts from is better.
 
 **Strip resolution moves here too.** A strip space point has to be slid along its
 strip to where the track crossed it, and that needs a direction. The only
@@ -524,6 +547,8 @@ alone.
 | `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip. Prompt: per doublet, against the chord. Displaced: per triplet, against the fitted tangent |
 | `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
 | `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |
+| `settledDoubletCuts` | @ref gbts-graph | *displaced*: take every doublet cut after the stereo check, and the pull's eta rates, on the strip ends it settled. Needs `settleDoubletTau` |
+| `settledTripletFit` | @ref gbts-graph | *displaced*: start the triplet fit, which the strips are resolved against, from the doublets' settled ends. Needs `settleDoubletTau` |
 | `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have. Displaced, it also sets the @f$z_0@f$ band, the @f$\phi@f$ window and the curvature floor of a doublet, so it drives the combinatorics |
 | `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency. Displaced, only a doublet in a triplet is an edge, see @ref gbts-lrt-storage |
 | `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth`, `matchBeforeCreateMaxEdges` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that depth in the barrel |

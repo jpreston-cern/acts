@@ -1070,6 +1070,39 @@ BOOST_AUTO_TEST_CASE(TauRatioPullModesKeepEveryEdge) {
   }
 }
 
+// The doublet cuts taken on the settled strip ends, the triplet fit started
+// from them, and both, still find every edge and connection the tracks owe the
+// graph, with the strip points walked off along their strips so that the
+// nominal and settled ends differ, and among dense tracks.
+BOOST_AUTO_TEST_CASE(SettledEndsKeepEveryEdge) {
+  const ToyDetector detector = stripBarrelDetector();
+  for (const bool dense : {false, true}) {
+    const std::vector<Track> tracks =
+        dense ? makeDenseDisplacedTracks() : makeDisplacedTracks();
+    constexpr float kWalk = 8.f;
+    const SpacePointContainer spacePoints =
+        makeSpacePoints(detector, tracks, dense ? 0.f : kWalk);
+    for (const auto [cuts, fit] :
+         {std::pair{true, false}, std::pair{false, true},
+          std::pair{true, true}}) {
+      const SeederSetup setup =
+          makeSeeder(detector, true, false,
+                     [cuts, fit](Experimental::GbtsGraphConfig& cfg) {
+                       cfg.settledDoubletCuts = cuts;
+                       cfg.settledTripletFit = fit;
+                     });
+      const Completeness result = checkCompleteness(
+          buildGraph(setup, spacePoints), spacePoints, tracks);
+
+      BOOST_TEST_MESSAGE("dense " << dense << ", cuts " << cuts << ", fit "
+                                  << fit << ":\n"
+                                  << result.report);
+      BOOST_CHECK_EQUAL(result.foundEdges, result.expectedEdges);
+      BOOST_CHECK_EQUAL(result.foundLinks, result.expectedLinks);
+    }
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }  // namespace Acts::Test
