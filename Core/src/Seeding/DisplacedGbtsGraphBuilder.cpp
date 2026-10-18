@@ -535,6 +535,20 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
     }
   }
 
+  // Per node, the unit axis of its outer strip for the pull's eta rates,
+  // derived once here rather than once per doublet and per triplet, as the
+  // stereo pairs themselves are by the node storage.
+  std::vector<std::array<float, 3>> nodeStripAxis;
+
+  if (tauPull) {
+    nodeStripAxis.resize(nodeStorage.numberOfNodes());
+
+    for (std::size_t node = 0; node < nodeStripAxis.size(); ++node) {
+      nodeStripAxis[node] =
+          stripAxis(nodeView.strip(static_cast<SpacePointIndex>(node)));
+    }
+  }
+
   // nominal position of a node, before any strip calibration
   const auto nodePoint = [&nodeView](const SpacePointIndex node) {
     const std::array<float, 4>& position = nodeView.positions[node];
@@ -801,51 +815,14 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
           }
 
-          // Two points fix no circle, but of the circles through them that
-          // pass within d0Max of the beamline one bends least, and a track
-          // inside the curvature limit needs that one inside it too. This is
-          // the interaction point cut of `DoubletSeedFinder`, taken exactly:
-          // its small d0Max / r forms do not hold where d0Max nears r1.
-          //
-          // A chord whose own line passes within d0Max is straight enough for
-          // any limit. Otherwise, with the centre a distance t along the
-          // chord's bisector, |d0| = d0Max is a quadratic in t and its larger
-          // root is the widest circle. Lengths are carried times the chord, so
-          // there is no division. Costs a square root, hence after the RZ cuts.
-          //
-          // Nominal positions: an endcap strip end has still to slide, which
-          // turns the chord, so such a doublet is held to a limit
-          // `curvatureScaleEndcapStrip` times looser instead.
-
-          // chord times the distance from the beamline to the chord's line
-          const float chordTimesMiss = std::abs(x1 * dy - y1 * dx);
-          const float chordTimesD0Max = m_cfg.d0Max * chord;
-
-          if (chordTimesMiss > chordTimesD0Max) {
-            const float delta = chordTimesMiss * chordTimesMiss -
-                                chordTimesD0Max * chordTimesD0Max;
-            const float dot =
-                x1 * position2[0] + y1 * position2[1] - d0MaxSquare;
-            // 2 * t * delta / chord, for the larger root
-            const float root = std::abs(dot) * chordTimesMiss +
-                               chordTimesD0Max * std::sqrt(dot * dot + delta);
-
-            // [CUT] doublet curvature: the least any circle through the
-            // doublet can have, delta / (chord * hypot(delta, root)), against
-            // the loosest limit
-            if ((doubletSlides ? curvatureCutSlidingSquare
-                               : curvatureCutLoosestSquare) *
-                    chord * chord * (delta * delta + root * root) <
-                delta * delta) {
-              continue;
-            }
-          }
-
           // [CUT] doublet stereo: the chord must cross both strips of the
           // stereo pair at each strip end. The triplet fit makes the same
           // check against the fitted tangent, at the tighter
           // `maxStripLengthFraction`, and it rejects nearly every candidate
           // there; taken here it spares the triplet loop those doublets.
+          // Taken straight after the RZ cuts, as `DoubletSeedFinder` takes its
+          // strip calibration: it removes most of what reaches it, for a few
+          // dot products, and so spares the curvature cut's square root.
           // The chord the turn cut reads, which for an end sliding along a
           // radial strip is taken from where the stereo check finds the
           // chord crosses that strip rather than from the nominal end.
@@ -930,6 +907,47 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             }
           }
 
+          // Two points fix no circle, but of the circles through them that
+          // pass within d0Max of the beamline one bends least, and a track
+          // inside the curvature limit needs that one inside it too. This is
+          // the interaction point cut of `DoubletSeedFinder`, taken exactly:
+          // its small d0Max / r forms do not hold where d0Max nears r1.
+          //
+          // A chord whose own line passes within d0Max is straight enough for
+          // any limit. Otherwise, with the centre a distance t along the
+          // chord's bisector, |d0| = d0Max is a quadratic in t and its larger
+          // root is the widest circle. Lengths are carried times the chord, so
+          // there is no division. Costs a square root, hence after the RZ and
+          // stereo cuts.
+          //
+          // Nominal positions: an endcap strip end has still to slide, which
+          // turns the chord, so such a doublet is held to a limit
+          // `curvatureScaleEndcapStrip` times looser instead.
+
+          // chord times the distance from the beamline to the chord's line
+          const float chordTimesMiss = std::abs(x1 * dy - y1 * dx);
+          const float chordTimesD0Max = m_cfg.d0Max * chord;
+
+          if (chordTimesMiss > chordTimesD0Max) {
+            const float delta = chordTimesMiss * chordTimesMiss -
+                                chordTimesD0Max * chordTimesD0Max;
+            const float dot =
+                x1 * position2[0] + y1 * position2[1] - d0MaxSquare;
+            // 2 * t * delta / chord, for the larger root
+            const float root = std::abs(dot) * chordTimesMiss +
+                               chordTimesD0Max * std::sqrt(dot * dot + delta);
+
+            // [CUT] doublet curvature: the least any circle through the
+            // doublet can have, delta / (chord * hypot(delta, root)), against
+            // the loosest limit
+            if ((doubletSlides ? curvatureCutSlidingSquare
+                               : curvatureCutLoosestSquare) *
+                    chord * chord * (delta * delta + root * root) <
+                delta * delta) {
+              continue;
+            }
+          }
+
           if (!tauSettled) {
             allTausSettled = false;
           }
@@ -998,8 +1016,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           inner.expEta.push_back(expEta);
           if (tauPull) {
             inner.etaGradient.push_back(chordEtaGradient(
-                point1, {position2[0], position2[1], z2}, stripAxis(strip1),
-                stripAxis(nodeView.strip(n2Idx))));
+                point1, {position2[0], position2[1], z2}, nodeStripAxis[n1Idx],
+                nodeStripAxis[n2Idx]));
           }
 
           ++numCreatedEdges;
@@ -1066,22 +1084,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
             const float tauRatio = outer.expEta[inEdgeIdx] * invExpEta;
             const float absTauRatio = std::abs(tauRatio - 1.0f);
 
-            // the pull's tolerance on the doublets' difference in eta
-            float pullTolerance = 0.f;
-            float logTauRatio = 0.f;
-            if (tauPull) {
-              pullTolerance =
-                  m_cfg.tauRatioPullCut *
-                  std::sqrt(stripRes2 *
-                                tripletEtaGradient2(
-                                    newGradient, outer.etaGradient[inEdgeIdx]) +
-                            pullFloor2);
-              logTauRatio = std::log(tauRatio);
-            }
-
-            // [CUT] loosest tau ratio, off the compact array
-            if (!passesTau(absTauRatio, windowTauRatioCut, logTauRatio,
-                           pullTolerance)) {
+            // [CUT] loosest tau ratio, off the compact array. With a pull it
+            // waits for the turn cut instead, which costs less than the pull's
+            // square root and log and removes most of what reaches it.
+            if (!tauPull && absTauRatio > windowTauRatioCut) {
               continue;
             }
 
@@ -1120,6 +1126,25 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                   ((doubletSlides || outerSlides) ? turnCurvatureCutSliding
                                                   : turnCurvatureCut) *
                       (turnChord + pS->chord)) {
+                continue;
+              }
+            }
+
+            // the pull's tolerance on the doublets' difference in eta
+            float pullTolerance = 0.f;
+            float logTauRatio = 0.f;
+            if (tauPull) {
+              pullTolerance =
+                  m_cfg.tauRatioPullCut *
+                  std::sqrt(stripRes2 *
+                                tripletEtaGradient2(
+                                    newGradient, outer.etaGradient[inEdgeIdx]) +
+                            pullFloor2);
+              logTauRatio = std::log(tauRatio);
+
+              // [CUT] loosest tau ratio, with the pull
+              if (!passesTau(absTauRatio, windowTauRatioCut, logTauRatio,
+                             pullTolerance)) {
                 continue;
               }
             }
@@ -1258,13 +1283,12 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
               if (tauPull) {
                 resolvedLogRatio = std::log(*expEta23 / *expEta12);
-                const std::array<std::array<float, 3>, 3> axes{
-                    stripAxis(nodeView.strip(tripletNodes[0])),
-                    stripAxis(nodeView.strip(tripletNodes[1])),
-                    stripAxis(nodeView.strip(tripletNodes[2]))};
+                const std::array<float, 3>& axis1 = nodeStripAxis[n1Idx];
+                const std::array<float, 3>& axis2 = nodeStripAxis[n2Idx];
+                const std::array<float, 3>& axis3 = nodeStripAxis[pS->n2];
                 tightGradient2 = tripletEtaGradient2(
-                    chordEtaGradient(points[0], points[1], axes[0], axes[1]),
-                    chordEtaGradient(points[1], points[2], axes[1], axes[2]));
+                    chordEtaGradient(points[0], points[1], axis1, axis2),
+                    chordEtaGradient(points[1], points[2], axis2, axis3));
               }
             }
 
