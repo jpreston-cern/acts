@@ -264,6 +264,14 @@ struct GbtsGraphConfig {
   /// @note Displaced only, and only with `useEtaBinning`.
   bool perPairPhiWindow = true;
 
+  /// Largest phi half window a doublet may span, zero for none. The window
+  /// `d0Max` asks for is wide, near 0.3 rad between the inner strip layers for
+  /// 300 mm, and a cap trades the doublets of the most displaced tracks for
+  /// time, as `doubletDPhiCap` does for the grid triplet seeder.
+  ///
+  /// @note Displaced only, and only with `useEtaBinning`.
+  float maxDoubletDeltaPhi = 0.0f;
+
   /// Take a doublet's tau with each strip end at the crossing
   /// `doubletStereoCut` finds rather than at its nominal position: z for a
   /// barrel strip, the transverse position for an endcap strip. Two doublets

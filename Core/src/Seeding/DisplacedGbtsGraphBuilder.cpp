@@ -592,6 +592,13 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
     }
   }
 
+  // a phi half window held to `maxDoubletDeltaPhi`, where there is one
+  const auto capDeltaPhi = [this](const float deltaPhi) {
+    return m_cfg.maxDoubletDeltaPhi > 0.0f
+               ? std::min(deltaPhi, m_cfg.maxDoubletDeltaPhi)
+               : deltaPhi;
+  };
+
   // The phi window of a pair of its own radii, from the two radii and each
   // one's window terms.
   const auto pairDeltaPhi = [&](const float r1, const std::array<float, 2>& t1,
@@ -602,8 +609,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         near ? m_cfg.phiWindowNearOffset : m_cfg.phiWindowFarOffset;
     const float pairSlope =
         near ? m_cfg.phiWindowNearSlope : m_cfg.phiWindowFarSlope;
-    return pairOffset + std::abs(t2[0] - t1[0]) +
-           std::abs(t2[1] - t1[1]) * pairSlope * ptScale;
+    return capDeltaPhi(pairOffset + std::abs(t2[0] - t1[0]) +
+                       std::abs(t2[1] - t1[1]) * pairSlope * ptScale);
   };
 
   // the window terms of a radius, as `nodeWindowTerms` holds them per node
@@ -695,6 +702,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           deltaPhi =
               phiWindow(m_cfg.phiWindowFarOffset, m_cfg.phiWindowFarSlope);
         }
+        deltaPhi = capDeltaPhi(deltaPhi);
       }
 
       SlidingWindow& window = phiSlidingWindow.emplace_back();
