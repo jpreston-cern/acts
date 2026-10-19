@@ -84,7 +84,72 @@ struct SlidingWindow {
   GbtsLayerTechnology technology{};
   /// Type of the bin's layer.
   GbtsLayerType type{};
+  /// bounding boxes of the bin's phi-ordered nodes, a `kStereoBlock` of them
+  /// each, for skipping a block that n1's stereo pair rules out
+  const std::array<float, 6>* blockBoxes{};
 };
+
+/// Phi-ordered nodes per bounding box for the doublet stereo cut at n1.
+constexpr std::uint32_t kStereoBlock = 16;
+
+/// The range of v . d over the chords d from a point to anywhere in a box,
+/// and the largest that the terms of v . d can be, for the rounding slack.
+///
+/// @param v The vector to dot with
+/// @param from The point
+/// @param box The box, lowest x, y and z then highest
+/// @return The least and the most v . d, and the term magnitude
+std::array<float, 3> dotRange(const std::array<float, 3>& v,
+                              const std::array<float, 3>& from,
+                              const std::array<float, 6>& box) {
+  std::array<float, 3> range{0.f, 0.f, 0.f};
+  for (std::size_t i = 0; i < 3; ++i) {
+    const float low = v[i] * (box[i] - from[i]);
+    const float high = v[i] * (box[3 + i] - from[i]);
+    range[0] += std::min(low, high);
+    range[1] += std::max(low, high);
+    range[2] += std::max(std::abs(low), std::abs(high));
+  }
+  return range;
+}
+
+/// Whether no chord from a strip node to anywhere in a box can pass the
+/// doublet stereo cut at that node, `calibrateOuterStripSpacePoint` with
+/// `tolerance`: whether, over the whole box, one of its two numerators
+/// exceeds what the denominator allows. The ranges are exact, as the dot
+/// products are linear in the chord, and each is widened by far more than
+/// the rounding either computation can make, so a chord the cut would pass
+/// is never in a box ruled out.
+///
+/// @param strip The node's stereo pair
+/// @param from The node
+/// @param box The box, lowest x, y and z then highest
+/// @param tolerance The strip length fraction
+/// @return Whether the cut fails every chord into the box
+bool missesStereoPair(const OuterStripSpacePointCalibrationDetailsDerived& strip,
+                      const std::array<float, 3>& from,
+                      const std::array<float, 6>& box, const float tolerance) {
+  constexpr float slack = 1e-4f;
+
+  const std::array<float, 3> scale =
+      dotRange(strip.innerCrossOuterHalfVector, from, box);
+  const float maxScale = std::max(std::abs(scale[0]), std::abs(scale[1])) +
+                         slack * scale[2];
+
+  // the least |numerator| over the box, made smaller by the slack
+  const auto minAbs = [&](const std::array<float, 3>& numerator) {
+    const float least = numerator[0] > 0.f   ? numerator[0]
+                        : numerator[1] < 0.f ? -numerator[1]
+                                             : 0.f;
+    return least - slack * numerator[2];
+  };
+
+  const float limit = maxScale * tolerance;
+  return minAbs(dotRange(strip.innerToOuterSeparationCrossOuterHalfVector,
+                         from, box)) > limit ||
+         minAbs(dotRange(strip.innerToOuterSeparationCrossInnerHalfVector,
+                         from, box)) > limit;
+}
 
 /// Whether a strip node on this layer slides radially when calibrated: true
 /// for endcap strips. Barrel strips slide along z and keep their transverse
@@ -592,6 +657,40 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
     }
   }
 
+  // Per outer bin, the bounding box of each `kStereoBlock` of its phi-ordered
+  // nodes, at the positions the doublet stereo cut takes its chord to.
+  std::vector<std::vector<std::array<float, 6>>> binBlockBoxes;
+
+  if (stereoCut) {
+    binBlockBoxes.resize(numBins);
+
+    for (std::uint32_t bin = 0; bin < numBins; ++bin) {
+      if (binDoublets[bin].nPendingReaders == 0) {
+        continue;
+      }
+
+      const auto& phiNodes = nodeStorage.etaBin(bin).phiNodes;
+      std::vector<std::array<float, 6>>& boxes = binBlockBoxes[bin];
+      boxes.reserve((phiNodes.size() + kStereoBlock - 1) / kStereoBlock);
+
+      for (std::size_t k = 0; k < phiNodes.size(); ++k) {
+        const SpacePointIndex node = phiNodes[k].second;
+        const std::array<float, 3> point{nodeView.positions[node][0],
+                                         nodeView.positions[node][1],
+                                         params[node].z};
+        if (k % kStereoBlock == 0) {
+          boxes.push_back({point[0], point[1], point[2], point[0], point[1],
+                           point[2]});
+        }
+        std::array<float, 6>& box = boxes.back();
+        for (std::size_t i = 0; i < 3; ++i) {
+          box[i] = std::min(box[i], point[i]);
+          box[3 + i] = std::max(box[3 + i], point[i]);
+        }
+      }
+    }
+  }
+
   // a phi half window held to `maxDoubletDeltaPhi`, where there is one
   const auto capDeltaPhi = [this](const float deltaPhi) {
     return m_cfg.maxDoubletDeltaPhi > 0.0f
@@ -713,6 +812,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       window.depth = B2.depth;
       window.technology = B2.technology;
       window.type = B2.type;
+      if (stereoCut) {
+        window.blockBoxes = binBlockBoxes[b2Idx].data();
+      }
     }
 
     // outer loop over n1 nodes in the inner bin
@@ -784,6 +886,11 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
         const float minPhi = phi1 - deltaPhi;
         const float maxPhi = phi1 + deltaPhi;
 
+        // whether whole blocks of candidates can be ruled out by n1's stereo
+        // pair, and the first candidate of the next block to try
+        const bool skipBlocks = stereoCut && strip1 != nullptr;
+        std::uint32_t nextBlockStart = 0;
+
         for (std::uint32_t n2PhiIdx = slw.firstIt; n2PhiIdx < slw.numPhiNodes;
              ++n2PhiIdx) {
           const float phi2 = slw.phiNodes[n2PhiIdx].first;
@@ -797,6 +904,20 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           if (phi2 > maxPhi) {
             // break and go to the next window
             break;
+          }
+
+          // [CUT] the doublet stereo cut at n1, below, for a whole block of
+          // candidates at once: n1's stereo pair alone rejects most of the
+          // window, and those it passes lie together in phi
+          if (skipBlocks && n2PhiIdx >= nextBlockStart) {
+            const std::uint32_t block = n2PhiIdx / kStereoBlock;
+            nextBlockStart = (block + 1) * kStereoBlock;
+
+            if (missesStereoPair(*strip1, point1, slw.blockBoxes[block],
+                                 m_cfg.doubletStripLengthFraction)) {
+              n2PhiIdx = nextBlockStart - 1;
+              continue;
+            }
           }
 
           const SpacePointIndex n2Idx = slw.phiNodes[n2PhiIdx].second;
