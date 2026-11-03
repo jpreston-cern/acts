@@ -29,6 +29,13 @@ struct GbtsLayerConnection {
   float tauRatioCutInner = 0.007f;
   /// Largest |tau ratio| if this is the outer pair of a triplet.
   float tauRatioCutOuter = 0.007f;
+  /// Added to the displaced graph's tau ratio cut for a triplet with a strip
+  /// node, by the larger of what its two pairs carry, until the triplet has
+  /// resolved its strips.
+  float tauRatioCorrStrip = 0.f;
+  /// The same, in place of `tauRatioCorrStrip`, between two doublets whose taus
+  /// both have their strip ends settled.
+  float tauRatioCorrStripSettled = 0.f;
 };
 
 /// Tau ratio tolerances for `assignAdaptiveTauRatioCuts`.
@@ -37,27 +44,28 @@ struct GbtsAdaptiveTauRatioCuts {
   float tauRatioCut = 0.007f;
   /// Widening for a barrel layer skipped, or for the barrel left.
   float tauRatioCorr = 0.006f;
-  /// Widening, on top, for a strip layer in the triplet.
-  ///
-  /// @note Set this to zero for the displaced graph, which adds its own strip
-  ///       widening per triplet and takes it off again once the triplet has
-  ///       resolved its strips. A widening carried by the pair could not come
-  ///       off.
+  /// Widening for a strip layer in the triplet.
   float tauRatioCorrStrip = 0.03f;
-  /// Whether the barrel `tauRatioCorr` looks at is every barrel layer, rather
-  /// than only the pixel ones. With it, a pair of strip barrel layers that
-  /// skips one is widened, and going from the pixel barrel onto a strip barrel
-  /// layer is not leaving the barrel.
+  /// Widening for a strip layer in the triplet between two doublets whose taus
+  /// both have their strip ends settled.
   ///
-  /// @note Set this for the displaced graph, whose tracks live in the strips.
-  bool stripsInBarrel = false;
+  /// @note Displaced only.
+  float tauRatioCorrStripSettled = 0.0075f;
+  /// Fill the pairs for the displaced graph. Every barrel layer then counts as
+  /// barrel for `tauRatioCorr`, rather than only the pixel ones, so a pair of
+  /// strip barrel layers that skips one is widened, and going from the pixel
+  /// barrel onto a strip barrel layer is not leaving it. The strip widenings
+  /// go in the pair's own fields rather than in its cuts, to come off once a
+  /// triplet has resolved its strips.
+  bool displaced = false;
 };
 
 /// Fill the tau ratio tolerances of the layer pairs. A pair is widened by
 /// `tauRatioCorr` if it skips a barrel layer of any technology between two
 /// barrel layers, or, as an outer pair, if it leaves the barrel, the barrel
-/// being the pixel one unless `stripsInBarrel` is set. A pair with a strip
-/// layer is widened by `tauRatioCorrStrip` on top.
+/// being the pixel one unless `displaced` is set. A pair with a strip layer is
+/// widened by `tauRatioCorrStrip` on top, or with `displaced` carries it and
+/// `tauRatioCorrStripSettled` in its own fields.
 ///
 /// @param connections The layer pairs, whose tolerances are overwritten
 /// @param layers The layers the geometry is built from

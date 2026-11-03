@@ -868,6 +868,7 @@ BOOST_AUTO_TEST_CASE(AdaptiveTauRatioCutsOverStripBarrel) {
     return description;
   };
   const std::vector<GbtsLayerDescription> layers = {
+      layer(6, GbtsLayerType::Barrel, GbtsLayerTechnology::Pixel, 30.f),
       layer(1, GbtsLayerType::Barrel, GbtsLayerTechnology::Pixel, 50.f),
       layer(2, GbtsLayerType::Barrel, GbtsLayerTechnology::Strip, 400.f),
       layer(3, GbtsLayerType::Barrel, GbtsLayerTechnology::Strip, 600.f),
@@ -882,22 +883,36 @@ BOOST_AUTO_TEST_CASE(AdaptiveTauRatioCutsOverStripBarrel) {
       {.src = 3, .dst = 1},  // pixel onto strip, skips a layer
       {.src = 5, .dst = 4},  // leaves the barrel
       {.src = 5, .dst = 5},  // off the barrel
+      {.src = 1, .dst = 6},  // pixel, adjacent
   };
   Experimental::GbtsAdaptiveTauRatioCuts cuts;
-  cuts.tauRatioCorrStrip = 0.f;
-  cuts.stripsInBarrel = true;
+  cuts.displaced = true;
   Experimental::assignAdaptiveTauRatioCuts(connections, layers, cuts);
 
   const float base = cuts.tauRatioCut;
   const float wide = base + cuts.tauRatioCorr;
   const std::vector<std::pair<float, float>> expected = {
-      {base, base}, {base, base}, {wide, wide},
-      {wide, wide}, {base, wide}, {base, base},
+      {base, base}, {base, base}, {wide, wide}, {wide, wide},
+      {base, wide}, {base, base}, {base, base},
   };
   for (std::size_t i = 0; i < connections.size(); ++i) {
     BOOST_CHECK_CLOSE(connections[i].tauRatioCutInner, expected[i].first, 1e-4);
     BOOST_CHECK_CLOSE(connections[i].tauRatioCutOuter, expected[i].second,
                       1e-4);
+
+    // the strip widenings are in the pair's own fields, on a pair with a strip
+    const bool hasStrip = i + 1 < connections.size();
+    BOOST_CHECK_EQUAL(connections[i].tauRatioCorrStrip,
+                      hasStrip ? cuts.tauRatioCorrStrip : 0.f);
+    BOOST_CHECK_EQUAL(connections[i].tauRatioCorrStripSettled,
+                      hasStrip ? cuts.tauRatioCorrStripSettled : 0.f);
+  }
+
+  // and left out of them for the prompt graph, which has them in its cuts
+  Experimental::assignAdaptiveTauRatioCuts(connections, layers);
+  for (const GbtsLayerConnection& connection : connections) {
+    BOOST_CHECK_EQUAL(connection.tauRatioCorrStrip, 0.f);
+    BOOST_CHECK_EQUAL(connection.tauRatioCorrStripSettled, 0.f);
   }
 }
 

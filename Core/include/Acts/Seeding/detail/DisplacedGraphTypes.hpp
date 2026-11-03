@@ -151,20 +151,20 @@ struct DisplacedGbtsDoublet final {
   /// @param cosAlpha_ Cosine of the azimuth of that chord
   /// @param sinAlpha_ Sine of the azimuth of that chord
   /// @param firstProperty_ Where the doublet's triplet properties will start
-  /// @param tauRatioCut_ Tau ratio cut of this doublet as an outer pair
+  /// @param connection_ Index of the doublet's layer pair in the geometry
   /// @param n2Slides_ Whether the outer node slides radially under calibration
   /// @param chordSettled_ Whether the turn cut can trust the chord
   /// @param tauSettled_ Whether the doublet's tau has its strip ends settled
   DisplacedGbtsDoublet(SpacePointIndex n2_, float chord_, float cosAlpha_,
                        float sinAlpha_, std::uint32_t firstProperty_,
-                       float tauRatioCut_, bool n2Slides_, bool chordSettled_,
-                       bool tauSettled_)
+                       std::uint32_t connection_, bool n2Slides_,
+                       bool chordSettled_, bool tauSettled_)
       : n2{n2_},
         chord(chord_),
         cosAlpha(cosAlpha_),
         sinAlpha(sinAlpha_),
         firstProperty{firstProperty_},
-        tauRatioCut{tauRatioCut_},
+        connection{connection_},
         n2Slides{n2Slides_},
         chordSettled{chordSettled_},
         tauSettled{tauSettled_} {}
@@ -200,9 +200,10 @@ struct DisplacedGbtsDoublet final {
   /// before the next one is made, so they are contiguous.
   std::uint32_t firstProperty{};
 
-  /// GbtsLayerConnection::tauRatioCutOuter of this doublet's layer pair,
-  /// the cut it brings to a triplet it is the outer doublet of.
-  float tauRatioCut{};
+  /// Index of this doublet's layer pair in GbtsGeometry::layerConnections,
+  /// which holds the tau ratio tolerances it brings to a triplet it is the
+  /// outer doublet of.
+  std::uint32_t connection{};
 
   /// Whether the outer node is an endcap strip that calibration slides
   /// radially, which loosens the turn cut of any triplet it ends.

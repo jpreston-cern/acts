@@ -83,6 +83,13 @@ class GbtsGeometry final {
   /// @return The bin groups
   std::span<const GbtsBinGroup> binGroups() const { return m_binGroups; }
 
+  /// The layer pairs the geometry was built from, in the order it was given
+  /// them, which is what GbtsBinLink::connection indexes.
+  /// @return The layer pairs
+  std::span<const GbtsLayerConnection> layerConnections() const {
+    return m_layerConnections;
+  }
+
  private:
   // The layer object is shared only with the classes that build the graph.
   friend class GbtsNodeStorage;
@@ -117,6 +124,9 @@ class GbtsGeometry final {
 
   /// Bin groups
   std::vector<GbtsBinGroup> m_binGroups;
+
+  /// The layer pairs the geometry was built from.
+  std::vector<GbtsLayerConnection> m_layerConnections;
 };
 
 }  // namespace Acts::Experimental

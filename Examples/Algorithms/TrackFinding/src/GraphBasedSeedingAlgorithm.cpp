@@ -94,11 +94,7 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   if (!m_cfg.useAdaptiveCuts) {
     tauRatioCuts.tauRatioCorr = 0.f;
   }
-  if (m_cfg.useDisplacedGraph) {
-    // its strip widening is per triplet, in `graphConfig.tauRatioCorrStrip`
-    tauRatioCuts.tauRatioCorrStrip = 0.f;
-    tauRatioCuts.stripsInBarrel = true;
-  }
+  tauRatioCuts.displaced = m_cfg.useDisplacedGraph;
   Acts::Experimental::assignAdaptiveTauRatioCuts(connections, layerGeometry,
                                                  tauRatioCuts);
 
@@ -451,6 +447,8 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("tauRatioCut: " << m_cfg.tauRatioCuts.tauRatioCut);
   ACTS_DEBUG("tauRatioCorr: " << m_cfg.tauRatioCuts.tauRatioCorr);
   ACTS_DEBUG("tauRatioCorrStrip: " << m_cfg.tauRatioCuts.tauRatioCorrStrip);
+  ACTS_DEBUG("tauRatioCorrStripSettled: "
+             << m_cfg.tauRatioCuts.tauRatioCorrStripSettled);
   ACTS_DEBUG("===== GbtsTrackFilter =====");
   const auto &cfg3 = m_cfg.trackingFilterConfig;
   ACTS_DEBUG("sigmaMS: " << cfg3.sigmaMS);

@@ -241,8 +241,7 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
 
     const auto inBarrel = [&cuts](const GbtsLayerDescription& layer) {
       return layer.depth >= 0 &&
-             (cuts.stripsInBarrel ||
-              layer.technology == GbtsLayerTechnology::Pixel);
+             (cuts.displaced || layer.technology == GbtsLayerTechnology::Pixel);
     };
     const bool outerInBarrel = inBarrel(*outer);
     const bool innerInBarrel = inBarrel(*inner);
@@ -252,10 +251,10 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
     const bool skipsLayer =
         outerInBarrel && innerInBarrel && outer->depth - inner->depth != 1;
     const bool leavesBarrel = innerInBarrel && !outerInBarrel;
-    const float strip = (outer->technology == GbtsLayerTechnology::Strip ||
-                         inner->technology == GbtsLayerTechnology::Strip)
-                            ? cuts.tauRatioCorrStrip
-                            : 0.f;
+    const bool hasStrip = outer->technology == GbtsLayerTechnology::Strip ||
+                          inner->technology == GbtsLayerTechnology::Strip;
+    const float strip =
+        hasStrip && !cuts.displaced ? cuts.tauRatioCorrStrip : 0.f;
 
     // leaving the barrel widens only the triplet that leaves after its middle
     connection.tauRatioCutInner =
@@ -263,6 +262,11 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
     connection.tauRatioCutOuter =
         cuts.tauRatioCut +
         (skipsLayer || leavesBarrel ? cuts.tauRatioCorr : 0.f) + strip;
+
+    const bool ownFields = hasStrip && cuts.displaced;
+    connection.tauRatioCorrStrip = ownFields ? cuts.tauRatioCorrStrip : 0.f;
+    connection.tauRatioCorrStripSettled =
+        ownFields ? cuts.tauRatioCorrStripSettled : 0.f;
   }
 }
 
@@ -289,9 +293,16 @@ GbtsGeometry::GbtsGeometry(
   binLayerMap.resize(m_nEtaBins);
   std::optional<std::uint32_t> lastBin1;
 
-  for (const GbtsLayerConnection& connection : layerConnections) {
+  m_layerConnections.assign(layerConnections.begin(), layerConnections.end());
+
+  for (std::uint32_t connectionIdx = 0;
+       connectionIdx < m_layerConnections.size(); ++connectionIdx) {
+    const GbtsLayerConnection& connection = m_layerConnections[connectionIdx];
+
     if (connection.tauRatioCutInner < 0.f ||
-        connection.tauRatioCutOuter < 0.f) {
+        connection.tauRatioCutOuter < 0.f ||
+        connection.tauRatioCorrStrip < 0.f ||
+        connection.tauRatioCorrStripSettled < 0.f) {
       throw std::invalid_argument(
           "GbtsGeometry: layer connection with a negative tau ratio cut");
     }
@@ -326,7 +337,7 @@ GbtsGeometry::GbtsGeometry(
         binLayerMap[bin2Idx] = pL2;
 
         const GbtsBinLink link{bin2Idx, connection.tauRatioCutInner,
-                               connection.tauRatioCutOuter};
+                               connection.tauRatioCutOuter, connectionIdx};
 
         if (bin1Idx != lastBin1) {
           // adding a new group

@@ -460,12 +460,13 @@ The @f$\tau@f$ tolerance comes from the layer pairs, as in the prompt graph: the
 looser of `tauRatioCutInner` of the inner pair and `tauRatioCutOuter` of the outer
 one, see @ref Acts::Experimental::GbtsLayerConnection. These can be set pair by
 pair, or filled by @ref Acts::Experimental::assignAdaptiveTauRatioCuts, which for
-this graph should be given `stripsInBarrel` and a `tauRatioCorrStrip` of zero.
-A pair of barrel layers of either technology that skips a layer is then widened,
-there being more material to scatter in, as is an outer pair that leaves the
-barrel. What depends on the strips being unresolved stays per triplet:
-`tauRatioCorrStrip` is added on top and comes off once the triplet has resolved
-them.
+this graph should be given `displaced`. A pair of barrel layers of either
+technology that skips a layer is then widened, there being more material to
+scatter in, as is an outer pair that leaves the barrel. What depends on the
+strips being unresolved is carried apart from those cuts: a triplet with a strip
+node adds the larger `tauRatioCorrStrip` of its two pairs, or their larger
+`tauRatioCorrStripSettled` between two doublets that settled their taus, and
+drops it once the triplet has resolved its strips.
 
 ### Doublets and edges {#gbts-lrt-storage}
 
@@ -535,7 +536,6 @@ alone.
 | `cutDPhiMax`, `cutDCurvMax` | @ref gbts-graph | edge-to-edge linking tolerances |
 | `useSumRatioCut`, `sumRatioCutMax` | @ref gbts-graph | prompt: bound on the summed linking tolerances, against pairs marginal in all three |
 | `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the high-pT check, the linking cut coming from @ref Acts::Experimental::GbtsLayerConnection in either graph |
-| `tauRatioCorrStrip` | @ref gbts-lrt | displaced: widen the layer pairs' cut where an end is an unresolved strip, which comes back off once the triplet has resolved it |
 | `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip. Prompt: per doublet, against the chord. Displaced: per triplet, against the fitted tangent |
 | `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
 | `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |

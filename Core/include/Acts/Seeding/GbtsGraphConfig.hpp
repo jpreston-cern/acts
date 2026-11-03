@@ -52,14 +52,6 @@ struct GbtsGraphConfig {
   /// Tau ratio precut threshold.
   float tauRatioPrecut = 0.009f;
 
-  /// Added to the layer pairs' tau ratio cut for a triplet any of whose three
-  /// nodes a strip module made, whose two doublets resolved the shared node's
-  /// along-strip coordinate separately. Reaches nothing without a strip in the
-  /// triplet, and comes off once the triplet has resolved its strips.
-  ///
-  /// @note Displaced only. The prompt graph has this on the layer pairs.
-  float tauRatioCorrStrip = 0.03f;
-
   /// Minimum transverse momentum.
   float minPt = 1.0f * Acts::UnitConstants::GeV;
 
@@ -262,9 +254,9 @@ struct GbtsGraphConfig {
   /// Take a doublet's tau with each strip end at the crossing
   /// `doubletStereoCut` finds rather than at its nominal position: z for a
   /// barrel strip, the transverse position for an endcap strip. Two doublets
-  /// whose strip ends are all settled this way are then compared with
-  /// `tauRatioCorrStripSettled` instead of `tauRatioCorrStrip`. Needs
-  /// `doubletStereoCut`.
+  /// whose strip ends are all settled this way then take their layer pairs'
+  /// `tauRatioCorrStripSettled` instead of their `tauRatioCorrStrip`, see
+  /// `GbtsLayerConnection`. Needs `doubletStereoCut`.
   ///
   /// @note Displaced only.
   bool settleDoubletTau = true;
@@ -294,12 +286,6 @@ struct GbtsGraphConfig {
   ///
   /// @note Displaced only.
   bool settledTripletFit = false;
-
-  /// The strip widening of the tau ratio cuts between two doublets whose
-  /// taus are both settled, in place of `tauRatioCorrStrip`.
-  ///
-  /// @note Displaced only.
-  float tauRatioCorrStripSettled = 0.0075f;
 
   /// Cut a fitted triplet on its z0 against [minZ0, maxZ0] and its z at
   /// `maxOuterRadius` against the RoI, using the fitted d0. Gated apart from

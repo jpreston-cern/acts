@@ -95,8 +95,7 @@ using ConnectionTweak =
 /// The tau ratio cuts the displaced graph is meant to be given.
 Experimental::GbtsAdaptiveTauRatioCuts displacedTauRatioCuts() {
   Experimental::GbtsAdaptiveTauRatioCuts cuts;
-  cuts.tauRatioCorrStrip = 0.f;
-  cuts.stripsInBarrel = true;
+  cuts.displaced = true;
   return cuts;
 }
 
@@ -896,16 +895,13 @@ BOOST_AUTO_TEST_CASE(LayerPairsSetTheTauRatioCut) {
   // so a search that stopped short of it would stop the count growing too.
   const auto withoutStripWidening = [&](const float cut) {
     const SeederSetup setup = makeSeeder(
-        detector, true, false,
-        [](Experimental::GbtsGraphConfig& config) {
-          config.tauRatioCorrStrip = 0.f;
-          config.tauRatioCorrStripSettled = 0.f;
-        },
-        {}, displacedTauRatioCuts(),
+        detector, true, false, {}, {}, displacedTauRatioCuts(),
         [&](std::vector<Experimental::GbtsLayerConnection>& connections) {
           for (Experimental::GbtsLayerConnection& connection : connections) {
             connection.tauRatioCutInner = cut;
             connection.tauRatioCutOuter = cut;
+            connection.tauRatioCorrStrip = 0.f;
+            connection.tauRatioCorrStripSettled = 0.f;
           }
         });
     return buildGraph(setup, spacePoints).nConnections;
@@ -914,6 +910,63 @@ BOOST_AUTO_TEST_CASE(LayerPairsSetTheTauRatioCut) {
   const std::uint32_t atLarge = withoutStripWidening(0.2f);
   BOOST_TEST_MESSAGE("no strip widening: " << atMedium << ", " << atLarge);
   BOOST_CHECK_GT(atLarge, atMedium);
+}
+
+// The strip widenings are the layer pairs' too. Calibration is off for most of
+// this, as it would take them off again before the count could show them.
+BOOST_AUTO_TEST_CASE(LayerPairsSetTheStripWidening) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  // the pairs are in the detector's order, the middle one in both triplets
+  const auto connectionsWith = [&](const float strip, const float settled,
+                                   const bool settleTau, const bool calibrate,
+                                   const bool middleOnly = false) {
+    const SeederSetup setup = makeSeeder(
+        detector, calibrate, false,
+        [&](Experimental::GbtsGraphConfig& config) {
+          config.settleDoubletTau = settleTau;
+        },
+        {}, displacedTauRatioCuts(),
+        [&](std::vector<Experimental::GbtsLayerConnection>& connections) {
+          for (std::size_t i = 0; i < connections.size(); ++i) {
+            const bool set = !middleOnly || i == 1;
+            connections[i].tauRatioCorrStrip = set ? strip : 0.f;
+            connections[i].tauRatioCorrStripSettled = set ? settled : 0.f;
+          }
+        });
+    return buildGraph(setup, spacePoints).nConnections;
+  };
+
+  // unsettled, `tauRatioCorrStrip` opens the cut and the search with it
+  const std::uint32_t atNone = connectionsWith(0.f, 0.f, false, false);
+  const std::uint32_t atMedium = connectionsWith(0.05f, 0.f, false, false);
+  const std::uint32_t atLarge = connectionsWith(0.2f, 0.f, false, false);
+  BOOST_TEST_MESSAGE("unsettled: " << atNone << ", " << atMedium << ", "
+                                   << atLarge);
+  BOOST_CHECK_LT(atNone, atMedium);
+  BOOST_CHECK_LT(atMedium, atLarge);
+
+  // the larger of the two pairs, as the inner pair of one triplet and the outer
+  // pair of the other
+  BOOST_CHECK_EQUAL(connectionsWith(0.05f, 0.f, false, false, true), atMedium);
+
+  // settled, `tauRatioCorrStripSettled` does the same
+  const std::uint32_t settledNone = connectionsWith(0.f, 0.f, true, false);
+  const std::uint32_t settledMedium = connectionsWith(0.f, 0.05f, true, false);
+  const std::uint32_t settledLarge = connectionsWith(0.f, 0.2f, true, false);
+  BOOST_TEST_MESSAGE("settled: " << settledNone << ", " << settledMedium << ", "
+                                 << settledLarge);
+  BOOST_CHECK_LT(settledNone, settledMedium);
+  BOOST_CHECK_LT(settledMedium, settledLarge);
+  BOOST_CHECK_EQUAL(connectionsWith(0.f, 0.05f, true, false, true),
+                    settledMedium);
+
+  // and calibration takes it off again
+  const std::uint32_t calibrated = connectionsWith(0.2f, 0.f, false, true);
+  BOOST_TEST_MESSAGE("calibrated: " << calibrated);
+  BOOST_CHECK_LT(calibrated, atLarge);
 }
 
 // A strip pair that skips a layer has crossed more material, so its triplets
@@ -927,9 +980,6 @@ BOOST_AUTO_TEST_CASE(StripPairsSkippingALayerAreWidened) {
 
   Experimental::GbtsAdaptiveTauRatioCuts unwidened = displacedTauRatioCuts();
   unwidened.tauRatioCorr = 0.f;
-  Experimental::GbtsAdaptiveTauRatioCuts pixelBarrelOnly =
-      displacedTauRatioCuts();
-  pixelBarrelOnly.stripsInBarrel = false;
 
   const auto connectionsWith =
       [&](const Experimental::GbtsAdaptiveTauRatioCuts& cuts) {
@@ -941,7 +991,6 @@ BOOST_AUTO_TEST_CASE(StripPairsSkippingALayerAreWidened) {
   const std::uint32_t widened = connectionsWith(displacedTauRatioCuts());
   BOOST_TEST_MESSAGE("widened: " << widened);
   BOOST_CHECK_GT(widened, connectionsWith(unwidened));
-  BOOST_CHECK_GT(widened, connectionsWith(pixelBarrelOnly));
 }
 
 // A doublet only becomes an edge of the graph when a triplet passes through
