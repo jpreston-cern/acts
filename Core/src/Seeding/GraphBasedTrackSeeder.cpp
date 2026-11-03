@@ -521,8 +521,9 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   float bestQuality = 0;
   detail::GbtsEdgeState<detail::GbtsEdge> bestState;
 
-  const auto search = [&](const auto& self, const std::uint32_t e,
-                          const detail::GbtsEdgeState<detail::GbtsEdge>& state) -> void {
+  const auto search =
+      [&](const auto& self, const std::uint32_t e,
+          const detail::GbtsEdgeState<detail::GbtsEdge>& state) -> void {
     path.push_back(e);
     // every step goes one level up, so the depth is bounded by `maxLength`
     assert(path.size() <= maxLength);

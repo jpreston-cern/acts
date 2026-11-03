@@ -121,10 +121,10 @@ void addTrackFinding(py::module& mex) {
   ACTS_PYTHON_DECLARE_ALGORITHM(
       GraphBasedSeedingAlgorithm, mex, "GraphBasedSeedingAlgorithm",
       inputSpacePoints, outputSeeds, seedFinderConfig, graphConfig,
-      useDisplacedGraph, useStripConnections, useAdaptiveCuts,
-      layerMappingFile, connectorInputFile, lutInputFile, collisionRegionMin,
-      collisionRegionMax, trackingGeometry, fillModuleCsv, inputClusters,
-      bFieldInZ, useLayerTilt, magneticField, outputFreeParameters);
+      useDisplacedGraph, useStripConnections, useAdaptiveCuts, layerMappingFile,
+      connectorInputFile, lutInputFile, collisionRegionMin, collisionRegionMax,
+      trackingGeometry, fillModuleCsv, inputClusters, bFieldInZ, useLayerTilt,
+      magneticField, outputFreeParameters);
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
       HoughTransformSeeder, mex, "HoughTransformSeeder", inputSpacePoints,

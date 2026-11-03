@@ -174,7 +174,7 @@ ProcessCode GraphBasedSeedingAlgorithm::execute(
   // create the seeds
 
   std::vector<std::optional<Acts::Experimental::GbtsSeedFit>> fits;
-  auto* outputFits = m_outputFreeParameters.isInitialized() ? &fits : nullptr;
+  auto *outputFits = m_outputFreeParameters.isInitialized() ? &fits : nullptr;
 
   // the seeder is written once over the graph builder, so the mode is just
   // which of the two it is handed

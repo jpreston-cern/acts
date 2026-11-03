@@ -126,15 +126,16 @@ std::array<float, 3> dotRange(const std::array<float, 3>& v,
 /// @param box The box, lowest x, y and z then highest
 /// @param tolerance The strip length fraction
 /// @return Whether the cut fails every chord into the box
-bool missesStereoPair(const OuterStripSpacePointCalibrationDetailsDerived& strip,
-                      const std::array<float, 3>& from,
-                      const std::array<float, 6>& box, const float tolerance) {
+bool missesStereoPair(
+    const OuterStripSpacePointCalibrationDetailsDerived& strip,
+    const std::array<float, 3>& from, const std::array<float, 6>& box,
+    const float tolerance) {
   constexpr float slack = 1e-4f;
 
   const std::array<float, 3> scale =
       dotRange(strip.innerCrossOuterHalfVector, from, box);
-  const float maxScale = std::max(std::abs(scale[0]), std::abs(scale[1])) +
-                         slack * scale[2];
+  const float maxScale =
+      std::max(std::abs(scale[0]), std::abs(scale[1])) + slack * scale[2];
 
   // the least |numerator| over the box, made smaller by the slack
   const auto minAbs = [&](const std::array<float, 3>& numerator) {
@@ -145,10 +146,10 @@ bool missesStereoPair(const OuterStripSpacePointCalibrationDetailsDerived& strip
   };
 
   const float limit = maxScale * tolerance;
-  return minAbs(dotRange(strip.innerToOuterSeparationCrossOuterHalfVector,
-                         from, box)) > limit ||
-         minAbs(dotRange(strip.innerToOuterSeparationCrossInnerHalfVector,
-                         from, box)) > limit;
+  return minAbs(dotRange(strip.innerToOuterSeparationCrossOuterHalfVector, from,
+                         box)) > limit ||
+         minAbs(dotRange(strip.innerToOuterSeparationCrossInnerHalfVector, from,
+                         box)) > limit;
 }
 
 /// Whether a strip node on this layer slides radially when calibrated: true
@@ -295,8 +296,7 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
 /// @param points The three node positions, inside out
 /// @return The circle, or nothing if the nodes are degenerate
 [[gnu::always_inline]] inline std::optional<detail::TripletCircle>
-fitTripletCircle(
-    const std::array<std::array<float, 3>, 3>& points) {
+fitTripletCircle(const std::array<std::array<float, 3>, 3>& points) {
   detail::TripletCircle circle{};
 
   const float x0 = points[1][0];
@@ -611,8 +611,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
   const bool stereoCut = m_cfg.doubletStereoCut && nodeStorage.hasStrips();
 
   // if the stereo crossings settle an endcap strip end for the turn cut
-  const bool resolveSlides =
-      calibrate && stereoCut && m_cfg.turnCutEndcapStrip;
+  const bool resolveSlides = calibrate && stereoCut && m_cfg.turnCutEndcapStrip;
 
   // the turn cut's limit where an end slides along a radial strip
   const float curvatureCutSliding =
@@ -637,9 +636,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
     for (std::size_t node = 0; node < nodeWindowTerms.size(); ++node) {
       const float r = params[node].r;
-      nodeWindowTerms[node] = {
-          std::acos(std::min(1.0f, m_cfg.d0Max / r)),
-          std::sqrt(std::max(0.0f, r * r - d0MaxSquare))};
+      nodeWindowTerms[node] = {std::acos(std::min(1.0f, m_cfg.d0Max / r)),
+                               std::sqrt(std::max(0.0f, r * r - d0MaxSquare))};
     }
   }
 
@@ -679,8 +677,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                                          nodeView.positions[node][1],
                                          params[node].z};
         if (k % kStereoBlock == 0) {
-          boxes.push_back({point[0], point[1], point[2], point[0], point[1],
-                           point[2]});
+          boxes.push_back(
+              {point[0], point[1], point[2], point[0], point[1], point[2]});
         }
         std::array<float, 6>& box = boxes.back();
         for (std::size_t i = 0; i < 3; ++i) {
@@ -1182,8 +1180,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
               // n2's doublets are in exp(eta) order, so only a window of
               // them can match
               const auto [n2InFirst, expEtaHigh] =
-                  tauRatioWindow(slw.doublets->expEta, n2FirstEdge,
-                                 n2LastEdge, expEta, m_cfg.tauRatioPrecut);
+                  tauRatioWindow(slw.doublets->expEta, n2FirstEdge, n2LastEdge,
+                                 expEta, m_cfg.tauRatioPrecut);
 
               for (std::uint32_t n2InIdx = n2InFirst; n2InIdx < n2LastEdge;
                    ++n2InIdx) {
@@ -1287,9 +1285,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           const float turnCurvatureCut =
               lowEtaTurn ? curvatureCutLowEta : curvatureCutLoosest;
           const float turnCurvatureCutSliding =
-              lowEtaTurn
-                  ? curvatureCutLowEta * m_cfg.curvatureScaleEndcapStrip
-                  : curvatureCutSliding;
+              lowEtaTurn ? curvatureCutLowEta * m_cfg.curvatureScaleEndcapStrip
+                         : curvatureCutSliding;
 
           // looking for neighbours of the new doublet using outer node
           for (std::uint32_t inEdgeIdx = inEdgeFirst; inEdgeIdx < n2LastEdge;
@@ -1347,10 +1344,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
               // [CUT] turn angle against the loosest curvature limit, looser
               // still where an end was settled on a radial strip
-              if (std::abs(sinDelta) >
-                  ((doubletSlides || outerSlides) ? turnCurvatureCutSliding
-                                                  : turnCurvatureCut) *
-                      (turnChord + pS->chord)) {
+              if (std::abs(sinDelta) > ((doubletSlides || outerSlides)
+                                            ? turnCurvatureCutSliding
+                                            : turnCurvatureCut) *
+                                           (turnChord + pS->chord)) {
                 continue;
               }
             }

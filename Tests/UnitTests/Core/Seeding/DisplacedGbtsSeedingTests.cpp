@@ -880,11 +880,10 @@ BOOST_AUTO_TEST_CASE(CurvatureFromDoubletTauKeepsEveryEdge) {
   const std::vector<Track> tracks = makeDenseDisplacedTracks();
   const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
 
-  const SeederSetup setup =
-      makeSeeder(detector, true, false,
-                 [](Experimental::GbtsGraphConfig& config) {
-                   config.curvatureFromDoubletTau = true;
-                 });
+  const SeederSetup setup = makeSeeder(
+      detector, true, false, [](Experimental::GbtsGraphConfig& config) {
+        config.curvatureFromDoubletTau = true;
+      });
   const GraphRun run = buildGraph(setup, spacePoints);
   const Completeness result = checkCompleteness(run, spacePoints, tracks);
 
