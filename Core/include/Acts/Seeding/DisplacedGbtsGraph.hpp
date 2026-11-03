@@ -20,6 +20,22 @@
 
 namespace Acts::Experimental{
 
+  /// The doublet graph of the GBTS workflow, built without assuming the track
+  /// came from the beamline.
+  ///
+  /// Does the same job as @c GbtsGraph and takes the same configuration, but
+  /// a doublet here cannot be read for a curvature, an azimuth at the perigee
+  /// or a @c z0: all three of those come from treating the beamline as a third
+  /// point on the circle, which is exactly the assumption large radius
+  /// tracking drops. So the doublet stage keeps to the non-bending plane and
+  /// everything else waits for a triplet fit, which is also where a strip end
+  /// is resolved along its strip, the fitted tangent being the first direction
+  /// good enough to do it with.
+  ///
+  /// An edge therefore carries the triplets it is the inner edge of rather
+  /// than parameters of its own, and two edges are matched through those. The
+  /// levels and chain heads it produces are the prompt graph's, so the rest of
+  /// the workflow is unchanged.
   class DisplacedGbtsGraph{
 
     public:
@@ -32,13 +48,26 @@ namespace Acts::Experimental{
     /// the same object to either.
     using Config = GbtsGraphConfig;
 
-    // we should give the same kind of objects in, just different configurations
+    /// Takes the same objects as the prompt graph, differing only in the
+    /// configuration it is given.
+    /// @param config Configuration for the graph
+    /// @param geometry GBTS geometry
+    /// @param logger Logging instance
     DisplacedGbtsGraph(const Config& config, std::shared_ptr<const GbtsGeometry> geometry,
                        std::unique_ptr<const Acts::Logger> logger = Acts::getDefaultLogger(
                            "DisplacedGbtsGraph", Acts::Logging::Level::INFO));
 
+    /// Access the configuration, which also carries the chain selection that
+    /// seed extraction has to agree with.
+    /// @return The configuration
     const Config& config() const { return m_cfg; };
 
+    /// Build the displaced doublet graph from nodes.
+    /// @param roi Region of interest descriptor
+    /// @param nodeStorage Data storage containing nodes
+    /// @param edgeStorage Storage for generated edges
+    /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
+    /// @return Pair of edge count and edge link count
     std::pair<std::uint32_t, std::uint32_t> buildTheGraph(const GbtsRoiDescriptor& roi, 
                                                           GbtsNodeStorage& nodeStorage,
                                                           std::vector<detail::DisplacedGbtsEdge>& edgeStorage, 
