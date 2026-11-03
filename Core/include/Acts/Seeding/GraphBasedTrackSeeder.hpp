@@ -53,10 +53,19 @@ class GraphBasedTrackSeeder {
     std::uint32_t maxChainLength = 15;
     /// Chain length a seed candidate must reach: a triplet plus one
     /// confirmation.
+    ///
+    /// @note The displaced graph can be run at two, where the prompt graph
+    ///       cannot: a link there already cost a triplet fit, so two edges are
+    ///       three nodes that were fitted and cut on rather than three that
+    ///       merely agreed on tau.
     std::uint8_t minSeedLevel = 3;
     /// optionally add 3 sp seeds within a certain eta range
     ///
-    /// @note Matters most where there are few layers.
+    /// @note Matters most where there are few layers. The displaced graph masks
+    ///       edges, so there it is worth little until `maxAbsEtaAddTriplets` is
+    ///       opened past `edgeMaskMinEta`.
+    /// @note This accepts a chain one level short, so at a `minSeedLevel` of two
+    ///       it reaches down to a single edge: two nodes and no fit at all.
     bool addTriplets = false;
     /// the maximum allowed eta value in which
     /// three spacepoint seeds are passed through

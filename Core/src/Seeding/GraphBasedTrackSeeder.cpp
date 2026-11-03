@@ -134,13 +134,14 @@ void GraphBasedTrackSeeder::createSeeds(
   if constexpr (isPrompt) {
     paths = extractBestPathPerEdge(nodeView, graph, filter);
   } else {
-    const std::uint32_t maxLevel =
-        graphBuilder.runCCA(graph.nEdges, graph.edgeStorage);
+    const std::uint32_t maxLevel = graphBuilder.runCCA(
+        graph.nEdges, graph.edgeStorage, m_cfg.maxChainLength);
 
     ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-    const std::vector<edge_t*> vChainHeads =
-        graphBuilder.extractChainHeads(graph.edgeStorage, graph.nEdges);
+    const std::vector<edge_t*> vChainHeads = graphBuilder.extractChainHeads(
+        graph.edgeStorage, graph.nEdges, m_cfg.minSeedLevel, m_cfg.addTriplets,
+        m_cfg.maxAbsEtaAddTriplets);
 
     if (vChainHeads.empty()) {
       ACTS_WARNING("No chains passed minimum edge requirement");
