@@ -456,12 +456,16 @@ nothing to disagree with, so it passes. That is worth knowing when tuning: the
 @f$d_0@f$, @f$p_T@f$, curvature and the @f$\tau@f$ ratio — with no relative test
 behind it.
 
-The @f$\tau@f$ tolerance is its own here rather than the layer pair's. When
-`useAdaptiveCuts` is on it is widened for a triplet that skipped a layer, there
-being more material to scatter in. Adjacency is counted over `depth`, so a strip
-layer sitting between two pixel layers counts as the gap it is; a triplet whose
-outermost node left the barrel cannot be counted at all and is widened on that
-basis.
+The @f$\tau@f$ tolerance comes from the layer pairs, as in the prompt graph: the
+looser of `tauRatioCutInner` of the inner pair and `tauRatioCutOuter` of the outer
+one, see @ref Acts::Experimental::GbtsLayerConnection. These can be set pair by
+pair, or filled by @ref Acts::Experimental::assignAdaptiveTauRatioCuts, which for
+this graph should be given `stripsInBarrel` and a `tauRatioCorrStrip` of zero.
+A pair of barrel layers of either technology that skips a layer is then widened,
+there being more material to scatter in, as is an outer pair that leaves the
+barrel. What depends on the strips being unresolved stays per triplet:
+`tauRatioCorrStrip` is added on top and comes off once the triplet has resolved
+them.
 
 ### Doublets and edges {#gbts-lrt-storage}
 
@@ -530,9 +534,8 @@ alone.
 | `minZ0`, `maxZ0`, `doubletFilterRZ` | @ref gbts-graph | luminous-region cuts on the doublet |
 | `cutDPhiMax`, `cutDCurvMax` | @ref gbts-graph | edge-to-edge linking tolerances |
 | `useSumRatioCut`, `sumRatioCutMax` | @ref gbts-graph | prompt: bound on the summed linking tolerances, against pairs marginal in all three |
-| `tauRatioCut` | @ref gbts-graph | prompt: @f$\tau@f$ scale of the `validateTriplets` high-pT check, the linking cut coming from @ref Acts::Experimental::GbtsLayerConnection. Displaced: the linking tolerance |
-| `useAdaptiveCuts`, `tauRatioCorr` | @ref gbts-lrt | displaced: widen the @f$\tau@f$ tolerance when a layer is skipped, counted over `depth` |
-| `tauRatioCorrStrip` | @ref gbts-lrt | displaced: widen it again where an end is an unresolved strip, which comes back off once the triplet has resolved it |
+| `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the high-pT check, the linking cut coming from @ref Acts::Experimental::GbtsLayerConnection in either graph |
+| `tauRatioCorrStrip` | @ref gbts-lrt | displaced: widen the layer pairs' cut where an end is an unresolved strip, which comes back off once the triplet has resolved it |
 | `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip. Prompt: per doublet, against the chord. Displaced: per triplet, against the fitted tangent |
 | `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
 | `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |

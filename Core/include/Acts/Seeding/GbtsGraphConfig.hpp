@@ -45,32 +45,19 @@ struct GbtsGraphConfig {
   /// carries come out of it.
   bool validateTriplets = true;
 
-  /// Widens allowed variation in tau ratio if a layer is missed in edge
-  /// connecting.
-  ///
-  /// @note Displaced only. The prompt graph takes its linking cut from the
-  ///       layer pairs, see `GbtsLayerConnection`.
-  bool useAdaptiveCuts = true;
-
-  /// Tau ratio cut threshold of the displaced graph. To the prompt graph this
-  /// is only the scale of the `validateTriplets` high-pT check, its linking cut
-  /// coming from the layer pairs.
+  /// Scale of the tau ratio check on high-pT triplets. The linking cut itself
+  /// comes from the layer pairs, in either graph, see `GbtsLayerConnection`.
   float tauRatioCut = 0.007f;
 
   /// Tau ratio precut threshold.
   float tauRatioPrecut = 0.009f;
 
-  /// Correction applied to tau acceptance if a layer is missed during edge
-  /// connecting.
+  /// Added to the layer pairs' tau ratio cut for a triplet any of whose three
+  /// nodes a strip module made, whose two doublets resolved the shared node's
+  /// along-strip coordinate separately. Reaches nothing without a strip in the
+  /// triplet, and comes off once the triplet has resolved its strips.
   ///
-  /// @note Displaced only, with `useAdaptiveCuts`.
-  float tauRatioCorr = 0.006f;
-
-  /// The same for a triplet any of whose three nodes a strip module made,
-  /// whose two doublets resolved the shared node's along-strip coordinate
-  /// separately. Reaches nothing without a strip in the triplet.
-  ///
-  /// @note Displaced only, with `useAdaptiveCuts`.
+  /// @note Displaced only. The prompt graph has this on the layer pairs.
   float tauRatioCorrStrip = 0.03f;
 
   /// Minimum transverse momentum.

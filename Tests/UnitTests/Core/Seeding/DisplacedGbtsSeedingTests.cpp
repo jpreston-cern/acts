@@ -88,8 +88,23 @@ ToyDetector stripBarrelDetector() {
           {{81000, 80000}, {82000, 81000}, {83000, 82000}}};
 }
 
+/// Changes the layer pairs' cuts after they are filled.
+using ConnectionTweak =
+    std::function<void(std::vector<Experimental::GbtsLayerConnection>&)>;
+
+/// The tau ratio cuts the displaced graph is meant to be given.
+Experimental::GbtsAdaptiveTauRatioCuts displacedTauRatioCuts() {
+  Experimental::GbtsAdaptiveTauRatioCuts cuts;
+  cuts.tauRatioCorrStrip = 0.f;
+  cuts.stripsInBarrel = true;
+  return cuts;
+}
+
 std::shared_ptr<Experimental::GbtsGeometry> makeGeometry(
-    const ToyDetector& detector) {
+    const ToyDetector& detector,
+    const Experimental::GbtsAdaptiveTauRatioCuts& tauRatioCuts =
+        displacedTauRatioCuts(),
+    const ConnectionTweak& connectionTweak = {}) {
   std::vector<Experimental::GbtsLayerDescription> layers;
   layers.reserve(detector.layers.size());
   for (const LayerSpec& spec : detector.layers) {
@@ -107,6 +122,10 @@ std::shared_ptr<Experimental::GbtsGeometry> makeGeometry(
   connections.reserve(detector.links.size());
   for (const auto& [src, dst] : detector.links) {
     connections.push_back({src, dst});
+  }
+  Experimental::assignAdaptiveTauRatioCuts(connections, layers, tauRatioCuts);
+  if (connectionTweak) {
+    connectionTweak(connections);
   }
 
   // The bin table is what decides which eta bins may be connected at all, and
@@ -370,8 +389,11 @@ SeederSetup makeSeeder(
     const bool matchBeforeCreate = false,
     const std::function<void(Experimental::GbtsGraphConfig&)>& tweak = {},
     const std::function<void(Experimental::GraphBasedTrackSeeder::Config&)>&
-        seederTweak = {}) {
-  auto geometry = makeGeometry(detector);
+        seederTweak = {},
+    const Experimental::GbtsAdaptiveTauRatioCuts& tauRatioCuts =
+        displacedTauRatioCuts(),
+    const ConnectionTweak& connectionTweak = {}) {
+  auto geometry = makeGeometry(detector, tauRatioCuts, connectionTweak);
 
   const auto makeLogger = []() -> std::unique_ptr<const Logger> {
     return getDefaultLogger("DisplacedGbtsTest", Logging::Level::WARNING);
@@ -833,6 +855,93 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeAmongDenseTracks) {
   // the point of the fixture: the graph is working through real combinatorics
   // here, not just the tracks' own doublets
   BOOST_CHECK_GT(run.nDoublets, 2 * result.expectedEdges);
+}
+
+// The linking cut is the layer pairs', the looser of what the two pairs of a
+// triplet carry, and the search for partners has to open up to whatever they
+// are set to.
+BOOST_AUTO_TEST_CASE(LayerPairsSetTheTauRatioCut) {
+  const ToyDetector detector = stripBarrelDetector();
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  const auto connectionsWith = [&](const float inner, const float outer) {
+    const SeederSetup setup = makeSeeder(
+        detector, true, false, {}, {}, displacedTauRatioCuts(),
+        [&](std::vector<Experimental::GbtsLayerConnection>& connections) {
+          for (Experimental::GbtsLayerConnection& connection : connections) {
+            connection.tauRatioCutInner = inner;
+            connection.tauRatioCutOuter = outer;
+          }
+        });
+    return buildGraph(setup, spacePoints).nConnections;
+  };
+
+  const float nominal = displacedTauRatioCuts().tauRatioCut;
+  const std::uint32_t atNominal = connectionsWith(nominal, nominal);
+  BOOST_TEST_MESSAGE("nominal: " << atNominal << " connections");
+  BOOST_CHECK_GT(atNominal, 0u);
+
+  // either pair's cut is enough on its own
+  BOOST_CHECK_EQUAL(connectionsWith(nominal, 0.f), atNominal);
+  BOOST_CHECK_EQUAL(connectionsWith(0.f, nominal), atNominal);
+
+  const std::uint32_t atNone = connectionsWith(0.f, 0.f);
+  const std::uint32_t atWide = connectionsWith(0.1f, 0.1f);
+  BOOST_TEST_MESSAGE("no cut: " << atNone << ", wide: " << atWide);
+  BOOST_CHECK_LT(atNone, atNominal);
+  BOOST_CHECK_GT(atWide, atNominal);
+
+  // With the strip widening off, nothing but the pairs' cut opens the search,
+  // so a search that stopped short of it would stop the count growing too.
+  const auto withoutStripWidening = [&](const float cut) {
+    const SeederSetup setup = makeSeeder(
+        detector, true, false,
+        [](Experimental::GbtsGraphConfig& config) {
+          config.tauRatioCorrStrip = 0.f;
+          config.tauRatioCorrStripSettled = 0.f;
+        },
+        {}, displacedTauRatioCuts(),
+        [&](std::vector<Experimental::GbtsLayerConnection>& connections) {
+          for (Experimental::GbtsLayerConnection& connection : connections) {
+            connection.tauRatioCutInner = cut;
+            connection.tauRatioCutOuter = cut;
+          }
+        });
+    return buildGraph(setup, spacePoints).nConnections;
+  };
+  const std::uint32_t atMedium = withoutStripWidening(0.05f);
+  const std::uint32_t atLarge = withoutStripWidening(0.2f);
+  BOOST_TEST_MESSAGE("no strip widening: " << atMedium << ", " << atLarge);
+  BOOST_CHECK_GT(atLarge, atMedium);
+}
+
+// A strip pair that skips a layer has crossed more material, so its triplets
+// are widened as a pixel pair's would be.
+BOOST_AUTO_TEST_CASE(StripPairsSkippingALayerAreWidened) {
+  ToyDetector detector = stripBarrelDetector();
+  detector.links.emplace_back(82000, 80000);
+  detector.links.emplace_back(83000, 81000);
+  const std::vector<Track> tracks = makeDenseDisplacedTracks();
+  const SpacePointContainer spacePoints = makeSpacePoints(detector, tracks);
+
+  Experimental::GbtsAdaptiveTauRatioCuts unwidened = displacedTauRatioCuts();
+  unwidened.tauRatioCorr = 0.f;
+  Experimental::GbtsAdaptiveTauRatioCuts pixelBarrelOnly =
+      displacedTauRatioCuts();
+  pixelBarrelOnly.stripsInBarrel = false;
+
+  const auto connectionsWith =
+      [&](const Experimental::GbtsAdaptiveTauRatioCuts& cuts) {
+        const SeederSetup setup =
+            makeSeeder(detector, true, false, {}, {}, cuts);
+        return buildGraph(setup, spacePoints).nConnections;
+      };
+
+  const std::uint32_t widened = connectionsWith(displacedTauRatioCuts());
+  BOOST_TEST_MESSAGE("widened: " << widened);
+  BOOST_CHECK_GT(widened, connectionsWith(unwidened));
+  BOOST_CHECK_GT(widened, connectionsWith(pixelBarrelOnly));
 }
 
 // A doublet only becomes an edge of the graph when a triplet passes through

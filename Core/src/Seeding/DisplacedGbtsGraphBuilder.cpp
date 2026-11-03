@@ -78,8 +78,13 @@ struct SlidingWindow {
   std::uint32_t firstIt{};
   /// window half-width
   float deltaPhi{};
-  /// How deep the bin's layer sits in the barrel, -1 for an endcap.
-  std::int32_t depth{-1};
+  /// GbtsLayerConnection::tauRatioCutInner of the pair this bin came from.
+  float tauRatioCutInner{};
+  /// GbtsLayerConnection::tauRatioCutOuter of the pair this bin came from.
+  float tauRatioCutOuter{};
+  /// The loosest cut a triplet through this window can be held to before its
+  /// strip widening, for bounding the search of the outer doublets.
+  float loosestTauRatioCut{};
   /// Technology of the bin's layer.
   GbtsLayerTechnology technology{};
   /// Type of the bin's layer.
@@ -422,18 +427,16 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                                           m_cfg.curvatureScaleEndcapStrip *
                                           m_cfg.curvatureScaleEndcapStrip;
 
-  // the loosest tau ratio threshold the triplet matching can apply
-  const float maxTauRatioCut =
-      m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
-      (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStrip : 0.0f);
+  // the loosest strip widening of the tau ratio threshold
+  const float maxStripTauRatioCorr =
+      nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStrip : 0.0f;
 
   // if doublet taus are taken with their strip ends settled, and the
   // loosest threshold between two doublets that both are
   const bool settleTau = m_cfg.settleDoubletTau && m_cfg.doubletStereoCut &&
                          nodeStorage.hasStrips();
-  const float maxTauRatioCutSettled =
-      m_cfg.tauRatioCut + (m_cfg.useAdaptiveCuts ? m_cfg.tauRatioCorr : 0.0f) +
-      (nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStripSettled : 0.0f);
+  const float maxStripTauRatioCorrSettled =
+      nodeStorage.hasStrips() ? m_cfg.tauRatioCorrStripSettled : 0.0f;
 
   // if the doublet cuts read the settled ends
   const bool settledCuts = m_cfg.settledDoubletCuts && settleTau;
@@ -521,9 +524,14 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
   std::vector<BinDoublets> binDoublets(numBins);
 
+  // the loosest cut any doublet kept for a bin brings as an outer pair
+  std::vector<float> loosestOuterTauRatioCut(numBins, 0.0f);
+
   for (const GbtsBinGroup& bg : binGroups) {
     for (const GbtsBinLink& link : bg.links) {
       ++binDoublets[link.bin].nPendingReaders;
+      loosestOuterTauRatioCut[bg.bin] =
+          std::max(loosestOuterTauRatioCut[bg.bin], link.tauRatioCutOuter);
     }
   }
 
@@ -807,7 +815,10 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
-      window.depth = B2.depth;
+      window.tauRatioCutInner = link.tauRatioCutInner;
+      window.tauRatioCutOuter = link.tauRatioCutOuter;
+      window.loosestTauRatioCut =
+          std::max(link.tauRatioCutInner, loosestOuterTauRatioCut[b2Idx]);
       window.technology = B2.technology;
       window.type = B2.type;
       if (stereoCut) {
@@ -850,8 +861,6 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
       // loop over the sliding windows of the outer bins
       for (auto& slw : phiSlidingWindow) {
-        const std::int32_t depth2 = slw.depth;
-
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
 
         // Whether either end of the doublet will slide radially under
@@ -1225,8 +1234,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // be the outer doublet of one made from a bin further in.
           inner.doublets.emplace_back(
               n2Idx, turnChord, cosAlpha12, sinAlpha12,
-              static_cast<std::uint32_t>(inner.properties.size()), depth2,
-              calibrate && slides2, turnSettled, tauSettled);
+              static_cast<std::uint32_t>(inner.properties.size()),
+              slw.tauRatioCutOuter, calibrate && slides2, turnSettled,
+              tauSettled);
           inner.expEta.push_back(expEta);
           if (tauPull) {
             inner.etaGradient.push_back(
@@ -1257,7 +1267,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
           // the tighter window holds only if no partner could be unsettled
           const bool windowSettled = settleTau && tauSettled && allTausSettled;
           const float windowTauRatioCut =
-              windowSettled ? maxTauRatioCutSettled : maxTauRatioCut;
+              slw.loosestTauRatioCut + (windowSettled
+                                            ? maxStripTauRatioCorrSettled
+                                            : maxStripTauRatioCorr);
           // With a pull, widen to the largest uncertainty any of n2's
           // doublets could give the pair; each candidate is held to its own
           // below.
@@ -1380,24 +1392,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                 !isPixel1, !isPixel2,
                 nodeView.strip(tripletNodes[2]) != nullptr};
 
-            const std::int32_t depth3 = pS->n2Depth;
-
-            float addTauRatioCorr = 0;
-
-            // Widen for material: a gap in barrel depth (over all barrel
-            // layers, strips included), or a third node that left the barrel.
-            if (m_cfg.useAdaptiveCuts && depth1 >= 0 && depth2 >= 0) {
-              if (depth3 >= 0) {
-                const bool noGap =
-                    (depth2 - depth1) == 1 && (depth3 - depth2) == 1;
-
-                if (!noGap) {
-                  addTauRatioCorr = m_cfg.tauRatioCorr;
-                }
-              } else {
-                addTauRatioCorr = m_cfg.tauRatioCorr;
-              }
-            }
+            // the looser of the cuts the two layer pairs carry
+            const float pairTauRatioCut =
+                std::max(slw.tauRatioCutInner, pS->tauRatioCut);
 
             // Widen for strips, whose along-strip coordinate is unresolved
             // until the calibration below, which removes this again; less
@@ -1410,10 +1407,8 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                     : 0.0f;
 
             // [CUT] doublet tau ratio, loose; retaken tight after calibration
-            if (!passesTau(
-                    absTauRatio,
-                    m_cfg.tauRatioCut + addTauRatioCorr + stripTauRatioCorr,
-                    logTauRatio, pullTolerance)) {
+            if (!passesTau(absTauRatio, pairTauRatioCut + stripTauRatioCorr,
+                           logTauRatio, pullTolerance)) {
               continue;
             }
 
@@ -1534,10 +1529,9 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
                         : 0.f;
 
             // [CUT] tight tau ratio on the calibrated ends
-            if (!passesTau(
-                    resolvedTauRatio,
-                    m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr,
-                    resolvedLogRatio, tightPullTolerance)) {
+            if (!passesTau(resolvedTauRatio,
+                           pairTauRatioCut + unresolvedStripCorr,
+                           resolvedLogRatio, tightPullTolerance)) {
               continue;
             }
 
@@ -1645,7 +1639,7 @@ DisplacedGbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
                 // [CUT] triplet match: tau ratio of the two fits
                 if (std::abs(prev.expEta * circle->invExpEta - 1.0f) >
-                    m_cfg.tauRatioCut + addTauRatioCorr + unresolvedStripCorr) {
+                    pairTauRatioCut + unresolvedStripCorr) {
                   continue;
                 }
 

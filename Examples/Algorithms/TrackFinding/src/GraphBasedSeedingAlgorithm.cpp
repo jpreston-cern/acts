@@ -94,6 +94,11 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   if (!m_cfg.useAdaptiveCuts) {
     tauRatioCuts.tauRatioCorr = 0.f;
   }
+  if (m_cfg.useDisplacedGraph) {
+    // its strip widening is per triplet, in `graphConfig.tauRatioCorrStrip`
+    tauRatioCuts.tauRatioCorrStrip = 0.f;
+    tauRatioCuts.stripsInBarrel = true;
+  }
   Acts::Experimental::assignAdaptiveTauRatioCuts(connections, layerGeometry,
                                                  tauRatioCuts);
 

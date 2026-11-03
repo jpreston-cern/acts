@@ -239,10 +239,13 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
     const GbtsLayerDescription* outer = find(connection.src);
     const GbtsLayerDescription* inner = find(connection.dst);
 
-    const bool outerInBarrel =
-        outer->depth >= 0 && outer->technology == GbtsLayerTechnology::Pixel;
-    const bool innerInBarrel =
-        inner->depth >= 0 && inner->technology == GbtsLayerTechnology::Pixel;
+    const auto inBarrel = [&cuts](const GbtsLayerDescription& layer) {
+      return layer.depth >= 0 &&
+             (cuts.stripsInBarrel ||
+              layer.technology == GbtsLayerTechnology::Pixel);
+    };
+    const bool outerInBarrel = inBarrel(*outer);
+    const bool innerInBarrel = inBarrel(*inner);
     // How much material the pair crossed, so it counts every barrel layer
     // rather than the pixel ones alone: a strip layer between two pixel layers
     // is material a triplet scattered in.

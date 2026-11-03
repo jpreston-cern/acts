@@ -851,6 +851,56 @@ BOOST_AUTO_TEST_CASE(AdaptiveTauRatioCuts) {
   }
 }
 
+// Counting the strip barrel layers as barrel, as the displaced graph does: a
+// strip pair that skips a layer is widened, and pixel onto strip is adjacent.
+BOOST_AUTO_TEST_CASE(AdaptiveTauRatioCutsOverStripBarrel) {
+  using Experimental::GbtsLayerConnection;
+  using Experimental::GbtsLayerDescription;
+
+  const auto layer = [](Experimental::GbtsExperimentLayerId id,
+                        GbtsLayerType type, GbtsLayerTechnology technology,
+                        float refCoord) {
+    GbtsLayerDescription description;
+    description.id = id;
+    description.type = type;
+    description.technology = technology;
+    description.refCoord = refCoord;
+    return description;
+  };
+  const std::vector<GbtsLayerDescription> layers = {
+      layer(1, GbtsLayerType::Barrel, GbtsLayerTechnology::Pixel, 50.f),
+      layer(2, GbtsLayerType::Barrel, GbtsLayerTechnology::Strip, 400.f),
+      layer(3, GbtsLayerType::Barrel, GbtsLayerTechnology::Strip, 600.f),
+      layer(4, GbtsLayerType::Barrel, GbtsLayerTechnology::Strip, 800.f),
+      layer(5, GbtsLayerType::Endcap, GbtsLayerTechnology::Strip, 1500.f),
+  };
+
+  std::vector<GbtsLayerConnection> connections = {
+      {.src = 2, .dst = 1},  // pixel onto strip, adjacent
+      {.src = 3, .dst = 2},  // strip, adjacent
+      {.src = 4, .dst = 2},  // strip, skips a layer
+      {.src = 3, .dst = 1},  // pixel onto strip, skips a layer
+      {.src = 5, .dst = 4},  // leaves the barrel
+      {.src = 5, .dst = 5},  // off the barrel
+  };
+  Experimental::GbtsAdaptiveTauRatioCuts cuts;
+  cuts.tauRatioCorrStrip = 0.f;
+  cuts.stripsInBarrel = true;
+  Experimental::assignAdaptiveTauRatioCuts(connections, layers, cuts);
+
+  const float base = cuts.tauRatioCut;
+  const float wide = base + cuts.tauRatioCorr;
+  const std::vector<std::pair<float, float>> expected = {
+      {base, base}, {base, base}, {wide, wide},
+      {wide, wide}, {base, wide}, {base, base},
+  };
+  for (std::size_t i = 0; i < connections.size(); ++i) {
+    BOOST_CHECK_CLOSE(connections[i].tauRatioCutInner, expected[i].first, 1e-4);
+    BOOST_CHECK_CLOSE(connections[i].tauRatioCutOuter, expected[i].second,
+                      1e-4);
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }  // namespace Acts::Test

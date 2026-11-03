@@ -106,15 +106,14 @@ void addTrackFinding(py::module& mex) {
         py::class_<Config>(mex, "GbtsGraphBuilderConfig").def(py::init<>());
     ACTS_PYTHON_STRUCT(
         c, minPt, maxEdgesPerSP, minDeltaRadius, doubletFilterRZ,
-        matchBeforeCreate, validateTriplets, useAdaptiveCuts, calibrateStrips,
-        useTurnAngleCut, curvatureScaleEndcapStrip, tripletFilterRZ,
-        doubletStereoCut, doubletStripLengthFraction, turnCutEndcapStrip,
-        curvatureFromDoubletTau, curvatureSplitTauMargin, perPairPhiWindow,
-        settleDoubletTau, settledDoubletCuts, settledTripletFit,
-        tauRatioCorrStripSettled, maxOuterRadius, d0Max, cutDPhiMax,
-        cutDCurvMax, tauRatioCut, useSumRatioCut, sumRatioCutMax, tauRatioMode,
-        stripAlongResolution, tauRatioPullFloor, tauRatioPullCut,
-        tauRatioPullCutTight);
+        matchBeforeCreate, validateTriplets, calibrateStrips, useTurnAngleCut,
+        curvatureScaleEndcapStrip, tripletFilterRZ, doubletStereoCut,
+        doubletStripLengthFraction, turnCutEndcapStrip, curvatureFromDoubletTau,
+        curvatureSplitTauMargin, perPairPhiWindow, settleDoubletTau,
+        settledDoubletCuts, settledTripletFit, tauRatioCorrStripSettled,
+        maxOuterRadius, d0Max, cutDPhiMax, cutDCurvMax, tauRatioCut,
+        useSumRatioCut, sumRatioCutMax, tauRatioMode, stripAlongResolution,
+        tauRatioPullFloor, tauRatioPullCut, tauRatioPullCutTight);
     patchKwargsConstructor(c);
   }
 
