@@ -31,8 +31,6 @@
 
 namespace Acts::Experimental {
 
-struct GbtsGraph;
-
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
  public:
@@ -246,7 +244,8 @@ class GraphBasedTrackSeeder {
   /// @param filter Tracking filter fitting the paths
   /// @return The fitted paths, each with its head edge first
   std::vector<detail::GbtsEdgeState<detail::GbtsEdge>> extractBestPathPerEdge(
-      const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+      const detail::GbtsNodeView& nodeView,
+      const detail::GbtsGraph<detail::GbtsEdge>& graph,
       const GbtsTrackingFilter& filter) const;
 
   /// Follow the chains of the displaced graph from their heads, longest first,

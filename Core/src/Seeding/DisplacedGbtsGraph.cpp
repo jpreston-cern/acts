@@ -95,9 +95,12 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-  std::pair<std::uint32_t, std::uint32_t> DisplacedGbtsGraph::buildTheGraph(
+  detail::GbtsGraph<detail::DisplacedGbtsEdge> DisplacedGbtsGraph::buildTheGraph(
     const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage, const float bFieldInZ) const {
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::DisplacedGbtsEdge> graph;
+  std::vector<detail::DisplacedGbtsEdge>& edgeStorage = graph.edgeStorage;
+
   // z range at the outer radius, for the outer z cuts
   const float cutZMinU =
       m_cfg.minZ0 + m_cfg.maxOuterRadius * static_cast<float>(roi.dzdrMin());
@@ -779,124 +782,8 @@ std::optional<float> arcFromPerigee(const float r, const float d0,
                  << " edges - possible efficiency loss");
   }
 
-  return std::make_pair(nEdges, nConnections);
-}
-
-std::uint32_t DisplacedGbtsGraph::runCCA(
-    const std::uint32_t nEdges,
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-    const std::uint32_t maxIterations) const {
-  std::uint32_t maxLevel = 0;
-
-  std::uint32_t iter = 0;
-
-  std::vector<detail::DisplacedGbtsEdge*> vOld;
-
-  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
-    detail::DisplacedGbtsEdge* pS = &(edgeStorage[edgeIndex]);
-    if (pS->nNei == 0) {
-      continue;
-    }
-
-    vOld.push_back(pS);
-  }
-
-  std::vector<detail::DisplacedGbtsEdge*> vNew;
-  vNew.reserve(vOld.size());
-
-  // generate proposals
-  for (; iter < maxIterations; iter++) {
-    vNew.clear();
-
-    for (detail::DisplacedGbtsEdge* pS : vOld) {
-      std::int32_t nextLevel = pS->level;
-
-      for (std::uint32_t nIdx = 0; nIdx < pS->nNei; ++nIdx) {
-        const std::uint32_t nextEdgeIdx = pS->vNei[nIdx];
-
-        const detail::DisplacedGbtsEdge* pN = &(edgeStorage[nextEdgeIdx]);
-
-        if (pS->level == pN->level) {
-          nextLevel = pS->level + 1;
-          vNew.push_back(pS);
-          break;
-        }
-      }
-
-      // proposal
-      pS->next = static_cast<std::int8_t>(nextLevel);
-    }
-
-    // update
-
-    std::uint32_t nChanges = 0;
-
-    for (auto pS : vNew) {
-      if (pS->next != pS->level) {
-        nChanges++;
-        pS->level = pS->next;
-        // levels only grow from zero here, so the cast is safe
-        maxLevel = std::max(maxLevel, static_cast<std::uint32_t>(pS->level));
-      }
-    }
-
-    if (nChanges == 0) {
-      break;
-    }
-
-    vOld.swap(vNew);
-    vNew.clear();
-  }
-
-  return maxLevel;
-}
-
-std::vector<detail::DisplacedGbtsEdge*> DisplacedGbtsGraph::extractChainHeads(
-    std::vector<detail::DisplacedGbtsEdge>& edgeStorage,
-    std::uint32_t nEdges, const std::uint8_t minSeedLevel,
-    const bool addTriplets, const float maxAbsEtaAddTriplets) const {
-  const std::uint8_t minLevel = minSeedLevel;
-  // `addTriplets` accepts a chain one level short. Signed: an uncollected
-  // edge sits at level -1 and `minSeedLevel` may be configured to 0.
-  const int minLevelAddTriplets = int{minLevel} - 1;
-  std::vector<detail::DisplacedGbtsEdge*> vChainHeads;
-
-  vChainHeads.reserve(nEdges / 2);
-
-  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
-    detail::DisplacedGbtsEdge* pS = &edgeStorage[edgeIndex];
-
-    if (!addTriplets) {
-      if (pS->level < minLevel) {
-        continue;
-      }
-    } else {  // eta-dependent cut
-      // the edge's own eta, from the doublet: eta is -log(exp(eta)) and the
-      // displaced edge keeps exp(eta) where the prompt one kept it in p[0]
-      const float edgeAbsEta = std::abs(-std::log(pS->expEta));
-
-      if (edgeAbsEta > maxAbsEtaAddTriplets) {
-        if (pS->level < minLevel) {
-          continue;
-        }
-      } else {
-        if (pS->level < minLevelAddTriplets) {
-          continue;
-        }
-      }
-    }
-
-    vChainHeads.push_back(pS);
-  }
-
-  if (vChainHeads.empty()) {
-    return vChainHeads;
-  }
-
-  std::ranges::sort(vChainHeads, std::ranges::greater{},
-                    [](const detail::DisplacedGbtsEdge* e) { return e->level; });
-
-  return vChainHeads;
+  graph.nConnections = nConnections;
+  return graph;
 }
 
 std::optional<detail::TripletCircle> DisplacedGbtsGraph::fitTripletCircle(
@@ -983,5 +870,130 @@ std::optional<detail::TripletCircle> DisplacedGbtsGraph::fitTripletCircle(
 
   return circle;
 }
+
+template <typename edge_t>
+std::uint32_t detail::GbtsGraph<edge_t>::runCCA(
+    const std::uint32_t maxIterations) {
+  const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
+
+  std::uint32_t maxLevel = 0;
+
+  std::uint32_t iter = 0;
+
+  std::vector<edge_t*> vOld;
+
+  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
+    edge_t* pS = &(edgeStorage[edgeIndex]);
+    if (pS->nNei == 0) {
+      continue;
+    }
+
+    // TODO: increment level for segments as they already have at least one
+    // neighbour
+    vOld.push_back(pS);
+  }
+
+  std::vector<edge_t*> vNew;
+  vNew.reserve(vOld.size());
+
+  // generate proposals
+  for (; iter < maxIterations; iter++) {
+    vNew.clear();
+
+    for (edge_t* pS : vOld) {
+      std::int32_t nextLevel = pS->level;
+
+      for (std::uint32_t nIdx = 0; nIdx < pS->nNei; ++nIdx) {
+        const std::uint32_t nextEdgeIdx = pS->vNei[nIdx];
+
+        const edge_t* pN = &(edgeStorage[nextEdgeIdx]);
+
+        if (pS->level == pN->level) {
+          nextLevel = pS->level + 1;
+          vNew.push_back(pS);
+          break;
+        }
+      }
+
+      // proposal
+      pS->next = static_cast<std::int8_t>(nextLevel);
+    }
+
+    // update
+
+    std::uint32_t nChanges = 0;
+
+    for (auto pS : vNew) {
+      if (pS->next != pS->level) {
+        nChanges++;
+        pS->level = pS->next;
+        // levels only grow from zero here, so the cast is safe
+        maxLevel = std::max(maxLevel, static_cast<std::uint32_t>(pS->level));
+      }
+    }
+
+    if (nChanges == 0) {
+      break;
+    }
+
+    vOld.swap(vNew);
+    vNew.clear();
+  }
+
+  return maxLevel;
+}
+
+template <typename edge_t>
+std::vector<edge_t*> detail::GbtsGraph<edge_t>::extractChainHeads(
+    const std::uint8_t minSeedLevel, const bool addTriplets,
+    const float maxAbsEtaAddTriplets) {
+  const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
+
+  // `addTriplets` accepts a chain one level short. Signed: an uncollected
+  // edge sits at level -1 and `minSeedLevel` may be configured to 0.
+  const std::int8_t minLevelAddTriplets =
+      static_cast<std::int8_t>(minSeedLevel - 1);
+  std::vector<edge_t*> vChainHeads;
+
+  vChainHeads.reserve(nEdges / 2);
+
+  for (std::uint32_t edgeIndex = 0; edgeIndex < nEdges; ++edgeIndex) {
+    edge_t* pS = &edgeStorage[edgeIndex];
+
+    if (!addTriplets) {
+      if (pS->level < minSeedLevel) {
+        continue;
+      }
+    } else {  // eta-dependent cut
+      // the prompt edge keeps exp(eta) among its fit parameters and the
+      // displaced one in a field of its own, so ask rather than reach in
+      const float edgeAbsEta = std::abs(-std::log(detail::edgeExpEta(*pS)));
+
+      if (edgeAbsEta > maxAbsEtaAddTriplets) {
+        if (pS->level < minSeedLevel) {
+          continue;
+        }
+      } else {
+        if (pS->level < minLevelAddTriplets) {
+          continue;
+        }
+      }
+    }
+
+    vChainHeads.push_back(pS);
+  }
+
+  std::ranges::sort(vChainHeads, std::ranges::greater{},
+                    [](const edge_t* e) { return e->level; });
+
+  return vChainHeads;
+}
+
+// Only the displaced edge carries a level, so only it has these.
+template std::uint32_t detail::GbtsGraph<detail::DisplacedGbtsEdge>::runCCA(
+    std::uint32_t maxIterations);
+template std::vector<detail::DisplacedGbtsEdge*>
+detail::GbtsGraph<detail::DisplacedGbtsEdge>::extractChainHeads(
+    std::uint8_t minSeedLevel, bool addTriplets, float maxAbsEtaAddTriplets);
 
 } // Acts::Experimental namespace

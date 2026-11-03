@@ -372,6 +372,8 @@ SeederSetup makeSeeder(const ToyDetector& detector,
   Experimental::GraphBasedTrackSeeder::Config config;
   // the toy setup has no tau lookup table and no cluster widths
   config.useClusterWidthCuts = false;
+  // a link here already cost a triplet fit, so three nodes are a seed
+  config.minSeedLevel = 2;
 
   Experimental::GbtsGraphConfig graphConfig;
   graphConfig.minPt = 1_GeV;
@@ -381,8 +383,6 @@ SeederSetup makeSeeder(const ToyDetector& detector,
   graphConfig.maxOuterRadius = kMaxOuterRadius;
   graphConfig.calibrateStrips = calibrateStrips;
   graphConfig.matchBeforeCreate = matchBeforeCreate;
-  // a link here already cost a triplet fit, so three nodes are a seed
-  graphConfig.minSeedLevel = 2;
 
   // The filter walks the chains the graph found and has its own beamspot
   // assumption, defaulting to 170mm. Left there it would throw away the
@@ -427,10 +427,11 @@ GraphRun buildGraph(const SeederSetup& setup,
   storage.finalize();
 
   GraphRun run;
-  const auto stats = setup.graph.buildTheGraph(
-      setup.roi, storage, run.edges, setup.options.bFieldInZ);
-  run.nEdges = stats.first;
-  run.nConnections = stats.second;
+  Experimental::detail::GbtsGraph<DisplacedGbtsEdge> graph =
+      setup.graph.buildTheGraph(setup.roi, storage, setup.options.bFieldInZ);
+  run.edges = std::move(graph.edgeStorage);
+  run.nEdges = static_cast<std::uint32_t>(run.edges.size());
+  run.nConnections = graph.nConnections;
 
   run.nodeOfSpacePoint.assign(spacePoints.size(), 0);
   for (std::uint32_t node = 0; node < storage.numberOfNodes(); ++node) {

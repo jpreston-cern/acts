@@ -24,8 +24,6 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
-#include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -101,23 +99,8 @@ void GraphBasedTrackSeeder::createSeeds(
   // prompt graph, one carrying the triplets it belongs to for the displaced
   using edge_t = typename graph_builder_t::EdgeType;
 
-  // The prompt builder hands back the graph it built, while the displaced one
-  // still fills caller-owned storage and returns the counts, so its result is
-  // gathered into the same shape here.
-  constexpr bool isPrompt = std::is_same_v<graph_builder_t, GbtsGraphBuilder>;
-  struct DisplacedGraph {
-    std::vector<edge_t> edgeStorage;
-    std::uint32_t nEdges = 0;
-    std::uint32_t nConnections = 0;
-  };
-  std::conditional_t<isPrompt, GbtsGraph, DisplacedGraph> graph;
-
-  if constexpr (isPrompt) {
-    graph = graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
-  } else {
-    std::tie(graph.nEdges, graph.nConnections) = graphBuilder.buildTheGraph(
-        roi, nodeStorage, graph.edgeStorage, options.bFieldInZ);
-  }
+  detail::GbtsGraph<edge_t> graph =
+      graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
 
   ACTS_DEBUG("Created graph with " << graph.edgeStorage.size() << " edges and "
                                    << graph.nConnections << " edge links");
@@ -131,17 +114,15 @@ void GraphBasedTrackSeeder::createSeeds(
   // The prompt graph gives the best fitted path of every edge. The displaced
   // graph follows its chains from their heads, longest first.
   std::vector<detail::GbtsEdgeState<edge_t>> paths;
-  if constexpr (isPrompt) {
+  if constexpr (std::is_same_v<edge_t, detail::GbtsEdge>) {
     paths = extractBestPathPerEdge(nodeView, graph, filter);
   } else {
-    const std::uint32_t maxLevel = graphBuilder.runCCA(
-        graph.nEdges, graph.edgeStorage, m_cfg.maxChainLength);
+    const std::uint32_t maxLevel = graph.runCCA(m_cfg.maxChainLength);
 
     ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
 
-    const std::vector<edge_t*> vChainHeads = graphBuilder.extractChainHeads(
-        graph.edgeStorage, graph.nEdges, m_cfg.minSeedLevel, m_cfg.addTriplets,
-        m_cfg.maxAbsEtaAddTriplets);
+    const std::vector<edge_t*> vChainHeads = graph.extractChainHeads(
+        m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
 
     if (vChainHeads.empty()) {
       ACTS_WARNING("No chains passed minimum edge requirement");
@@ -393,7 +374,8 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
 std::vector<detail::GbtsEdgeState<detail::GbtsEdge>>
 GraphBasedTrackSeeder::extractBestPathPerEdge(
-    const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+    const detail::GbtsNodeView& nodeView,
+    const detail::GbtsGraph<detail::GbtsEdge>& graph,
     const GbtsTrackingFilter& filter) const {
   const std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());

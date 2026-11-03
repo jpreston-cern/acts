@@ -196,10 +196,10 @@ GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
       m_geometry(std::move(geometry)),
       m_logger(std::move(logger)) {}
 
-GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
-                                          GbtsNodeStorage& nodeStorage,
-                                          const float bFieldInZ) const {
-  GbtsGraph graph;
+detail::GbtsGraph<detail::GbtsEdge> GbtsGraphBuilder::buildTheGraph(
+    const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::GbtsEdge> graph;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 
   // used to calculate Z cut on doublets
