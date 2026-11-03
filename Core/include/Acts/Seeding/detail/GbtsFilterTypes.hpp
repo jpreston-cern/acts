@@ -50,19 +50,4 @@ struct GbtsEdgeState final {
   float s{};
 };
 
-/// Maximum number of edge states
-static constexpr std::uint32_t kGbtsMaxEdgeStates = 2500;
-
-/// State for the tracking filter, containing edge states and a global counter.
-///
-/// @tparam edge_t The graph edge being followed
-template <typename edge_t>
-struct GbtsFilterState final {
-  std::vector<GbtsEdgeState<edge_t>*> stateVec;
-
-  std::array<GbtsEdgeState<edge_t>, kGbtsMaxEdgeStates> stateStore{};
-
-  std::uint32_t globalStateCounter{0};
-};
-
 }  // namespace Acts::Experimental::detail

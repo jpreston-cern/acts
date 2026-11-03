@@ -59,9 +59,7 @@ class GraphBasedTrackSeeder {
     std::uint8_t minSeedLevel = 3;
     /// optionally add 3 sp seeds within a certain eta range
     ///
-    /// @note Matters most where there are few layers. The displaced graph masks
-    ///       edges, so there it is worth little until `maxAbsEtaAddTriplets` is
-    ///       opened past `edgeMaskMinEta`.
+    /// @note Matters most where there are few layers.
     /// @note This accepts a chain one level short, so at a `minSeedLevel` of two
     ///       it reaches down to a single edge: two nodes and no fit at all.
     bool addTriplets = false;
@@ -72,8 +70,6 @@ class GraphBasedTrackSeeder {
     std::uint32_t minSplitSeedSize = 4;
     /// Largest seed size that is split.
     std::uint32_t maxSplitSeedSize = 5;
-    /// Minimum eta for edge masking. Only the displaced graph masks edges.
-    float edgeMaskMinEta = 1.5;
     /// Threshold for hit sharing between seeds.
     float hitShareThreshold = 0.49;
     /// Call a seed candidate a clone only when a single better candidate
@@ -251,41 +247,30 @@ class GraphBasedTrackSeeder {
 
   const Acts::Logger& logger() const { return *m_logger; }
 
-  /// Turn fitted paths through the graph into seed candidates.
-  /// @tparam edge_t The graph edge the paths are made of
+  /// Extract seed candidates from the graph.
+  /// @tparam edge_t The edge of the graph, prompt or displaced
   /// @param nodeStorage Storage containing the graph nodes
-  /// @param paths The fitted paths, each with its head edge first
+  /// @param graph The graph
   /// @param vOutputSeeds Output vector for seed candidates
+  /// @param filter Tracking filter to be applied
   /// @param withFits Whether the fit of the filter to each seed is kept
   template <typename edge_t>
-  void extractSeedsFromTheGraph(
-      const GbtsNodeStorage& nodeStorage,
-      const std::vector<detail::GbtsEdgeState<edge_t>>& paths,
-      std::vector<OutputSeedProperties>& vOutputSeeds, bool withFits) const;
+  void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
+                                const detail::GbtsGraph<edge_t>& graph,
+                                std::vector<OutputSeedProperties>& vOutputSeeds,
+                                const GbtsTrackingFilter& filter,
+                                bool withFits) const;
 
   /// Extract the best fitted path from every edge inwards to a root edge.
+  /// @tparam edge_t The edge of the graph, prompt or displaced
   /// @param nodeView View of the node positions and layers
   /// @param graph The graph
   /// @param filter Tracking filter fitting the paths
   /// @return The fitted paths, each with its head edge first
-  std::vector<detail::GbtsEdgeState<detail::GbtsEdge>> extractBestPathPerEdge(
-      const detail::GbtsNodeView& nodeView,
-      const detail::GbtsGraph<detail::GbtsEdge>& graph,
-      const GbtsTrackingFilter& filter) const;
-
-  /// Follow the chains of the displaced graph from their heads, longest first,
-  /// masking the edges of each one above `edgeMaskMinEta`.
-  /// @tparam edge_t The graph edge being followed
-  /// @param nodeView View of the node positions and layers
-  /// @param edgeStorage Storage containing edges, after the connected
-  ///                    component analysis
-  /// @param vChainHeads Chain heads the graph selected
-  /// @param filter Tracking filter fitting the chains
-  /// @return The fitted paths, each with its head edge first
   template <typename edge_t>
-  std::vector<detail::GbtsEdgeState<edge_t>> followChainHeads(
-      const detail::GbtsNodeView& nodeView, std::vector<edge_t>& edgeStorage,
-      const std::vector<edge_t*>& vChainHeads,
+  std::vector<detail::GbtsEdgeState<edge_t>> extractBestPathPerEdge(
+      const detail::GbtsNodeView& nodeView,
+      const detail::GbtsGraph<edge_t>& graph,
       const GbtsTrackingFilter& filter) const;
 
   /// Mark as clones the three space point candidates beyond

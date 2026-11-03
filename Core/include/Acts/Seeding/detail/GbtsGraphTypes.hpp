@@ -236,25 +236,6 @@ struct GbtsGraph {
 
   /// Number of links between edges.
   std::uint32_t nConnections = 0;
-
-  /// Run connected component analysis on the graph, updating the edge levels.
-  /// Only for an edge that carries a level, which the displaced one does.
-  /// @param maxIterations Maximum number of connected-component iterations
-  /// @return The highest chain level any edge reached
-  std::uint32_t runCCA(std::uint32_t maxIterations);
-
-  /// extract edges that start a chain. Only for an edge that carries a level,
-  /// which the displaced one does.
-  /// @param minSeedLevel Chain length a seed candidate must reach
-  /// @param addTriplets Accept chains one level short within
-  ///        `maxAbsEtaAddTriplets`
-  /// @param maxAbsEtaAddTriplets The maximum |eta| at which `addTriplets`
-  ///        applies
-  /// @return The edges that start chains, ordered by length of chain, empty
-  ///         if no chain reached the required level
-  std::vector<edge_t*> extractChainHeads(std::uint8_t minSeedLevel,
-                                         bool addTriplets,
-                                         float maxAbsEtaAddTriplets);
 };
 
 }  // namespace Acts::Experimental::detail

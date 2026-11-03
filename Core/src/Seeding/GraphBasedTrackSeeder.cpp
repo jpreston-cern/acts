@@ -22,14 +22,59 @@
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace Acts::Experimental {
 
 namespace {
+
+/// Order the edges so that each comes before every edge it links to.
+///
+/// The prompt builder creates its edges in that order already. The displaced
+/// one creates an edge the first time a triplet passes through it, so an outer
+/// edge can come after an inner edge an earlier triplet created. Nor does its
+/// cut on the chord rule out a closed loop of links: the edges of a loop, and
+/// those it links to, are not placed.
+template <typename edge_t>
+std::vector<std::uint32_t> edgesOutsideIn(const std::vector<edge_t>& edges) {
+  const auto nEdges = static_cast<std::uint32_t>(edges.size());
+
+  std::vector<std::uint32_t> order;
+  order.reserve(nEdges);
+
+  if constexpr (std::is_same_v<edge_t, detail::GbtsEdge>) {
+    for (std::uint32_t e = 0; e < nEdges; ++e) {
+      order.push_back(e);
+    }
+  } else {
+    std::vector<std::uint32_t> nOuter(nEdges, 0);
+    for (const edge_t& edge : edges) {
+      for (std::uint32_t k = 0; k < edge.nNei; ++k) {
+        ++nOuter[edge.vNei[k]];
+      }
+    }
+    for (std::uint32_t e = 0; e < nEdges; ++e) {
+      if (nOuter[e] == 0) {
+        order.push_back(e);
+      }
+    }
+    for (std::size_t i = 0; i < order.size(); ++i) {
+      const edge_t& edge = edges[order[i]];
+      for (std::uint32_t k = 0; k < edge.nNei; ++k) {
+        if (--nOuter[edge.vNei[k]] == 0) {
+          order.push_back(edge.vNei[k]);
+        }
+      }
+    }
+  }
+
+  return order;
+}
 
 /// |d0| and |z0| of the helix through three nodes, inside out: the circle
 /// through all three in the transverse plane, and the straight line through
@@ -192,32 +237,9 @@ void GraphBasedTrackSeeder::createSeeds(
     ACTS_WARNING("Missing edges or edge connections");
   }
 
-  const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
-
-  // The prompt graph gives the best fitted path of every edge. The displaced
-  // graph follows its chains from their heads, longest first.
-  std::vector<detail::GbtsEdgeState<edge_t>> paths;
-  if constexpr (std::is_same_v<edge_t, detail::GbtsEdge>) {
-    paths = extractBestPathPerEdge(nodeView, graph, filter);
-  } else {
-    const std::uint32_t maxLevel = graph.runCCA(m_cfg.maxChainLength);
-
-    ACTS_DEBUG("Reached Level " << maxLevel << " after GNN iterations");
-
-    const std::vector<edge_t*> vChainHeads = graph.extractChainHeads(
-        m_cfg.minSeedLevel, m_cfg.addTriplets, m_cfg.maxAbsEtaAddTriplets);
-
-    if (vChainHeads.empty()) {
-      ACTS_WARNING("No chains passed minimum edge requirement");
-      return;
-    }
-
-    paths = followChainHeads(nodeView, graph.edgeStorage, vChainHeads, filter);
-  }
-
   std::vector<OutputSeedProperties> vOutputSeeds;
-  extractSeedsFromTheGraph<edge_t>(nodeStorage, paths, vOutputSeeds,
-                                   outputFits != nullptr);
+  extractSeedsFromTheGraph(nodeStorage, graph, vOutputSeeds, filter,
+                           outputFits != nullptr);
 
   ACTS_DEBUG("GBTS created " << vOutputSeeds.size() << " seeds");
   if (vOutputSeeds.empty()) {
@@ -237,10 +259,9 @@ void GraphBasedTrackSeeder::createSeeds(
 
 template <typename edge_t>
 void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
-    const GbtsNodeStorage& nodeStorage,
-    const std::vector<detail::GbtsEdgeState<edge_t>>& paths,
+    const GbtsNodeStorage& nodeStorage, const detail::GbtsGraph<edge_t>& graph,
     std::vector<OutputSeedProperties>& vOutputSeeds,
-    const bool withFits) const {
+    const GbtsTrackingFilter& filter, const bool withFits) const {
   const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
 
   std::vector<SeedCandidateProperties> vSeedCandidates;
@@ -250,7 +271,8 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
   std::uint32_t seedCounter = 0;
 
   // Turn the fitted path of every head edge into a seed candidate.
-  for (const detail::GbtsEdgeState<edge_t>& rs : paths) {
+  for (const detail::GbtsEdgeState<edge_t>& rs :
+       extractBestPathPerEdge(nodeView, graph, filter)) {
     const edge_t& head = *rs.vs.front();
     const float seedAbsEta = std::abs(-std::log(detail::edgeExpEta(head)));
 
@@ -464,22 +486,28 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
   }
 }
 
-std::vector<detail::GbtsEdgeState<detail::GbtsEdge>>
+template <typename edge_t>
+std::vector<detail::GbtsEdgeState<edge_t>>
 GraphBasedTrackSeeder::extractBestPathPerEdge(
     const detail::GbtsNodeView& nodeView,
-    const detail::GbtsGraph<detail::GbtsEdge>& graph,
+    const detail::GbtsGraph<edge_t>& graph,
     const GbtsTrackingFilter& filter) const {
-  const std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
+  const std::vector<edge_t>& edgeStorage = graph.edgeStorage;
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
   const auto maxLength = static_cast<std::uint32_t>(m_cfg.maxChainLength);
 
   // The level of an edge is the length of the longest chain of edges going
-  // outwards from it. `vNei` only holds edges further in, which are created
-  // later, so one pass in edge order settles it. Edges in chains longer than
-  // `maxLength` stay above it and are left out.
-  std::vector<std::uint32_t> level(nEdges, 1);
-  for (std::uint32_t e = 0; e < nEdges; ++e) {
-    const detail::GbtsEdge& edge = edgeStorage[e];
+  // outwards from it. `vNei` only holds edges further in, so one pass with
+  // every edge before those it links to settles it. Edges in chains longer than
+  // `maxLength` stay above it and are left out, as is any edge the ordering
+  // could not place.
+  const std::vector<std::uint32_t> order = edgesOutsideIn(edgeStorage);
+  std::vector<std::uint32_t> level(nEdges, maxLength + 1);
+  for (const std::uint32_t e : order) {
+    level[e] = 1;
+  }
+  for (const std::uint32_t e : order) {
+    const edge_t& edge = edgeStorage[e];
     const std::uint32_t next = std::min(level[e] + 1, maxLength + 1);
     for (std::uint32_t k = 0; k < edge.nNei; ++k) {
       std::uint32_t& innerLevel = level[edge.vNei[k]];
@@ -491,7 +519,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   // included, stepping one level up at a time; zero for an edge left out.
   // The edges further in come later, so one pass backwards settles it.
   std::vector<std::uint32_t> edgesToRoot(nEdges, 0);
-  for (std::uint32_t e = nEdges; e-- > 0;) {
+  for (const std::uint32_t e : std::views::reverse(order)) {
     if (level[e] > maxLength) {
       continue;
     }
@@ -500,7 +528,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     const std::uint32_t nextLevel = level[e] + 1;
     std::uint32_t length = 1;
     if (nextLevel <= maxLength) {
-      const detail::GbtsEdge& edge = edgeStorage[e];
+      const edge_t& edge = edgeStorage[e];
       for (std::uint32_t k = 0; k < edge.nNei; ++k) {
         const std::uint32_t inner = edge.vNei[k];
         if (level[inner] == nextLevel) {
@@ -514,16 +542,15 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   // From every edge, search all paths inwards to a root, fitting on the way.
   // The complete path with the best score per space point is the candidate
   // of the edge.
-  std::vector<detail::GbtsEdgeState<detail::GbtsEdge>> candidates;
+  std::vector<detail::GbtsEdgeState<edge_t>> candidates;
   std::uint32_t minLength = 0;
   std::vector<std::uint32_t> path;
   std::vector<std::uint32_t> bestPath;
   float bestQuality = 0;
-  detail::GbtsEdgeState<detail::GbtsEdge> bestState;
+  detail::GbtsEdgeState<edge_t> bestState;
 
-  const auto search =
-      [&](const auto& self, const std::uint32_t e,
-          const detail::GbtsEdgeState<detail::GbtsEdge>& state) -> void {
+  const auto search = [&](const auto& self, const std::uint32_t e,
+                          const detail::GbtsEdgeState<edge_t>& state) -> void {
     path.push_back(e);
     // every step goes one level up, so the depth is bounded by `maxLength`
     assert(path.size() <= maxLength);
@@ -542,14 +569,14 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
         bestPath = path;
       }
     } else {
-      const detail::GbtsEdge& edge = edgeStorage[e];
+      const edge_t& edge = edgeStorage[e];
       for (std::uint32_t k = 0; k < edge.nNei; ++k) {
         const std::uint32_t inner = edge.vNei[k];
         if (level[inner] != level[e] + 1 ||
             path.size() + edgesToRoot[inner] < minLength) {
           continue;
         }
-        detail::GbtsEdgeState<detail::GbtsEdge> innerState = state;
+        detail::GbtsEdgeState<edge_t> innerState = state;
         if (filter.update(nodeView, edgeStorage[inner], innerState)) {
           self(self, inner, innerState);
         }
@@ -560,12 +587,13 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   };
 
   for (std::uint32_t head = 0; head < nEdges; ++head) {
-    const detail::GbtsEdge& headEdge = edgeStorage[head];
+    const edge_t& headEdge = edgeStorage[head];
 
     // `addTriplets` accepts a path one edge short at low eta
     minLength = m_cfg.minSeedLevel;
     if (m_cfg.addTriplets && minLength > 0 &&
-        std::abs(-std::log(headEdge.p[0])) <= m_cfg.maxAbsEtaAddTriplets) {
+        std::abs(-std::log(detail::edgeExpEta(headEdge))) <=
+            m_cfg.maxAbsEtaAddTriplets) {
       --minLength;
     }
 
@@ -573,7 +601,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       continue;
     }
 
-    detail::GbtsEdgeState<detail::GbtsEdge> state;
+    detail::GbtsEdgeState<edge_t> state;
     state.initialize(headEdge, nodeView, filter.m_cfg.initialVarianceX,
                      filter.m_cfg.initialVarianceY);
     if (!filter.update(nodeView, headEdge, state)) {
@@ -595,71 +623,6 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   }
 
   return candidates;
-}
-
-template <typename edge_t>
-std::vector<detail::GbtsEdgeState<edge_t>>
-GraphBasedTrackSeeder::followChainHeads(
-    const detail::GbtsNodeView& nodeView, std::vector<edge_t>& edgeStorage,
-    const std::vector<edge_t*>& vChainHeads,
-    const GbtsTrackingFilter& filter) const {
-  // `addTriplets` accepts a chain one level short. Signed: an uncollected
-  // edge sits at level -1 and `minSeedLevel` may be configured to 0.
-  const std::int8_t minLevelAddTriplets =
-      static_cast<std::int8_t>(m_cfg.minSeedLevel - 1);
-
-  std::vector<detail::GbtsEdgeState<edge_t>> paths;
-  paths.reserve(vChainHeads.size());
-
-  GbtsTrackingFilter::State<edge_t> filterState{};
-
-  for (edge_t* pS : vChainHeads) {
-    if (pS->level == -1) {
-      continue;
-    }
-
-    std::optional<detail::GbtsEdgeState<edge_t>> rs =
-        filter.followTrack(filterState, nodeView, edgeStorage, *pS);
-
-    if (!rs.has_value()) {
-      continue;
-    }
-
-    // the prompt edge keeps exp(eta) among its fit parameters and the
-    // displaced one in a field of its own, so ask rather than reach in
-    const float seedAbsEta = std::abs(-std::log(detail::edgeExpEta(*pS)));
-
-    const std::uint32_t chainLength = static_cast<std::uint32_t>(rs->vs.size());
-
-    if (!m_cfg.addTriplets) {
-      if (chainLength < m_cfg.minSeedLevel) {
-        continue;
-      }
-    } else {
-      if (seedAbsEta > m_cfg.maxAbsEtaAddTriplets) {
-        if (chainLength < m_cfg.minSeedLevel) {
-          continue;
-        }
-      } else {
-        if (minLevelAddTriplets > 0 &&
-            chainLength < static_cast<std::uint32_t>(minLevelAddTriplets)) {
-          continue;
-        }
-      }
-    }
-
-    if (seedAbsEta > m_cfg.edgeMaskMinEta) {
-      // mark as collected, for the chains still to come
-      for (const edge_t* edge : rs->vs) {
-        edgeStorage[static_cast<std::size_t>(edge - edgeStorage.data())].level =
-            -1;
-      }
-    }
-
-    paths.push_back(std::move(*rs));
-  }
-
-  return paths;
 }
 
 // The seeder is written once and built for each graph builder that exists.

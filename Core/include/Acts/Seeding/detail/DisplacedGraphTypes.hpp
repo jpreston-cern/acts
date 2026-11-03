@@ -231,7 +231,7 @@ struct DisplacedGbtsDoublet final {
 
 //! [displaced edge]
 /// A doublet at least one triplet passed through, which is all the graph
-/// keeps: the two nodes, the links, and the level the links give it.
+/// keeps: the two nodes and the links.
 struct DisplacedGbtsEdge final {
   DisplacedGbtsEdge() = default;
 
@@ -240,15 +240,12 @@ struct DisplacedGbtsEdge final {
   /// @param n2_ Outer node index
   /// @param expEta_ exp(eta) of the edge, the first fit parameter
   DisplacedGbtsEdge(SpacePointIndex n1_, SpacePointIndex n2_, float expEta_)
-      : n1{n1_}, n2{n2_}, level{1}, next{1}, expEta(expEta_) {}
+      : n1{n1_}, n2{n2_}, expEta(expEta_) {}
 
   /// Inner node of the edge
   SpacePointIndex n1{kSpacePointIndexInvalid};
   /// Outer node of the edge
   SpacePointIndex n2{kSpacePointIndexInvalid};
-
-  std::int8_t level{-1};
-  std::int8_t next{-1};
 
   std::uint8_t nNei{0};
 

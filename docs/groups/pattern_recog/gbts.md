@@ -217,8 +217,9 @@ negative limit switches the cut off:
 With the edge graph built, every edge gets a **level**: the length of the
 longest chain of linked edges going outwards from it, so an edge that nothing
 further out links to is at level 1. An edge only links to edges further in,
-which are always created after it, so a single pass over the edges in creation
-order settles every level. Chains longer than `maxChainLength` edges are left
+so a single pass with every edge before those it links to settles every level:
+creation order for the prompt builder, which always creates an edge before those
+further in, and a sort of the links for the displaced one, which does not. Chains longer than `maxChainLength` edges are left
 unsettled and take no part in the extraction.
 
 An edge with no settled edge further in exactly one level up is a **root**, the
@@ -296,9 +297,8 @@ For a track from a displaced vertex all of that is unavailable at doublet stage.
 @ref Acts::Experimental::DisplacedGbtsGraphBuilder builds the same kind of graph without
 it. It is a drop-in alternative to
 @ref Acts::Experimental::PromptGbtsGraphBuilder "PromptGbtsGraphBuilder" — same node
-storage, same configuration object, same seed candidates and clone removal, and
-the seeder is written once over either. The one step it does differently is how
-it finds the paths through its graph, see @ref gbts-lrt-chains.
+storage, same configuration object, same @ref gbts-levels and @ref gbts-extraction,
+and the seeder is written once over either.
 
 ### What a doublet can still say
 
@@ -448,7 +448,7 @@ middle node of a triplet is the inner node of its outer edge.
 
 Agreement with **any one** recorded triplet is enough. An outer edge may belong
 to several from combinatorics, only one of which is the real track, and the graph
-keeps that ambiguity for @ref gbts-lrt-chains and @ref gbts-extraction to resolve.
+keeps that ambiguity for @ref gbts-extraction to resolve.
 
 An outer edge with no triplets yet is the outermost pair of its chain and has
 nothing to disagree with, so it passes. That is worth knowing when tuning: the
@@ -486,17 +486,6 @@ it, as either of the two doublets, and the graph holds nothing else:
 The edge indices that `vNei` links by are handed out then, so the edges are in
 the order triplets found them and not in node order. `maxEdgesPerSP` caps
 these edges, not the doublets.
-
-### Following the chains {#gbts-lrt-chains}
-
-The displaced graph does not take the best fitted path from every edge. An inner
-edge can be created before an outer one that later links to it, so the single
-pass of @ref gbts-levels would not settle its levels. It propagates the levels
-by iteration instead, up to `maxChainLength` times, picks the edges whose level
-reaches `minSeedLevel` as heads, and follows the chains from the highest head down
-through @ref Acts::Experimental::GbtsTrackingFilter. Above `edgeMaskMinEta` the
-edges of a chain that gave a candidate are masked for the chains still to come,
-so here the seeds depend on the order the heads are followed in.
 
 ### Chain length
 
@@ -561,8 +550,7 @@ The rest are on @ref Acts::Experimental::GraphBasedTrackSeeder "GraphBasedTrackS
 | `nMaxPhiSlice` | @ref gbts-nodes | sets the @f$\phi@f$ slice width, and with it the base sliding-window width the graph uses |
 | `maxChainLength` | @ref gbts-levels | longest chain of edges taken into account |
 | `minSeedLevel` | @ref gbts-extraction | chain length a candidate must reach, in edges. 3 by default; a displaced run can use 2, since a link there already cost a triplet fit |
-| `postFitCurvatureFactor` | @ref gbts-extraction | prompt: tighter curvature bound on the fitted chain, as a factor on the filter's `maxCurvature`; values below 1 does nothing |
-| `edgeMaskMinEta` | @ref gbts-lrt | displaced: above this \f$|\eta|\f$ the edges of a followed chain are masked for the chains still to come |
+| `postFitCurvatureFactor` | @ref gbts-extraction | tighter curvature bound on the fitted chain, as a factor on the filter's `maxCurvature`; values below 1 does nothing |
 | `addTriplets`, `maxAbsEtaAddTriplets` | @ref gbts-extraction | allow shorter chains within an @f$\eta@f$ range |
 | `hitShareThreshold` | @ref gbts-extraction | fraction of shared hits above which a candidate is a clone |
 | `maxSeedSplitEta`, `maxInvRadDiff` | @ref gbts-extraction | seed splitting |
