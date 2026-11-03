@@ -16,6 +16,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace Acts::Experimental {
@@ -78,6 +79,25 @@ class GbtsTrackingFilter final {
   // Only the seeder walks the edge graph.
   friend class GraphBasedTrackSeeder;
 
+  template <typename edge_t>
+  using State = detail::GbtsFilterState<edge_t>;
+
+  /// Follow track starting from edge
+  ///
+  /// Only the displaced graph is still walked this way: the prompt one extracts
+  /// the best fitted path from every edge in the seeder.
+  /// @tparam edge_t The graph edge being followed
+  /// @param state Tracking filter state
+  /// @param nodeView View of the node positions and layers
+  /// @param sb Edge storage
+  /// @param pS Starting edge
+  /// @return Final edge state after following the track, none if no chain
+  ///         survived
+  template <typename edge_t>
+  std::optional<detail::GbtsEdgeState<edge_t>> followTrack(
+      State<edge_t>& state, const detail::GbtsNodeView& nodeView,
+      std::vector<edge_t>& sb, edge_t& pS) const;
+
   /// Configuration for the tracking filter.
   Config m_cfg{};
 
@@ -91,13 +111,27 @@ class GbtsTrackingFilter final {
   /// @return Logger reference
   const Logger& logger() const { return *m_logger; }
 
+  /// Propagate edge state
+  /// @tparam edge_t The graph edge being followed
+  /// @param state Tracking filter state
+  /// @param nodeView View of the node positions and layers
+  /// @param sb Edge storage
+  /// @param pS Edge to propagate from
+  /// @param ts Edge state to update
+  template <typename edge_t>
+  void propagate(State<edge_t>& state, const detail::GbtsNodeView& nodeView,
+                 std::vector<edge_t>& sb, edge_t& pS,
+                 detail::GbtsEdgeState<edge_t>& ts) const;
+
   /// Update edge state with edge
+  /// @tparam edge_t The graph edge being followed
   /// @param nodeView View of the node positions and layers
   /// @param pS Edge to update with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool update(const detail::GbtsNodeView& nodeView, const detail::GbtsEdge& pS,
-              detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool update(const detail::GbtsNodeView& nodeView, const edge_t& pS,
+              detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Get layer type from layer index
   /// @param layerIndex Layer index

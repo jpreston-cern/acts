@@ -32,7 +32,6 @@
 namespace Acts::Experimental {
 
 struct GbtsGraph;
-class GbtsGraphBuilder;
 
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
@@ -66,6 +65,8 @@ class GraphBasedTrackSeeder {
     std::uint32_t minSplitSeedSize = 4;
     /// Largest seed size that is split.
     std::uint32_t maxSplitSeedSize = 5;
+    /// Minimum eta for edge masking. Only the displaced graph masks edges.
+    float edgeMaskMinEta = 1.5;
     /// Threshold for hit sharing between seeds.
     float hitShareThreshold = 0.49;
     /// Max seed eta value considered for splitting.
@@ -135,19 +136,25 @@ class GraphBasedTrackSeeder {
   /// Convenience wrapper that builds and finalizes the node storage itself. The
   /// container must carry the `gbtsLayerIndex`, `clusterWidth` and
   /// `localPositionY` columns.
+  /// @tparam graph_builder_t The graph builder, `GbtsGraphBuilder` for
+  ///                         prompt tracks or `DisplacedGbtsGraph` for large
+  ///                         radius ones. Its `EdgeType` says which edge the
+  ///                         two carry.
   /// @param spacePoints Space point container
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
   /// @param filter Tracking filter to be applied
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
+  template <typename graph_builder_t>
   void createSeeds(const SpacePointContainer& spacePoints,
                    const GbtsRoiDescriptor& roi,
-                   const GbtsGraphBuilder& graphBuilder,
+                   const graph_builder_t& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
   /// Create seeds from a finalized node storage in a region of interest.
+  /// @tparam graph_builder_t The graph builder, prompt or displaced
   /// @param nodeStorage Finalized graph node storage
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
@@ -155,9 +162,10 @@ class GraphBasedTrackSeeder {
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
   /// @param outputFits Fit of the tracking filter to each generated seed
+  template <typename graph_builder_t>
   void createSeeds(
       GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-      const GbtsGraphBuilder& graphBuilder, const GbtsTrackingFilter& filter,
+      const graph_builder_t& graphBuilder, const GbtsTrackingFilter& filter,
       const Options& options, SeedContainer& outputSeeds,
       std::vector<std::optional<GbtsSeedFit>>* outputFits = nullptr) const;
 
@@ -211,25 +219,40 @@ class GraphBasedTrackSeeder {
 
   const Acts::Logger& logger() const { return *m_logger; }
 
-  /// Extract seed candidates from the graph.
+  /// Turn fitted paths through the graph into seed candidates.
+  /// @tparam edge_t The graph edge the paths are made of
   /// @param nodeStorage Storage containing the graph nodes
-  /// @param graph The graph
+  /// @param paths The fitted paths, each with its head edge first
   /// @param vOutputSeeds Output vector for seed candidates
-  /// @param filter Tracking filter to be applied
   /// @param withFits Whether the fit of the filter to each seed is kept
-  void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
-                                const GbtsGraph& graph,
-                                std::vector<OutputSeedProperties>& vOutputSeeds,
-                                const GbtsTrackingFilter& filter,
-                                bool withFits) const;
+  template <typename edge_t>
+  void extractSeedsFromTheGraph(
+      const GbtsNodeStorage& nodeStorage,
+      const std::vector<detail::GbtsEdgeState<edge_t>>& paths,
+      std::vector<OutputSeedProperties>& vOutputSeeds, bool withFits) const;
 
   /// Extract the best fitted path from every edge inwards to a root edge.
   /// @param nodeView View of the node positions and layers
   /// @param graph The graph
   /// @param filter Tracking filter fitting the paths
   /// @return The fitted paths, each with its head edge first
-  std::vector<detail::GbtsEdgeState> extractBestPathPerEdge(
+  std::vector<detail::GbtsEdgeState<detail::GbtsEdge>> extractBestPathPerEdge(
       const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+      const GbtsTrackingFilter& filter) const;
+
+  /// Follow the chains of the displaced graph from their heads, longest first,
+  /// masking the edges of each one above `edgeMaskMinEta`.
+  /// @tparam edge_t The graph edge being followed
+  /// @param nodeView View of the node positions and layers
+  /// @param edgeStorage Storage containing edges, after the connected
+  ///                    component analysis
+  /// @param vChainHeads Chain heads the graph selected
+  /// @param filter Tracking filter fitting the chains
+  /// @return The fitted paths, each with its head edge first
+  template <typename edge_t>
+  std::vector<detail::GbtsEdgeState<edge_t>> followChainHeads(
+      const detail::GbtsNodeView& nodeView, std::vector<edge_t>& edgeStorage,
+      const std::vector<edge_t*>& vChainHeads,
       const GbtsTrackingFilter& filter) const;
 
   /// Estimate the inverse radius of the circle through three nodes.

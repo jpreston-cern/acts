@@ -17,6 +17,11 @@
 namespace Acts::Experimental::detail {
 
 /// Per-edge tracking state used by the GBTS filter.
+///
+/// @tparam edge_t The graph edge being followed, prompt or displaced. The fit
+///                reads only the two nodes of an edge, which both edges carry
+///                alike.
+template <typename edge_t>
 struct GbtsEdgeState final {
  public:
   GbtsEdgeState() = default;
@@ -26,14 +31,14 @@ struct GbtsEdgeState final {
   /// @param nodeView View of the node positions and layers
   /// @param varianceX Initial variance of the transverse state
   /// @param varianceY Initial variance of the longitudinal state
-  void initialize(const GbtsEdge& pS, const GbtsNodeView& nodeView,
+  void initialize(const edge_t& pS, const GbtsNodeView& nodeView,
                   const std::array<float, 3>& varianceX,
                   const std::array<float, 2>& varianceY);
 
   /// Score for comparison
   float j{};
 
-  std::vector<const GbtsEdge*> vs;
+  std::vector<const edge_t*> vs;
 
   std::array<float, 3> x{};
   std::array<float, 2> y{};
@@ -43,6 +48,21 @@ struct GbtsEdgeState final {
   float refY{};
   float c{};
   float s{};
+};
+
+/// Maximum number of edge states
+static constexpr std::uint32_t kGbtsMaxEdgeStates = 2500;
+
+/// State for the tracking filter, containing edge states and a global counter.
+///
+/// @tparam edge_t The graph edge being followed
+template <typename edge_t>
+struct GbtsFilterState final {
+  std::vector<GbtsEdgeState<edge_t>*> stateVec;
+
+  std::array<GbtsEdgeState<edge_t>, kGbtsMaxEdgeStates> stateStore{};
+
+  std::uint32_t globalStateCounter{0};
 };
 
 }  // namespace Acts::Experimental::detail

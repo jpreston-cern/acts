@@ -142,4 +142,13 @@ namespace Acts::Experimental::detail{
 
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 };
+
+/// exp(eta) of an edge, which the displaced edge keeps in a field of its own
+/// because a displaced doublet has no fit parameters to put it among.
+///
+/// @param edge The edge
+/// @return exp(eta) of the edge
+inline float edgeExpEta(const DisplacedGbtsEdge& edge) {
+  return edge.expEta;
+}
 }
