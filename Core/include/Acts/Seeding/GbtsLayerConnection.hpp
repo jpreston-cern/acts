@@ -35,16 +35,17 @@ struct GbtsLayerConnection {
 struct GbtsAdaptiveTauRatioCuts {
   /// Tolerance of a triplet nothing widens.
   float tauRatioCut = 0.007f;
-  /// Widening for a pixel barrel layer skipped, or for the pixel barrel left.
+  /// Widening for a barrel layer skipped on the pixel barrel, or for the pixel
+  /// barrel left.
   float tauRatioCorr = 0.006f;
   /// Widening, on top, for a strip layer in the triplet.
   float tauRatioCorrStrip = 0.03f;
 };
 
 /// Fill the tau ratio tolerances of the layer pairs. A pair is widened by
-/// `tauRatioCorr` if it skips a pixel barrel layer, or, as an outer pair, if it
-/// leaves the pixel barrel. A pair with a strip layer is widened by
-/// `tauRatioCorrStrip` on top.
+/// `tauRatioCorr` if it skips a barrel layer of any technology between two pixel
+/// barrel layers, or, as an outer pair, if it leaves the pixel barrel. A pair
+/// with a strip layer is widened by `tauRatioCorrStrip` on top.
 ///
 /// @param connections The layer pairs, whose tolerances are overwritten
 /// @param layers The layers the geometry is built from

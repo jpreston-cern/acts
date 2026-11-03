@@ -42,8 +42,8 @@ struct SlidingWindow {
   std::uint32_t firstIt{};
   /// window half-width;
   float deltaPhi{};
-  /// Inside-out pixel barrel ordinal of the bin's layer, -1 for the rest.
-  std::int32_t barrelOrder{-1};
+  /// How deep the bin's layer sits in the barrel, -1 for an endcap.
+  std::int32_t depth{-1};
   /// Tau ratio cuts of the bin's layer pair, as inner and as outer pair
   float tauRatioCutInner{};
   float tauRatioCutOuter{};
@@ -278,18 +278,17 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
     const float rb1 = B1.minRadius;
 
-    const std::int32_t barrelOrder1 = B1.barrelOrder;
-
-    const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
-    const bool isPixelBarrel1 = barrelOrder1 >= 0;
-
-    const bool useZ0Histogram =
-        barrelOrder1 >= 0 && barrelOrder1 <= m_cfg.z0HistogramMaxBarrelOrder;
     // How deep this bin's layer sits in the barrel, counting every barrel
-    // layer rather than the pixel ones alone, so that this reaches the
-    // innermost layers of a detector whatever they are made of.
+    // layer whatever it is made of. The z0 histogram and matchBeforeCreate
+    // key on it; where a cut wants pixels specifically it asks the technology
+    // as well.
     const std::int32_t depth1 = B1.depth;
 
+    const bool isPixel1 = B1.technology == GbtsLayerTechnology::Pixel;
+    const bool isPixelBarrel1 = depth1 >= 0 && isPixel1;
+
+    const bool useZ0Histogram =
+        depth1 >= 0 && depth1 <= m_cfg.z0HistogramMaxDepth;
     const bool useMatchBeforeCreate = m_cfg.matchBeforeCreate && depth1 >= 0 &&
                                       depth1 <= m_cfg.matchBeforeCreateMaxDepth;
 
@@ -325,7 +324,7 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
       window.phiNodes = B2.phiNodes.data();
       window.numPhiNodes = static_cast<std::uint32_t>(B2.phiNodes.size());
       window.deltaPhi = deltaPhi;
-      window.barrelOrder = B2.barrelOrder;
+      window.depth = B2.depth;
       window.tauRatioCutInner = link.tauRatioCutInner;
       window.tauRatioCutOuter = link.tauRatioCutOuter;
       window.type = B2.type;
@@ -438,10 +437,10 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
 
       // the intermediate loop over sliding windows
       for (auto& slw : phiSlidingWindow) {
-        const std::int32_t barrelOrder2 = slw.barrelOrder;
+        const std::int32_t depth2 = slw.depth;
 
         const bool isPixel2 = slw.technology == GbtsLayerTechnology::Pixel;
-        const bool isPixelBarrel2 = barrelOrder2 >= 0;
+        const bool isPixelBarrel2 = depth2 >= 0 && isPixel2;
 
         const bool stripPair = calibrate && (!isPixel1 || !isPixel2);
 

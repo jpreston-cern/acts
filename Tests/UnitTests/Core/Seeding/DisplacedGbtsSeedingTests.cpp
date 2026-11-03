@@ -699,9 +699,8 @@ BOOST_AUTO_TEST_CASE(GraphFindsEveryEdgeWithTheTurnPrecutActive) {
 }
 
 // Every barrel layer is given a depth counting outwards from the innermost,
-// whatever it is made of. `barrelOrder` cannot serve: it numbers the pixel
-// barrel alone, so on this detector it is -1 throughout and anything keyed on
-// it never fires.
+// whatever it is made of. This detector has no pixels at all, so anything
+// numbering the pixel barrel alone would see nothing here.
 BOOST_AUTO_TEST_CASE(BarrelLayersAreGivenADepth) {
   const ToyDetector detector = stripBarrelDetector();
   const auto geometry = makeGeometry(detector);
@@ -714,8 +713,8 @@ BOOST_AUTO_TEST_CASE(BarrelLayersAreGivenADepth) {
 
     // the toy layers are handed over innermost first, so depth follows
     BOOST_CHECK_EQUAL(layer.depth, static_cast<std::int32_t>(i));
-    // and the thing it replaces is blind to them
-    BOOST_CHECK_EQUAL(layer.barrelOrder, -1);
+    // depth says where, technology says what: every layer here is a strip
+    BOOST_CHECK(layer.technology == GbtsLayerTechnology::Strip);
   }
 }
 

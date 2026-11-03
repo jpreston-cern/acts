@@ -183,41 +183,14 @@ using BinConnections =
     std::unordered_map<std::uint32_t, std::pair<std::vector<std::uint32_t>,
                                                 std::vector<GbtsBinLink>>>;
 
-// Fill in the inside-out pixel barrel order where the layers leave it unset.
-std::vector<GbtsLayerDescription> orderPixelBarrel(
+// Three things need to know where a layer sits in the barrel: the adaptive tau
+// widening, the z0 histogram and matchBeforeCreate. Derive that depth here so
+// the seeder never has to read an experiment layer id.
+std::vector<GbtsLayerDescription> deriveBarrelDepth(
     std::span<const GbtsLayerDescription> layerDescriptions) {
   std::vector<GbtsLayerDescription> layers(layerDescriptions.begin(),
                                            layerDescriptions.end());
 
-  std::vector<GbtsLayerDescription*> pixelBarrel;
-  for (GbtsLayerDescription& layer : layers) {
-    if (layer.type == GbtsLayerType::Barrel &&
-        layer.technology == GbtsLayerTechnology::Pixel) {
-      pixelBarrel.push_back(&layer);
-    }
-  }
-
-  const auto numOrdered = std::ranges::count_if(
-      pixelBarrel,
-      [](const GbtsLayerDescription* l) { return l->barrelOrder >= 0; });
-  if (numOrdered == 0) {
-    // ties broken by id so the result does not depend on the input order
-    std::ranges::sort(pixelBarrel, {}, [](const GbtsLayerDescription* l) {
-      return std::pair{l->refCoord, l->id};
-    });
-    for (std::size_t i = 0; i < pixelBarrel.size(); ++i) {
-      pixelBarrel[i]->barrelOrder = static_cast<std::int32_t>(i);
-    }
-  } else if (numOrdered != std::ssize(pixelBarrel)) {
-    throw std::invalid_argument(
-        "GbtsGeometry: barrelOrder must be set on every pixel barrel layer or "
-        "on none of them");
-  }
-
-  // How deep each barrel layer sits, counting outwards from the innermost the
-  // geometry was given. `barrelOrder` above cannot answer that: it numbers the
-  // pixel barrel alone, so on a detector whose inner layers are strips it is
-  // -1 throughout and anything keyed on it never fires.
   std::vector<GbtsLayerDescription*> barrel;
   for (GbtsLayerDescription& layer : layers) {
     if (layer.type == GbtsLayerType::Barrel) {
@@ -249,8 +222,8 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
                                 std::span<const GbtsLayerDescription> layers,
                                 const GbtsAdaptiveTauRatioCuts& cuts) {
   std::unordered_map<GbtsExperimentLayerId, const GbtsLayerDescription*> byId;
-  const std::vector<GbtsLayerDescription> ordered = orderPixelBarrel(layers);
-  for (const GbtsLayerDescription& layer : ordered) {
+  const std::vector<GbtsLayerDescription> withDepth = deriveBarrelDepth(layers);
+  for (const GbtsLayerDescription& layer : withDepth) {
     byId.emplace(layer.id, &layer);
   }
   const auto find = [&](GbtsExperimentLayerId id) {
@@ -266,10 +239,15 @@ void assignAdaptiveTauRatioCuts(std::span<GbtsLayerConnection> connections,
     const GbtsLayerDescription* outer = find(connection.src);
     const GbtsLayerDescription* inner = find(connection.dst);
 
-    const bool outerInBarrel = outer->barrelOrder >= 0;
-    const bool innerInBarrel = inner->barrelOrder >= 0;
-    const bool skipsLayer = outerInBarrel && innerInBarrel &&
-                            outer->barrelOrder - inner->barrelOrder != 1;
+    const bool outerInBarrel =
+        outer->depth >= 0 && outer->technology == GbtsLayerTechnology::Pixel;
+    const bool innerInBarrel =
+        inner->depth >= 0 && inner->technology == GbtsLayerTechnology::Pixel;
+    // How much material the pair crossed, so it counts every barrel layer
+    // rather than the pixel ones alone: a strip layer between two pixel layers
+    // is material a triplet scattered in.
+    const bool skipsLayer =
+        outerInBarrel && innerInBarrel && outer->depth - inner->depth != 1;
     const bool leavesBarrel = innerInBarrel && !outerInBarrel;
     const float strip = (outer->technology == GbtsLayerTechnology::Strip ||
                          inner->technology == GbtsLayerTechnology::Strip)
@@ -293,9 +271,8 @@ GbtsGeometry::GbtsGeometry(
   const float minZ0 = z0Range.min;
   const float maxZ0 = z0Range.max;
 
-  // the innermost-layer cuts key on where a pixel barrel layer sits radially
   const std::vector<GbtsLayerDescription> layers =
-      orderPixelBarrel(layerDescriptions);
+      deriveBarrelDepth(layerDescriptions);
 
   for (const GbtsLayerDescription& layer : layers) {
     const detail::GbtsLayer& pL = createLayer(layer, m_nEtaBins);
