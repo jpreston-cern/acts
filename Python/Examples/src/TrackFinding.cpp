@@ -88,27 +88,40 @@ void addTrackFinding(py::module& mex) {
     using Config = Acts::Experimental::GraphBasedTrackSeeder::Config;
     auto c =
         py::class_<Config>(mex, "GraphBasedSeedingConfig").def(py::init<>());
-    ACTS_PYTHON_STRUCT(c, nMaxPhiSlice, minSeedLevel, addTriplets,
-                       maxAbsEtaAddTriplets, maxSeedSplitEta,
+    ACTS_PYTHON_STRUCT(c, nMaxPhiSlice, maxChainLength, minSeedLevel,
+                       addTriplets, maxAbsEtaAddTriplets, maxSeedSplitEta,
                        postFitCurvatureFactor);
     patchKwargsConstructor(c);
   }
 
   {
+    // One configuration serves both graphs, so this binds the prompt and the
+    // displaced mode alike.
     using Config = Acts::Experimental::GbtsGraphConfig;
+    py::enum_<Acts::Experimental::GbtsTauRatioMode>(mex, "GbtsTauRatioMode")
+        .value("Fixed", Acts::Experimental::GbtsTauRatioMode::Fixed)
+        .value("Pull", Acts::Experimental::GbtsTauRatioMode::Pull)
+        .value("FixedOrPull",
+               Acts::Experimental::GbtsTauRatioMode::FixedOrPull);
     auto c =
         py::class_<Config>(mex, "GbtsGraphBuilderConfig").def(py::init<>());
-    ACTS_PYTHON_STRUCT(c, minPt, maxEdgesPerSP, minDeltaRadius, doubletFilterRZ,
-                       matchBeforeCreate, validateTriplets, calibrateStrips,
-                       maxOuterRadius, z0HistogramMaxDepth, useSumRatioCut,
-                       sumRatioCutMax);
+    ACTS_PYTHON_STRUCT(
+        c, minPt, maxEdgesPerSP, minDeltaRadius, doubletFilterRZ,
+        matchBeforeCreate, validateTriplets, calibrateStrips, useTurnAngleCut,
+        curvatureScaleEndcapStrip, tripletFilterRZ, doubletStereoCut,
+        doubletStripLengthFraction, turnCutEndcapStrip, curvatureFromDoubletTau,
+        curvatureSplitTauMargin, perPairPhiWindow, settleDoubletTau,
+        settledDoubletCuts, settledTripletFit, maxOuterRadius,
+        z0HistogramMaxDepth, d0Max, cutDPhiMax, cutDCurvMax, tauRatioCut,
+        useSumRatioCut, sumRatioCutMax, tauRatioMode, stripAlongResolution,
+        tauRatioPullFloor, tauRatioPullCut, tauRatioPullCutTight);
     patchKwargsConstructor(c);
   }
 
   ACTS_PYTHON_DECLARE_ALGORITHM(
       GraphBasedSeedingAlgorithm, mex, "GraphBasedSeedingAlgorithm",
       inputSpacePoints, outputSeeds, seedFinderConfig, graphConfig,
-      useStripConnections, useAdaptiveCuts, layerMappingFile,
+      useDisplacedGraph, useStripConnections, useAdaptiveCuts, layerMappingFile,
       connectorInputFile, lutInputFile, collisionRegionMin, collisionRegionMax,
       trackingGeometry, fillModuleCsv, inputClusters, bFieldInZ, useLayerTilt,
       magneticField, outputFreeParameters);

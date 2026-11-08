@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -30,6 +31,7 @@
 #include <numbers>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ActsExamples {
@@ -40,10 +42,18 @@ namespace {
 /// `tauRatioCorr` if it skips a layer of depth, or, as an outer pair, if it
 /// leaves those layers. A pair with a strip layer is widened by
 /// `tauRatioCorrStrip` on top.
+///
+/// For the displaced graph the barrel layers are counted inside out, every one
+/// of them whatever its technology or depth, so that a pair of strip barrel
+/// layers that skips one is widened and going from the pixel barrel onto a
+/// strip barrel layer is not leaving it. Its strip widenings go in the pair's
+/// own fields rather than in its cuts, to come off once a triplet has resolved
+/// its strips.
 void assignTauRatioCuts(
     std::vector<Acts::Experimental::GbtsLayerConnection> &connections,
     const std::vector<Acts::Experimental::GbtsLayerDescription> &layers,
-    const GraphBasedSeedingAlgorithm::TauRatioCuts &cuts) {
+    const GraphBasedSeedingAlgorithm::TauRatioCuts &cuts,
+    const bool displaced) {
   std::map<Acts::Experimental::GbtsExperimentLayerId,
            const Acts::Experimental::GbtsLayerDescription *>
       byId;
@@ -59,20 +69,48 @@ void assignTauRatioCuts(
     return it->second;
   };
 
+  // the displaced graph's count of the barrel layers, inside out, ties broken
+  // by id so that it does not depend on the order the layers come in
+  std::map<Acts::Experimental::GbtsExperimentLayerId, std::int32_t>
+      barrelPosition;
+  if (displaced) {
+    std::vector<const Acts::Experimental::GbtsLayerDescription *> barrel;
+    for (const auto &layer : layers) {
+      if (layer.type == Acts::Experimental::GbtsLayerType::Barrel) {
+        barrel.push_back(&layer);
+      }
+    }
+    std::ranges::sort(barrel, {}, [](const auto *layer) {
+      return std::pair{layer->refCoord, layer->id};
+    });
+    for (std::size_t i = 0; i < barrel.size(); ++i) {
+      barrelPosition.emplace(barrel[i]->id, static_cast<std::int32_t>(i));
+    }
+  }
+  const auto position =
+      [&](const Acts::Experimental::GbtsLayerDescription &layer) {
+        if (!displaced) {
+          return layer.depth;
+        }
+        const auto it = barrelPosition.find(layer.id);
+        return it == barrelPosition.end() ? std::int32_t{-1} : it->second;
+      };
+
   for (auto &connection : connections) {
     const auto *outer = find(connection.src);
     const auto *inner = find(connection.dst);
 
-    const bool outerHasDepth = outer->depth >= 0;
-    const bool innerHasDepth = inner->depth >= 0;
+    const std::int32_t outerPosition = position(*outer);
+    const std::int32_t innerPosition = position(*inner);
+    const bool outerHasDepth = outerPosition >= 0;
+    const bool innerHasDepth = innerPosition >= 0;
     const bool skipsLayer =
-        outerHasDepth && innerHasDepth && outer->depth - inner->depth != 1;
+        outerHasDepth && innerHasDepth && outerPosition - innerPosition != 1;
     const bool leavesDepth = innerHasDepth && !outerHasDepth;
-    const float strip =
-        (outer->technology == Acts::Experimental::GbtsLayerTechnology::Strip ||
-         inner->technology == Acts::Experimental::GbtsLayerTechnology::Strip)
-            ? cuts.tauRatioCorrStrip
-            : 0.f;
+    const bool hasStrip =
+        outer->technology == Acts::Experimental::GbtsLayerTechnology::Strip ||
+        inner->technology == Acts::Experimental::GbtsLayerTechnology::Strip;
+    const float strip = hasStrip && !displaced ? cuts.tauRatioCorrStrip : 0.f;
 
     // leaving widens only the triplet that leaves after its middle
     connection.tauRatioCutInner =
@@ -80,6 +118,11 @@ void assignTauRatioCuts(
     connection.tauRatioCutOuter =
         cuts.tauRatioCut +
         (skipsLayer || leavesDepth ? cuts.tauRatioCorr : 0.f) + strip;
+
+    const bool ownFields = hasStrip && displaced;
+    connection.tauRatioCorrStrip = ownFields ? cuts.tauRatioCorrStrip : 0.f;
+    connection.tauRatioCorrStripSettled =
+        ownFields ? cuts.tauRatioCorrStripSettled : 0.f;
   }
 }
 
@@ -144,7 +187,8 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   if (!m_cfg.useAdaptiveCuts) {
     tauRatioCuts.tauRatioCorr = 0.f;
   }
-  assignTauRatioCuts(connections, layerGeometry, tauRatioCuts);
+  assignTauRatioCuts(connections, layerGeometry, tauRatioCuts,
+                     m_cfg.useDisplacedGraph);
 
   // initialise the object that holds all the geometry information needed for
   // the algorithm
@@ -162,9 +206,15 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
   m_cfg.graphConfig.maxZ0 = m_internalRoi->zMax();
   m_cfg.graphConfig.minZ0 = m_internalRoi->zMin();
 
-  m_gbtsGraphBuilder.emplace(
-      m_cfg.graphConfig, m_geometry,
-      this->logger().cloneWithSuffix("PromptGbtsGraphBuilder"));
+  if (m_cfg.useDisplacedGraph) {
+    m_displacedGraphBuilder.emplace(
+        m_cfg.graphConfig, m_geometry,
+        this->logger().cloneWithSuffix("DisplacedGbtsGraphBuilder"));
+  } else {
+    m_promptGraphBuilder.emplace(
+        m_cfg.graphConfig, m_geometry,
+        this->logger().cloneWithSuffix("PromptGbtsGraphBuilder"));
+  }
 
   m_finder.emplace(Acts::Experimental::GraphBasedTrackSeeder::DerivedConfig(
                        m_cfg.seedFinderConfig),
@@ -217,9 +267,19 @@ ProcessCode GraphBasedSeedingAlgorithm::execute(
   // create the seeds
 
   std::vector<std::optional<Acts::Experimental::GbtsSeedFit>> fits;
-  m_finder->createSeeds(
-      nodeStorage, m_internalRoi.value(), *m_gbtsGraphBuilder, *m_filter,
-      options, seeds, m_outputFreeParameters.isInitialized() ? &fits : nullptr);
+  auto *outputFits = m_outputFreeParameters.isInitialized() ? &fits : nullptr;
+
+  // the seeder is written once over the graph builder, so the mode is just
+  // which of the two it is handed
+  if (m_displacedGraphBuilder.has_value()) {
+    m_finder->createSeeds(nodeStorage, m_internalRoi.value(),
+                          *m_displacedGraphBuilder, *m_filter, options, seeds,
+                          outputFits);
+  } else {
+    m_finder->createSeeds(nodeStorage, m_internalRoi.value(),
+                          *m_promptGraphBuilder, *m_filter, options, seeds,
+                          outputFits);
+  }
 
   // free track parameters from the fit of the tracking filter
   if (m_outputFreeParameters.isInitialized()) {
@@ -446,6 +506,7 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("collisionRegionMin: " << m_cfg.collisionRegionMin);
   ACTS_DEBUG("collisionRegionMax: " << m_cfg.collisionRegionMax);
   ACTS_DEBUG("useStripConnections: " << m_cfg.useStripConnections);
+  ACTS_DEBUG("useDisplacedGraph: " << m_cfg.useDisplacedGraph);
   ACTS_DEBUG("===== GraphBasedTrackSeeder =====");
   const auto &cfg1 = m_cfg.seedFinderConfig;
   ACTS_DEBUG("nMaxPhiSlice: " << cfg1.nMaxPhiSlice);
@@ -458,7 +519,8 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("minSeedLevel: " << static_cast<std::uint32_t>(cfg1.minSeedLevel));
   ACTS_DEBUG("addTriplets: " << cfg1.addTriplets);
   ACTS_DEBUG("maxAbsEtaAddTriplets: " << cfg1.maxAbsEtaAddTriplets);
-  ACTS_DEBUG("=====PromptGbtsGraphBuilder=====");
+  ACTS_DEBUG((m_cfg.useDisplacedGraph ? "=====DisplacedGbtsGraphBuilder====="
+                                      : "=====PromptGbtsGraphBuilder====="));
   const auto &cfg2 = m_cfg.graphConfig;
   ACTS_DEBUG("matchBeforeCreate: " << cfg2.matchBeforeCreate);
   ACTS_DEBUG("tauRatioCut: " << cfg2.tauRatioCut);
@@ -479,6 +541,8 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("tauRatioCut: " << m_cfg.tauRatioCuts.tauRatioCut);
   ACTS_DEBUG("tauRatioCorr: " << m_cfg.tauRatioCuts.tauRatioCorr);
   ACTS_DEBUG("tauRatioCorrStrip: " << m_cfg.tauRatioCuts.tauRatioCorrStrip);
+  ACTS_DEBUG("tauRatioCorrStripSettled: "
+             << m_cfg.tauRatioCuts.tauRatioCorrStripSettled);
   ACTS_DEBUG("===== GbtsTrackFilter =====");
   const auto &cfg3 = m_cfg.trackingFilterConfig;
   ACTS_DEBUG("sigmaMS: " << cfg3.sigmaMS);

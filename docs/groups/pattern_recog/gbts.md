@@ -449,9 +449,12 @@ behind it.
 
 The @f$\tau@f$ tolerance comes from the layer pairs, as in the prompt graph: the
 looser of `tauRatioCutInner` of the inner pair and `tauRatioCutOuter` of the outer
-one, see @ref Acts::Experimental::GbtsLayerConnection. The caller fills them.
-What depends on the strips being unresolved is carried apart from those cuts, in
-the pair's own fields: a triplet with a strip node adds the larger `tauRatioCorrStrip` of
+one, see @ref Acts::Experimental::GbtsLayerConnection. The caller fills them. The
+Examples, for this graph, count every barrel layer inside out whatever its
+technology, and widen a pair of barrel layers that skips one, there being more
+material to scatter in, and an outer pair that leaves the barrel. What depends
+on the strips being unresolved is carried apart from those cuts, in the pair's
+own fields: a triplet with a strip node adds the larger `tauRatioCorrStrip` of
 its two pairs, or their larger `tauRatioCorrStripSettled` between two doublets
 that settled their taus, and drops it once the triplet has resolved its strips.
 
@@ -492,8 +495,9 @@ that were fitted and cut on rather than three that merely agreed on @f$\tau@f$.
 
 ### Running it
 
-The displaced builder takes the same configuration as the prompt one, and the
-seeder runs either. Two settings outside the graph default to a beamspot the displaced mode is meant to
+`ActsExamples::GraphBasedSeedingAlgorithm` selects the builder with
+`useDisplacedGraph`; everything else is shared, including `graphConfig`. Two
+settings outside the graph default to a beamspot the displaced mode is meant to
 leave behind, and both silently cost tracks if left alone:
 
 - @ref Acts::Experimental::GbtsZ0Range, which fixes which eta bins may be linked

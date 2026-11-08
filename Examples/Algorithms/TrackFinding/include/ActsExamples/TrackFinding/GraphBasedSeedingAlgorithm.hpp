@@ -15,6 +15,7 @@
 #include "Acts/Geometry/GeometryIdentifier.hpp"
 #include "Acts/Geometry/TrackingGeometry.hpp"
 #include "Acts/MagneticField/MagneticFieldProvider.hpp"
+#include "Acts/Seeding/DisplacedGbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
 #include "Acts/Seeding/GbtsLayerConnection.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
@@ -55,8 +56,14 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
     float tauRatioCut = 0.007f;
     /// Widening for a layer of depth skipped, or for those layers left.
     float tauRatioCorr = 0.006f;
-    /// Widening, on top, for a strip layer in the triplet.
+    /// Widening, on top, for a strip layer in the triplet. The displaced graph
+    /// carries it on the pair instead, to take it off once a triplet has
+    /// resolved its strips.
     float tauRatioCorrStrip = 0.03f;
+    /// Displaced graph only: the strip widening between two doublets whose
+    /// taus both have their strip ends settled, in place of
+    /// `tauRatioCorrStrip`.
+    float tauRatioCorrStripSettled = 0.0075f;
   };
 
   struct Config {
@@ -94,8 +101,17 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
     Acts::Experimental::GbtsTrackingFilter::Config trackingFilterConfig;
 
     /// steers doublet creation, edge linking and chain selection. `minZ0` and
-    /// `maxZ0` are overridden from the region of interest.
+    /// `maxZ0` are overridden from the region of interest. The same settings
+    /// serve either graph, so this does not change with `useDisplacedGraph`.
     Acts::Experimental::GbtsGraphConfig graphConfig;
+
+    /// Build the large radius graph instead of the prompt one.
+    ///
+    /// The displaced graph drops the beamline as a third point, so a doublet
+    /// no longer fixes a circle and the curvature cuts move to a triplet fit.
+    /// It finds tracks from a displaced vertex at the cost of combinatorics,
+    /// which `graphConfig.d0Max` sets the scale of.
+    bool useDisplacedGraph = false;
 
     /// the connection table (parsed from json file) used to make geoemetry cuts
     /// be GBTS
@@ -160,8 +176,14 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
   std::optional<Acts::Experimental::GraphBasedTrackSeeder> m_finder;
 
   /// graph used in creating and extracting edges, edge connections
-  /// and valid chains
-  std::optional<Acts::Experimental::PromptGbtsGraphBuilder> m_gbtsGraphBuilder;
+  /// and valid chains. Exactly one of the two is engaged, by
+  /// `Config::useDisplacedGraph`.
+  std::optional<Acts::Experimental::PromptGbtsGraphBuilder>
+      m_promptGraphBuilder;
+
+  /// the large radius graph, engaged in place of `m_promptGraphBuilder`
+  std::optional<Acts::Experimental::DisplacedGbtsGraphBuilder>
+      m_displacedGraphBuilder;
 
   /// filter used to extract seed candidates from graph
   std::optional<Acts::Experimental::GbtsTrackingFilter> m_filter;
