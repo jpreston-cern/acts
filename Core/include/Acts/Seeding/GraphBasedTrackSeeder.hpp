@@ -68,6 +68,31 @@ class GraphBasedTrackSeeder {
     std::uint32_t maxSplitSeedSize = 5;
     /// Threshold for hit sharing between seeds.
     float hitShareThreshold = 0.49;
+    /// Call a seed candidate a clone only when a single better candidate
+    /// that was kept holds more than `hitShareThreshold` of its space points,
+    /// rather than when better candidates between them, kept or not, hold
+    /// that many. In a dense displaced graph the latter removes a true three
+    /// space point seed whenever two unrelated better candidates take one of
+    /// its space points each.
+    bool pairwiseCloneRemoval = false;
+    /// With `pairwiseCloneRemoval`, still drop a three space point candidate
+    /// all of whose space points kept better candidates hold.
+    bool dropFullyTakenTriplets = false;
+    /// With `pairwiseCloneRemoval`, also drop a three space point candidate
+    /// that shares any space point with a kept better candidate of four or
+    /// more: most often the same track, seeded again from a piece of it.
+    bool dropTripletsSharingLonger = false;
+    /// Before clone removal, keep at most this many three space point
+    /// candidates per middle node, those whose helix through the three passes
+    /// closest to the beamline and the interaction region by
+    /// `tripletD0Weight` |d0| + `tripletZ0Weight` |z0|. The filter's quality
+    /// barely tells a true triplet from a fake one, which this does better.
+    /// Zero for no limit.
+    std::uint32_t maxTripletsPerMiddleNode = 0;
+    /// See `maxTripletsPerMiddleNode`.
+    float tripletD0Weight = 0.01f / UnitConstants::mm;
+    /// See `maxTripletsPerMiddleNode`.
+    float tripletZ0Weight = 0.005f / UnitConstants::mm;
     /// Max seed eta value considered for splitting.
     float maxSeedSplitEta = 0.6;
     /// Max allowed curvature for seed self consistency check.
@@ -236,6 +261,28 @@ class GraphBasedTrackSeeder {
   std::vector<FittedPath> extractBestPathPerEdge(
       const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
       const GbtsTrackingFilter& filter) const;
+
+  /// Mark as clones the three space point candidates beyond
+  /// `maxTripletsPerMiddleNode` on their middle node, and take them out of
+  /// the ranking clone removal reads.
+  /// @param nodeView View of the node positions
+  /// @param nNodes Number of graph nodes
+  /// @param vArgSort Quality and index of each candidate, best first
+  /// @param vSeedCandidates The candidates, whose clone flags are set
+  void capTripletsPerMiddleNode(
+      const detail::GbtsNodeView& nodeView, std::uint32_t nNodes,
+      std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+      std::vector<SeedCandidateProperties>& vSeedCandidates) const;
+
+  /// Mark as clones the seed candidates that `pairwiseCloneRemoval` and the
+  /// options alongside it remove.
+  /// @param nNodes Number of graph nodes
+  /// @param vArgSort Quality and index of each candidate, best first
+  /// @param vSeedCandidates The candidates, whose clone flags are set
+  void markClonesPairwise(
+      std::uint32_t nNodes,
+      const std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+      std::vector<SeedCandidateProperties>& vSeedCandidates) const;
 
   /// Estimate the inverse radius of the circle through three nodes.
   /// @param nodeView View of the node positions and layers

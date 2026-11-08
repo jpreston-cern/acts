@@ -15,6 +15,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -26,6 +27,88 @@
 #include <vector>
 
 namespace Acts::Experimental {
+
+namespace {
+
+/// |d0| and |z0| of the helix through three nodes, inside out: the circle
+/// through all three in the transverse plane, and the straight line through
+/// them in z against the transverse path length from the point of closest
+/// approach to the beamline.
+std::array<float, 2> tripletImpact(
+    const detail::GbtsNodeView& nodeView,
+    const std::array<SpacePointIndex, 3>& nodes) {
+  std::array<std::array<float, 3>, 3> p{};
+  for (std::size_t k = 0; k < 3; ++k) {
+    const detail::GbtsNodeProxy node = nodeView[nodes[k]];
+    p[k] = {node.x(), node.y(), node.z()};
+  }
+
+  // twice the signed area of the triangle in the transverse plane
+  const float area2 =
+      2.f * (p[0][0] * (p[1][1] - p[2][1]) + p[1][0] * (p[2][1] - p[0][1]) +
+             p[2][0] * (p[0][1] - p[1][1]));
+  const float l01 = std::hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]);
+  const float l12 = std::hypot(p[2][0] - p[1][0], p[2][1] - p[1][1]);
+
+  float d0 = 0.f;
+  std::array<float, 3> s{};
+  if (std::abs(area2) <= 1e-6f * l01 * l12) {
+    // a straight line, through the outer two ends
+    const float dx = p[2][0] - p[0][0];
+    const float dy = p[2][1] - p[0][1];
+    const float length = std::hypot(dx, dy);
+    if (length == 0.f) {
+      return {std::numeric_limits<float>::max(),
+              std::numeric_limits<float>::max()};
+    }
+    const float ux = dx / length;
+    const float uy = dy / length;
+    d0 = std::abs(p[0][0] * uy - p[0][1] * ux);
+    for (std::size_t k = 0; k < 3; ++k) {
+      s[k] = p[k][0] * ux + p[k][1] * uy;
+    }
+  } else {
+    std::array<float, 3> r2{};
+    for (std::size_t k = 0; k < 3; ++k) {
+      r2[k] = p[k][0] * p[k][0] + p[k][1] * p[k][1];
+    }
+    const float cx =
+        (r2[0] * (p[1][1] - p[2][1]) + r2[1] * (p[2][1] - p[0][1]) +
+         r2[2] * (p[0][1] - p[1][1])) /
+        area2;
+    const float cy =
+        (r2[0] * (p[2][0] - p[1][0]) + r2[1] * (p[0][0] - p[2][0]) +
+         r2[2] * (p[1][0] - p[0][0])) /
+        area2;
+    const float radius = std::hypot(p[0][0] - cx, p[0][1] - cy);
+    d0 = std::abs(std::hypot(cx, cy) - radius);
+    // the point of closest approach lies on the line from the centre through
+    // the beamline
+    const float phi0 = std::atan2(-cy, -cx);
+    for (std::size_t k = 0; k < 3; ++k) {
+      float dphi = std::atan2(p[k][1] - cy, p[k][0] - cx) - phi0;
+      if (dphi > std::numbers::pi_v<float>) {
+        dphi -= 2 * std::numbers::pi_v<float>;
+      } else if (dphi < -std::numbers::pi_v<float>) {
+        dphi += 2 * std::numbers::pi_v<float>;
+      }
+      s[k] = radius * std::abs(dphi);
+    }
+  }
+
+  const float sMean = (s[0] + s[1] + s[2]) / 3.f;
+  const float zMean = (p[0][2] + p[1][2] + p[2][2]) / 3.f;
+  float sxx = 0.f;
+  float sxz = 0.f;
+  for (std::size_t k = 0; k < 3; ++k) {
+    sxx += (s[k] - sMean) * (s[k] - sMean);
+    sxz += (s[k] - sMean) * (p[k][2] - zMean);
+  }
+  const float tau = sxx > 0.f ? sxz / sxx : 0.f;
+  return {d0, std::abs(zMean - tau * sMean)};
+}
+
+}  // namespace
 
 GraphBasedTrackSeeder::DerivedConfig::DerivedConfig(const Config& config)
     : Config(config) {
@@ -224,56 +307,65 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
   std::ranges::sort(vArgSort);
 
-  // hit to track associations, indexed by graph node index
-  std::vector<std::uint32_t> h2t(nodeStorage.numberOfNodes() + 1, 0);
-
-  std::uint32_t trackId = 0;
-
-  for (const auto& args : vArgSort) {
-    const auto& seed = vSeedCandidates[args.second];
-    ++trackId;
-
-    // loop over space points indices
-    for (const SpacePointIndex node : seed.nodes) {
-      const std::uint32_t hitId = node + 1;
-
-      const std::uint32_t tid = h2t[hitId];
-
-      // unused hit or used by a lesser track
-      if (tid == 0 || tid > trackId) {
-        // overwrite
-        h2t[hitId] = trackId;
-      }
-    }
+  if (m_cfg.maxTripletsPerMiddleNode > 0) {
+    capTripletsPerMiddleNode(nodeView, nodeStorage.numberOfNodes(), vArgSort,
+                             vSeedCandidates);
   }
 
-  std::uint32_t trackIdx = 0;
+  if (m_cfg.pairwiseCloneRemoval) {
+    markClonesPairwise(nodeStorage.numberOfNodes(), vArgSort, vSeedCandidates);
+  } else {
+    // hit to track associations, indexed by graph node index
+    std::vector<std::uint32_t> h2t(nodeStorage.numberOfNodes() + 1, 0);
 
-  for (const auto& args : vArgSort) {
-    const auto& seed = vSeedCandidates[args.second].nodes;
+    std::uint32_t trackId = 0;
 
-    const auto nTotal = static_cast<std::uint32_t>(seed.size());
+    for (const auto& args : vArgSort) {
+      const auto& seed = vSeedCandidates[args.second];
+      ++trackId;
 
-    std::uint32_t nOther = 0;
+      // loop over space points indices
+      for (const SpacePointIndex node : seed.nodes) {
+        const std::uint32_t hitId = node + 1;
 
-    trackId = trackIdx + 1;
+        const std::uint32_t tid = h2t[hitId];
 
-    ++trackIdx;
-
-    for (const SpacePointIndex node : seed) {
-      const std::uint32_t hitId = node + 1;
-
-      const std::uint32_t tid = h2t[hitId];
-
-      // taken by a better candidate
-      if (tid != trackId) {
-        nOther++;
+        // unused hit or used by a lesser track
+        if (tid == 0 || tid > trackId) {
+          // overwrite
+          h2t[hitId] = trackId;
+        }
       }
     }
 
-    if (nOther > m_cfg.hitShareThreshold * nTotal) {
-      // reject
-      vSeedCandidates[args.second].isClone = true;  // reject
+    std::uint32_t trackIdx = 0;
+
+    for (const auto& args : vArgSort) {
+      const auto& seed = vSeedCandidates[args.second].nodes;
+
+      const auto nTotal = static_cast<std::uint32_t>(seed.size());
+
+      std::uint32_t nOther = 0;
+
+      trackId = trackIdx + 1;
+
+      ++trackIdx;
+
+      for (const SpacePointIndex node : seed) {
+        const std::uint32_t hitId = node + 1;
+
+        const std::uint32_t tid = h2t[hitId];
+
+        // taken by a better candidate
+        if (tid != trackId) {
+          nOther++;
+        }
+      }
+
+      if (nOther > m_cfg.hitShareThreshold * nTotal) {
+        // reject
+        vSeedCandidates[args.second].isClone = true;  // reject
+      }
     }
   }
   vOutputSeeds.reserve(vSeedCandidates.size());
@@ -456,6 +548,98 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   }
 
   return candidates;
+}
+
+void GraphBasedTrackSeeder::capTripletsPerMiddleNode(
+    const detail::GbtsNodeView& nodeView, const std::uint32_t nNodes,
+    std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+    std::vector<SeedCandidateProperties>& vSeedCandidates) const {
+  // the three space point candidates, by weight
+  std::vector<std::pair<float, std::uint32_t>> triplets;
+  for (const auto& [quality, index] : vArgSort) {
+    const std::vector<SpacePointIndex>& nodes = vSeedCandidates[index].nodes;
+    if (nodes.size() != 3) {
+      continue;
+    }
+    const auto [d0, z0] =
+        tripletImpact(nodeView, {nodes[0], nodes[1], nodes[2]});
+    triplets.emplace_back(
+        m_cfg.tripletD0Weight * d0 + m_cfg.tripletZ0Weight * z0, index);
+  }
+  std::ranges::sort(triplets);
+
+  std::vector<std::uint32_t> perMiddleNode(nNodes, 0);
+  for (const auto& [weight, index] : triplets) {
+    std::uint32_t& n = perMiddleNode[vSeedCandidates[index].nodes[1]];
+    if (n >= m_cfg.maxTripletsPerMiddleNode) {
+      vSeedCandidates[index].isClone = true;
+    } else {
+      ++n;
+    }
+  }
+
+  std::erase_if(vArgSort, [&vSeedCandidates](const auto& args) {
+    return vSeedCandidates[args.second].isClone;
+  });
+}
+
+void GraphBasedTrackSeeder::markClonesPairwise(
+    const std::uint32_t nNodes,
+    const std::vector<std::pair<float, std::uint32_t>>& vArgSort,
+    std::vector<SeedCandidateProperties>& vSeedCandidates) const {
+  // the kept candidates holding each node, as lists threaded through
+  // `nextOwner`
+  constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
+  std::vector<std::uint32_t> firstOwner(nNodes, kNone);
+  std::vector<std::uint32_t> nextOwner;
+  std::vector<std::uint32_t> owner;
+
+  // the kept candidates sharing a node with the current one, and how many
+  std::vector<std::pair<std::uint32_t, std::uint32_t>> shared;
+
+  for (const auto& args : vArgSort) {
+    SeedCandidateProperties& seed = vSeedCandidates[args.second];
+    const auto nTotal = static_cast<std::uint32_t>(seed.nodes.size());
+
+    shared.clear();
+    std::uint32_t nTaken = 0;
+    for (const SpacePointIndex node : seed.nodes) {
+      for (std::uint32_t l = firstOwner[node]; l != kNone; l = nextOwner[l]) {
+        const auto it = std::ranges::find(
+            shared, owner[l], &std::pair<std::uint32_t, std::uint32_t>::first);
+        if (it == shared.end()) {
+          shared.emplace_back(owner[l], 1);
+        } else {
+          ++it->second;
+        }
+      }
+      if (firstOwner[node] != kNone) {
+        ++nTaken;
+      }
+    }
+
+    std::uint32_t maxShared = 0;
+    bool sharesWithLonger = false;
+    for (const auto& [other, n] : shared) {
+      maxShared = std::max(maxShared, n);
+      sharesWithLonger =
+          sharesWithLonger || vSeedCandidates[other].nodes.size() >= 4;
+    }
+
+    const bool isTriplet = nTotal == 3;
+    if (maxShared > m_cfg.hitShareThreshold * nTotal ||
+        (m_cfg.dropFullyTakenTriplets && isTriplet && nTaken == nTotal) ||
+        (m_cfg.dropTripletsSharingLonger && isTriplet && sharesWithLonger)) {
+      seed.isClone = true;
+      continue;
+    }
+
+    for (const SpacePointIndex node : seed.nodes) {
+      nextOwner.push_back(firstOwner[node]);
+      owner.push_back(args.second);
+      firstOwner[node] = static_cast<std::uint32_t>(owner.size() - 1);
+    }
+  }
 }
 
 float GraphBasedTrackSeeder::estimateCurvature(
