@@ -29,6 +29,13 @@ struct GbtsLayerConnection {
   float tauRatioCutInner = 0.007f;
   /// Largest |tau ratio| if this is the outer pair of a triplet.
   float tauRatioCutOuter = 0.007f;
+  /// Added to the displaced graph's tau ratio cut for a triplet with a strip
+  /// node, by the larger of what its two pairs carry, until the triplet has
+  /// resolved its strips.
+  float tauRatioCorrStrip = 0.f;
+  /// The same, in place of `tauRatioCorrStrip`, between two doublets whose taus
+  /// both have their strip ends settled.
+  float tauRatioCorrStripSettled = 0.f;
 };
 
 }  // namespace Acts::Experimental

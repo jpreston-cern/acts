@@ -38,6 +38,8 @@ struct GbtsBinLink final {
   float tauRatioCutInner{};
   /// GbtsLayerConnection::tauRatioCutOuter of the pair this link came from.
   float tauRatioCutOuter{};
+  /// Index of the pair this link came from in GbtsGeometry::layerConnections.
+  std::uint32_t connection{};
 };
 
 /// The outer eta bins reachable from one inner eta bin. Groups come in the

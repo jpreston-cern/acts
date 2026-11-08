@@ -27,7 +27,8 @@ The workflow has four stages, each documented below:
 
 1. @ref gbts-nodes — sort the space points into eta/phi-ordered graph nodes.
 2. @ref gbts-graph — create edges between compatible node pairs and link
-   compatible edges to each other.
+   compatible edges to each other. @ref gbts-lrt does the same without assuming
+   the track came from the beamline.
 3. @ref gbts-levels — give every edge a "level", the length of the longest
    chain of linked edges going outwards from it.
 4. @ref gbts-extraction — follow the best fitted path from every edge through a
@@ -190,24 +191,26 @@ Two further cuts apply on the innermost layers, where the combinatorics are
 worst. Each cut has its own limit on the `depth` of the inner layer, and a
 negative limit switches the cut off:
 
-- `matchBeforeCreate` (off by default, limited by
-  `matchBeforeCreateMaxDepth`) demands the @f$\tau@f$ half of the
-  triplet test *before* the edge exists: @f$n_2@f$ must already carry an
-  incoming edge whose @f$\tau@f$ agrees with the candidate's within
-  `tauRatioPrecut`. A node with two or fewer incoming edges passes
-  unconditionally, there being too little evidence to reject it.
+- `matchBeforeCreate` (off by default, limited by `matchBeforeCreateMaxDepth`)
+  demands the @f$\tau@f$ half of the triplet test *before* the edge exists:
+  @f$n_2@f$ must already carry an incoming edge whose @f$\tau@f$ agrees with
+  the candidate's within `tauRatioPrecut`. A node with `matchBeforeCreateMaxEdges`
+  or fewer incoming edges passes unconditionally, there being too little
+  evidence to reject it, so the cut only bites where a node is genuinely busy.
 - Every inner node accumulates a 16-bit @f$z_0@f$ **histogram bitmask** of its
   confirmed edges. On the layers down to `z0HistogramMaxDepth` that mask
   rejects candidates whose @f$z_0@f$ falls in an empty bin, and nodes with no
-  connections at all are skipped outright.
+  connections at all are skipped outright. This one is prompt-only: a displaced
+  track has no @f$z_0@f$ worth histogramming.
 
 ## Chain levels {#gbts-levels}
 
 With the edge graph built, every edge gets a **level**: the length of the
 longest chain of linked edges going outwards from it, so an edge that nothing
 further out links to is at level 1. An edge only links to edges further in,
-which are always created after it, so a single pass over the edges in creation
-order settles every level. Chains longer than `maxChainLength` edges are left
+so a single pass with every edge before those it links to settles every level:
+creation order for the prompt builder, which always creates an edge before those
+further in, and a sort of the links for the displaced one, which does not. Chains longer than `maxChainLength` edges are left
 unsettled and take no part in the extraction.
 
 An edge with no settled edge further in exactly one level up is a **root**, the
@@ -271,12 +274,245 @@ the angle. Wide clusters in the pixel endcap are dropped entirely
 > exercised only by experiment-side integrations that supply them through
 > `insert`.
 
+## Large radius tracking {#gbts-lrt}
+
+Everything above assumes the track came from the luminous region. That
+assumption is not a cut that can be loosened; it is load-bearing. The prompt
+builder reads a curvature off a *pair* of hits as @f$\kappa =
+(\phi_2-\phi_1)/\Delta r@f$, which is only a curvature because the beamline is
+silently used as a third point on the circle. Two transverse points do not fix a
+circle. Neither do they fix @f$z_0@f$, which the prompt form takes as @f$z_1 -
+r_1\tau@f$ — true only for a track leaving the beamline radially.
+
+For a track from a displaced vertex all of that is unavailable at doublet stage.
+@ref Acts::Experimental::DisplacedGbtsGraphBuilder builds the same kind of graph without
+it. It is a drop-in alternative to
+@ref Acts::Experimental::PromptGbtsGraphBuilder "PromptGbtsGraphBuilder" — same node
+storage, same configuration object, same @ref gbts-levels and @ref gbts-extraction,
+and the seeder is written once over either.
+
+### What a doublet can still say
+
+| Quantity | Prompt | Displaced |
+| --- | --- | --- |
+| @f$\tau = \cot\theta@f$ | @f$\Delta z/\Delta r@f$ | @f$\Delta z/\mathrm{chord}@f$ |
+| curvature | from the pair | **only a floor** |
+| azimuth at the perigee | from the pair | **not determined** |
+| @f$z_0@f$ | a value | **a band** |
+
+So the doublet stage keeps the @f$r@f$–@f$z@f$ (non-bending) plane, where the
+cuts change shape, and of the bending plane only what `d0Max` leaves of it:
+
+- **The @f$z_0@f$ band.** @f$z@f$ is linear in the transverse path @f$S_1@f$ from
+  the perigee to the inner hit, and @f$S_1 = \sqrt{r_1^2 - d_0^2}@f$ with
+  @f$d_0@f$ unknown. @f$S_1@f$ is monotonic in @f$d_0@f$, so the two ends of
+  @f$d_0 \in [0, d_0^{\max}]@f$ bracket a band. The band has to *overlap*
+  @f$[z_{0}^{\min}, z_{0}^{\max}]@f$ rather than sit inside it. The same holds
+  for @f$z@f$ at the outer radius.
+- **The @f$\phi@f$ window.** A track of impact parameter @f$d_0@f$ sits at
+  azimuth @f$\arccos(d_0/r)@f$, so between two radii it walks
+  @f$\arccos(d_0^{\max}/r_2) - \arccos(d_0^{\max}/r_1)@f$ on displacement alone,
+  on top of whatever it bends. Where the track started and which way it bends are
+  independent, so the window is the **sum** of the two terms, not their
+  difference. A layer inside the @f$d_0@f$ limit takes the limit down to its own
+  radius, since a track only reaches radius @f$r@f$ if its @f$\lvert d_0\rvert@f$
+  is below @f$r@f$.
+- **A floor on the curvature.** There is no curvature yet to cut on, but of
+  the circles through two points that pass within @f$d_0^{\max}@f$ of the
+  beamline one bends least: not at all if the chord's own line already passes
+  that close, and otherwise the circle that just grazes the limit. A track inside
+  the curvature bound needs that floor inside it too, so a doublet whose floor is
+  above the looser of the two bounds is dropped. This is the interaction point
+  cut of `DoubletSeedFinder` taken exactly, as its small @f$d_0/r@f$ forms give
+  out once @f$d_0^{\max}@f$ nears the layer radius. The fitted circle of a
+  triplet that passes its own @f$d_0@f$ and curvature cuts is one of those
+  circles, so the floor never costs a doublet such a triplet needed.
+
+  An endcap strip end has still to slide along its strip, which is radial, and
+  turns the chord as it goes. Such a doublet is not skipped but held to a limit
+  `curvatureScaleEndcapStrip` times looser, which is the same as lowering
+  `minPt` by that factor for it. The guarantee above does not survive this: the
+  slide moves the chord's line, which reads as a shift in @f$d_0@f$ rather than
+  in @f$p_T@f$, so a straight track can be handed any curvature and no factor is
+  both lossless and useful. The factor is a trade to tune, not a bound.
+
+With `settledDoubletCuts` these cuts read the doublet's settled ends instead,
+as `DoubletSeedFinder` cuts on strip space points calibrated against their
+chord. The stereo check finds where the chord crosses each strip, and each strip
+end is moved along its strip to that crossing: in @f$z@f$ for a barrel strip,
+radially for an endcap one. The cluster width @f$\tau@f$ window, the
+@f$|\tau|@f$ cut and the @f$z_0@f$ and @f$z(r_\mathrm{out})@f$ bands then take
+the settled @f$\tau@f$ and inner end, and the minimum chord and the pair's
+@f$\phi@f$ window the settled transverse ends. Each waits for the stereo check
+rather than running ahead of it wherever the doublet has an end it would move:
+any strip end for the first group, an endcap strip end for the second, as a
+barrel strip only settles in @f$z@f$. The curvature floor takes the settled
+transverse ends, and where every end settled it drops the
+`curvatureScaleEndcapStrip` loosening, the slide it stood in for having been
+made. A settled end is still only where the chord, not the track, crosses the
+strip, so the guarantee of the floor holds no better than the chord stands in
+for the tangent.
+
+The price is combinatorics, and `d0Max` sets its scale: it widens the
+@f$\phi@f$ window and the @f$z_0@f$ band together, and lowers the curvature
+floor. The floor and the @f$\phi@f$ window read the same two quantities, so on a
+pair of barrel layers, whose nodes sit at the radii the window was sized for,
+the floor finds little left to reject. It earns its square root where a bin
+spans a range of radii and the window had to be sized for the widest pair in it.
+
+### The triplet fit {#gbts-lrt-fit}
+
+Three nodes do fix a circle, so the edge-linking step is where the track
+parameters first exist. Inverting the transverse plane about the middle node
+maps every circle through that node onto a straight line, so the fit is the line
+through the two remaining nodes and needs no iteration. It is the same conformal
+mapping the prompt graph's `validateTriplets` uses, kept whole rather than
+reduced to a verdict: signed curvature, @f$d_0@f$, @f$\cot\theta@f$ along the
+fitted arc, and the track tangent at each of the three nodes.
+
+Curvature is reported in the prompt graph's @f$\mathrm{d}\phi/\mathrm{d}r@f$
+convention — half the geometric @f$1/R@f$ — so the tuned cut values carry over
+unchanged.
+
+With `settledTripletFit` the first fit starts from the doublets' settled ends
+instead of the nominal nodes: the inner node where the inner doublet settled it,
+the outer where the outer doublet did, and the middle node halfway between the
+crossings of its two chords, which brackets the tangent there. Everything the
+calibration below does is unchanged; only the tangent it starts from is better.
+
+**Strip resolution moves here too.** A strip space point has to be slid along its
+strip to where the track crossed it, and that needs a direction. The only
+direction a doublet has is its chord, which is the tangent *only* for a track
+from the beamline. The displaced builder therefore resolves each strip end
+against the fitted tangent and refits on the moved ends. One pass is enough: the
+slide is a small fraction of a strip and the fit is linear in the node positions
+to that order.
+
+The triplet is then cut on what the fit gives: the @f$\tau@f$ ratio retaken on
+the resolved points, an @f$\eta@f$-dependent bound on the curvature, and
+@f$d_0@f$ and @f$p_T@f$ under `validateTriplets`. The @f$\tau@f$ ratio is taken
+twice on purpose — loosely before the fit, keeping `tauRatioCorrStrip`, because
+the along-strip coordinate it leans on is the very thing about to move, and
+tightly afterwards with that looseness dropped for every end the calibration
+actually put back.
+
+### Skipping a candidate before fitting it {#gbts-lrt-turn}
+
+The fit is far too expensive to run on every pair of edges meeting at a node. A
+chord bisects the tangents at its ends, so the turn from the inner chord to the
+outer one is @f$\arcsin(\kappa L_{13})@f$: it grows with curvature and so falls
+with @f$p_T@f$, and a wide turn is not worth fitting.
+
+@f$L_{13}@f$ is not measured — the two chords bound it, @f$L_{13} \le L_{12} +
+L_{23}@f$ — and each doublet caches its own chord direction as a unit vector when
+it is built, so the turn's sine and cosine come from a dot and a cross of two cached
+pairs. No trigonometry, no square root, and the angle is never formed. On
+adjacent barrel layers it rejects between a third and two thirds of candidates
+before the fit sees them.
+
+The cut is skipped where a strip end has still to slide, since in the endcap that
+slide is largely radial and moves the very chords it reads. Rejecting a candidate
+the fit would have kept is the one thing it must not do.
+
+### Matching triplets {#gbts-lrt-matching}
+
+The prompt graph links two doublets by comparing the parameters each one carries.
+A displaced doublet carries none, so it instead records the triplets it is the
+**inner** doublet of:
+
+@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced triplet properties
+
+Bin groups are walked outer to inner, so when a doublet @f$(n_1, n_2)@f$ is made,
+every doublet hanging off @f$n_2@f$ already exists *and already carries its
+properties*. A candidate triplet @f$(n_1, n_2, n_3)@f$ is matched against the
+triplets its outer edge @f$(n_2, n_3)@f$ already belongs to. Those share a whole
+*doublet* with it, so they are the same track candidate seen one node apart, and
+both hold a tangent azimuth at @f$n_2@f$. Agreement in that azimuth, in curvature
+and in the arc-corrected @f$\tau@f$ is the displaced stand-in for the prompt
+@f$\Delta\phi@f$/@f$\Delta\kappa@f$ test.
+
+The bookkeeping that makes this line up is that an edge's stored @f$\phi@f$ is
+*always the tangent at that edge's own inner node*. A triplet writes onto its
+inner edge the tangent at node 1, and compares against its outer edge the tangent
+at node 2 — the same node, reached from two positions in the triplet, because the
+middle node of a triplet is the inner node of its outer edge.
+
+Agreement with **any one** recorded triplet is enough. An outer edge may belong
+to several from combinatorics, only one of which is the real track, and the graph
+keeps that ambiguity for @ref gbts-extraction to resolve.
+
+An outer edge with no triplets yet is the outermost pair of its chain and has
+nothing to disagree with, so it passes. That is worth knowing when tuning: the
+**first triplet of every chain** is accepted on the absolute cuts alone —
+@f$d_0@f$, @f$p_T@f$, curvature and the @f$\tau@f$ ratio — with no relative test
+behind it.
+
+The @f$\tau@f$ tolerance comes from the layer pairs, as in the prompt graph: the
+looser of `tauRatioCutInner` of the inner pair and `tauRatioCutOuter` of the outer
+one, see @ref Acts::Experimental::GbtsLayerConnection. The caller fills them.
+What depends on the strips being unresolved is carried apart from those cuts, in
+the pair's own fields: a triplet with a strip node adds the larger `tauRatioCorrStrip` of
+its two pairs, or their larger `tauRatioCorrStripSettled` between two doublets
+that settled their taus, and drops it once the triplet has resolved its strips.
+
+### Doublets and edges {#gbts-lrt-storage}
+
+Displaced, far more doublets pass the doublet cuts than ever pass a triplet, and
+a doublet in no triplet is in no chain. So the builder keeps the two apart. A
+doublet is held in a compact form, with what a triplet fit through it will ask
+for and nothing else:
+
+@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced doublet
+
+Doublets are stored per inner eta bin, each node's in a contiguous range that
+its `GbtsNodeEdgeInfo` gives as indices into that bin's doublets, with the
+triplet properties of the whole bin beside them. The only readers of a bin's
+doublets are the bin groups that link to it, so they are released as soon as the
+last of those is built.
+
+A doublet becomes an edge of the graph the first time a triplet passes through
+it, as either of the two doublets, and the graph holds nothing else:
+
+@snippet{trimleft} include/Acts/Seeding/detail/DisplacedGraphTypes.hpp displaced edge
+
+The edge indices that `vNei` links by are handed out then, so the edges are in
+the order triplets found them and not in node order. `maxEdgesPerSP` caps
+these edges, not the doublets.
+
+### Chain length
+
+A link here has already cost a full triplet fit, so two edges are three nodes
+that were fitted and cut on rather than three that merely agreed on @f$\tau@f$.
+`minSeedLevel` can be set to 2 accordingly, where the prompt graph wants 3.
+
+> [!warning]
+> `addTriplets` accepts a chain one level short, so at a `minSeedLevel` of 2 it
+> reaches down to a single edge — two nodes and no fit at all. Raise
+> `minSeedLevel` before enabling it.
+
+### Running it
+
+The displaced builder takes the same configuration as the prompt one, and the
+seeder runs either. Two settings outside the graph default to a beamspot the displaced mode is meant to
+leave behind, and both silently cost tracks if left alone:
+
+- @ref Acts::Experimental::GbtsZ0Range, which fixes which eta bins may be linked
+  at all, defaults to @f$\pm 168\,\mathrm{mm}@f$. A track starting further down
+  the beamline has no link to travel along however well it passes the cuts.
+- @ref Acts::Experimental::GbtsTrackingFilter "GbtsTrackingFilter::Config::maxZ0"
+  defaults to @f$170\,\mathrm{mm}@f$ and discards what the graph did find.
+
 ## Configuration {#gbts-configuration}
 
 The cuts that build and link the doublets live on
-@ref Acts::Experimental::GbtsGraphConfig "GbtsGraphConfig", which
-`GraphBasedSeedingAlgorithm` takes as `graphConfig` and exposes to Python as
-`GbtsGraphBuilderConfig`:
+@ref Acts::Experimental::GbtsGraphConfig, which `GraphBasedSeedingAlgorithm`
+takes as `graphConfig` and exposes to Python as `GbtsGraphBuilderConfig`.
+**Both builders take the same object**, so a caller sets it up once and hands
+it to whichever it runs; what differs is not which knobs exist but where each
+one bites, and the fields whose meaning moves say so.
+
+Fields marked *prompt* are read by @ref Acts::Experimental::PromptGbtsGraphBuilder
+alone.
 
 | Option | Stage | Effect |
 | --- | --- | --- |
@@ -284,19 +520,25 @@ The cuts that build and link the doublets live on
 | `minDeltaRadius`, `maxAbsTau` | @ref gbts-graph | doublet acceptance |
 | `minZ0`, `maxZ0`, `doubletFilterRZ` | @ref gbts-graph | luminous-region cuts on the doublet |
 | `cutDPhiMax`, `cutDCurvMax` | @ref gbts-graph | edge-to-edge linking tolerances |
-| `useSumRatioCut`, `sumRatioCutMax` | @ref gbts-graph | bound on the summed linking tolerances, against pairs marginal in all three |
-| `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the `validateTriplets` high-pT check. The linking cut comes from @ref Acts::Experimental::GbtsLayerConnection |
-| `validateTriplets`, `d0Max` | @ref gbts-graph | circle fit on pixel-barrel triplets |
-| `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency |
-| `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that depth in the pixel barrel |
-| `z0HistogramMaxDepth`, `z0Resolution` | @ref gbts-graph | @f$z_0@f$ histogram cut, down to that `depth` |
+| `useSumRatioCut`, `sumRatioCutMax` | @ref gbts-graph | prompt: bound on the summed linking tolerances, against pairs marginal in all three |
+| `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the high-pT check, the linking cut coming from @ref Acts::Experimental::GbtsLayerConnection in either graph |
+| `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip. Prompt: per doublet, against the chord. Displaced: per triplet, against the fitted tangent |
+| `validateTriplets` | @ref gbts-graph | prompt: circle fit on pixel-barrel triplets. Displaced: the @f$d_0@f$ and @f$p_T@f$ cuts of a fit that runs regardless |
+| `curvatureScaleEndcapStrip` | @ref gbts-graph | *displaced*: loosens the doublet curvature floor where an end is an endcap strip still to be calibrated |
+| `settledDoubletCuts` | @ref gbts-graph | *displaced*: take every doublet cut after the stereo check, and the pull's eta rates, on the strip ends it settled. Needs `settleDoubletTau` |
+| `settledTripletFit` | @ref gbts-graph | *displaced*: start the triplet fit, which the strips are resolved against, from the doublets' settled ends. Needs `settleDoubletTau` |
+| `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have. Displaced, it also sets the @f$z_0@f$ band, the @f$\phi@f$ window and the curvature floor of a doublet, so it drives the combinatorics |
+| `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency. Displaced, only a doublet in a triplet is an edge, see @ref gbts-lrt-storage |
+| `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth`, `matchBeforeCreateMaxEdges` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that `depth` |
+| `z0HistogramMaxDepth`, `z0Resolution` | @ref gbts-graph | *prompt*: @f$z_0@f$ histogram cut, down to that `depth` |
+
 The rest are on @ref Acts::Experimental::GraphBasedTrackSeeder "GraphBasedTrackSeeder::Config":
 
 | Option | Stage | Effect |
 | --- | --- | --- |
 | `nMaxPhiSlice` | @ref gbts-nodes | sets the @f$\phi@f$ slice width, and with it the base sliding-window width the graph uses |
 | `maxChainLength` | @ref gbts-levels | longest chain of edges taken into account |
-| `minSeedLevel` | @ref gbts-extraction | chain length a candidate must reach |
+| `minSeedLevel` | @ref gbts-extraction | chain length a candidate must reach, in edges. 3 by default; a displaced run can use 2, since a link there already cost a triplet fit |
 | `postFitCurvatureFactor` | @ref gbts-extraction | tighter curvature bound on the fitted chain, as a factor on the filter's `maxCurvature`; values below 1 does nothing |
 | `addTriplets`, `maxAbsEtaAddTriplets` | @ref gbts-extraction | allow shorter chains within an @f$\eta@f$ range |
 | `hitShareThreshold` | @ref gbts-extraction | fraction of shared hits above which a candidate is a clone |
@@ -321,14 +563,21 @@ separately controls the chain-following filter of @ref gbts-extraction "seed ext
 
 ## Implementation pointers {#gbts-implementation}
 
-- Seeder and configuration: @ref Acts::Experimental::GraphBasedTrackSeeder.
+- Seeder and configuration: @ref Acts::Experimental::GraphBasedTrackSeeder and
+  @ref Acts::Experimental::GbtsGraphConfig, shared by both builders. The seeder
+  and @ref Acts::Experimental::GbtsTrackingFilter are templated on the graph,
+  which names its own edge type, so the call sites deduce it.
+- Graph builders: @ref Acts::Experimental::PromptGbtsGraphBuilder and
+  @ref Acts::Experimental::DisplacedGbtsGraphBuilder. The displaced EDM -
+  `DisplacedGbtsDoublet`, `DisplacedGbtsEdge`, `TripletProperties` and the
+  `TripletCircle` the fit returns - lives in `Acts/Seeding/detail/DisplacedGraphTypes.hpp`.
 - Node storage: @ref Acts::Experimental::GbtsNodeStorage. The graph EDM it
   holds - `GbtsNodeParams`, `GbtsNodeEdgeInfo`, `GbtsEtaBinInfo`, `GbtsEdge` -
   is internal and lives in `Acts/Seeding/detail/GbtsGraphTypes.hpp`.
 - Geometry: @ref Acts::Experimental::GbtsGeometry,
   @ref Acts::Experimental::GbtsLayerConnection, the binning it hands back in
   `Acts/Seeding/GbtsBinning.hpp`, and the internal `GbtsLayer`.
-- Chain following: @ref Acts::Experimental::GbtsTrackingFilter and its internal
+- Path fitting: @ref Acts::Experimental::GbtsTrackingFilter and its internal
   `GbtsEdgeState`.
 - Region of interest: @ref Acts::Experimental::GbtsRoiDescriptor.
 - Connection-table training: @ref Acts::Experimental::GbtsLayerConnectionTool.

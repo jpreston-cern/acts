@@ -24,16 +24,6 @@
 
 namespace Acts::Experimental {
 
-/// The doublet graph of the GBTS workflow, as built by
-/// `PromptGbtsGraphBuilder`.
-struct GbtsGraph {
-  /// The graph edges, i.e. the doublets.
-  std::vector<detail::GbtsEdge> edgeStorage;
-
-  /// Number of links between edges.
-  std::uint32_t nConnections = 0;
-};
-
 /// Builds the doublet graph of the GBTS workflow.
 ///
 /// Turns a finalized `GbtsNodeStorage` into a graph whose edges are doublets
@@ -45,7 +35,12 @@ struct GbtsGraph {
 /// indexing they slide over cannot disagree.
 class PromptGbtsGraphBuilder {
  public:
-  /// Configuration of the graph
+  /// The edge this graph builds, so that the seeder and the filter can follow
+  /// a graph to its edge type rather than being told both.
+  using EdgeType = detail::GbtsEdge;
+
+  /// Configuration, shared with the displaced graph so that a caller can hand
+  /// the same object to either.
   using Config = GbtsGraphConfig;
 
   /// @param config Configuration for the graph
@@ -65,8 +60,9 @@ class PromptGbtsGraphBuilder {
   /// @param nodeStorage Data storage containing nodes
   /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
   /// @return The graph, with its edges and their link counts
-  GbtsGraph buildTheGraph(const GbtsRoiDescriptor& roi,
-                          GbtsNodeStorage& nodeStorage, float bFieldInZ) const;
+  detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
+                                            GbtsNodeStorage& nodeStorage,
+                                            float bFieldInZ) const;
 
  private:
   Config m_cfg;

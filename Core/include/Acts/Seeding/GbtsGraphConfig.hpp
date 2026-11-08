@@ -14,16 +14,39 @@
 
 namespace Acts::Experimental {
 
-/// Configuration for the GBTS graph builder.
+/// How the displaced graph compares the slopes of two doublets that share a
+/// node: by a fixed tau ratio tolerance, by the slope difference over its own
+/// uncertainty from the strips the three nodes sit on, or by either.
+enum class GbtsTauRatioMode : std::uint8_t {
+  /// The fixed tolerance, `tauRatioCut` and its corrections.
+  Fixed,
+  /// The slope difference within `tauRatioPullCut` times its uncertainty.
+  Pull,
+  /// Either of the two.
+  FixedOrPull
+};
+
+/// Configuration for either GBTS graph builder.
+///
+/// The prompt and displaced builders take the same settings, so they share one
+/// configuration and a caller can hand the same object to whichever it runs.
+/// What differs is not which knobs exist but where each one bites: the prompt
+/// graph fixes a circle from a doublet by borrowing the beamline as a third
+/// point, and the displaced graph, which cannot make that assumption, defers
+/// the same quantity to a triplet fit. Fields whose meaning moves that way say
+/// so, as do the few one builder ignores.
 struct GbtsGraphConfig {
   /// Match seeds before creating them.
   bool matchBeforeCreate = false;
 
-  /// Optional validation for barrel triplets.
+  /// Cut a triplet on the pT and d0 of its own fit. The prompt graph does this
+  /// for barrel triplets only; the displaced graph does it for every triplet,
+  /// and runs the fit either way since the curvature properties an edge
+  /// carries come out of it.
   bool validateTriplets = true;
 
-  /// Tau ratio scale of the `validateTriplets` high-pT check. The linking cut
-  /// comes from the layer pairs, see `GbtsLayerConnection`.
+  /// Scale of the tau ratio check on high-pT triplets. The linking cut itself
+  /// comes from the layer pairs, in either graph, see `GbtsLayerConnection`.
   float tauRatioCut = 0.007f;
 
   /// Tau ratio precut threshold.
@@ -45,6 +68,10 @@ struct GbtsGraphConfig {
   bool doubletFilterRZ = true;
 
   /// Maximum number of GBTS edges/doublets per space point.
+  ///
+  /// @note The displaced graph only keeps the doublets a triplet passed
+  ///       through as edges, and this caps those, not the doublets it makes
+  ///       on the way.
   float maxEdgesPerSP = 30.0f;
 
   /// Minimum delta radius between layers.
@@ -55,10 +82,16 @@ struct GbtsGraphConfig {
   float maxAbsTau = 36.0f;
 
   /// Maximum d0 impact parameter when validating an edge-connection triplet.
+  ///
+  /// @note The displaced graph also reads this at doublet stage, where d0 is
+  ///       still unknown: it sets the width of the z0 band and of the phi
+  ///       window, and how straight a circle through the doublet may be made.
+  ///       Opening it there costs combinatorics, not just acceptance.
   float d0Max = 3.0f * Acts::UnitConstants::mm;
 
   /// Maximum difference in allowed tangent between candidate edge
-  /// connections.
+  /// connections. Prompt, the two tangents come from the two doublets;
+  /// displaced, from the two triplet fits, taken at the doublet they share.
   float cutDPhiMax = 0.012f;
 
   /// Maximum allowed curvature tolerance for candidate edge connections.
@@ -67,10 +100,14 @@ struct GbtsGraphConfig {
   /// Reject a candidate edge connection whose tau ratio, phi and curvature
   /// differences, each divided by its own cut, add up to more than
   /// `sumRatioCutMax`: a pair that is marginal in all three at once.
+  ///
+  /// @note Prompt only.
   bool useSumRatioCut = false;
 
   /// Threshold of the summed ratios, between 1 (only one difference
   /// can use its full cut) and 3 (no effect beyond the individual cuts).
+  ///
+  /// @note Prompt only, with `useSumRatioCut`.
   float sumRatioCutMax = 1.3f;
 
   /// Minimum z0 value. In pixel mode the value is picked from the RoI.
@@ -84,7 +121,21 @@ struct GbtsGraphConfig {
   float tuningPt = 0.9f * Acts::UnitConstants::GeV;
 
   /// Maximum |curvature| above `curvatureSplitAbsTau`, before that scaling.
+  /// Applied to a doublet by the prompt graph and to a fitted triplet by the
+  /// displaced one, which has no curvature until then. A displaced doublet is
+  /// held to the looser of the two limits, by the least curvature a circle
+  /// through it can have and still pass within `d0Max` of the beamline.
   float maxCurvatureHighEta = 4.75e-4f / Acts::UnitConstants::mm;
+
+  /// How much looser that doublet limit is where calibration is on and an end
+  /// is an endcap strip, which has still to slide along its strip and turns
+  /// the chord as it goes. It is the same as dividing `minPt` by this for
+  /// those doublets. The slide moves the chord's line rather than bending it,
+  /// so no value is both lossless and useful: around 2 loses few doublets and
+  /// still cuts, around 5 loses none and cuts nothing.
+  ///
+  /// @note Displaced only.
+  float curvatureScaleEndcapStrip = 2.0f;
 
   /// Maximum |curvature| below `curvatureSplitAbsTau`, before that scaling.
   float maxCurvatureLowEta = 3.75e-4f / Acts::UnitConstants::mm;
@@ -117,6 +168,8 @@ struct GbtsGraphConfig {
   /// Deepest `GbtsLayerDescription::depth` whose nodes are cut against the z0
   /// histogram of their outer neighbourhood and whose isolated nodes are
   /// skipped. A negative value disables the cut.
+  ///
+  /// @note Prompt only. A displaced track has no z0 worth histogramming.
   std::int32_t z0HistogramMaxDepth = 0;
 
   /// Deepest `GbtsLayerDescription::depth` to which `matchBeforeCreate`
@@ -125,20 +178,166 @@ struct GbtsGraphConfig {
 
   /// Half-width of the z0 window against which a node is matched in the
   /// histogram.
+  ///
+  /// @note Prompt only, with `z0HistogramMaxDepth`.
   float z0Resolution = 2.5f * Acts::UnitConstants::mm;
 
   /// Maximum radius of the pixel detector.
   float maxOuterRadius = 550.0f;
 
-  /// Resolve a doublet's strip endpoints against its own direction before
-  /// cutting on them. Nothing is written back; the correction belongs to the
-  /// pair.
+  /// Resolve a strip node along its strip against the track direction before
+  /// cutting on it. Nothing is written back; the correction belongs to the
+  /// candidate that made it. The prompt graph does this per doublet, against
+  /// the chord; the displaced graph per triplet, against the fitted tangent,
+  /// the chord being the tangent only for a track from the beamline.
   bool calibrateStrips = true;
 
   /// How far along a strip a crossing may land and still be recovered, as a
   /// multiple of the strip half-length, so 1 is the strip itself. This is the
   /// same quantity as `TripletSeedFinder::Config::toleranceParam`.
   float maxStripLengthFraction = 1.1f;
+
+  /// Cut a candidate triplet on the turn between its two edges before the
+  /// triplet fit, against the curvature limit over the pair's own chords.
+  /// Where calibration is on, a triplet with an endcap strip end skips it,
+  /// since that end still slides along its strip and the strip is radial.
+  ///
+  /// @note Displaced only.
+  bool useTurnAngleCut = true;
+
+  /// Cut a doublet whose chord cannot cross both strips of the stereo pair at
+  /// either of its strip ends. This is the strip check the triplet fit makes,
+  /// taken early against the chord, so that the many doublets no triplet
+  /// could pass never reach the triplet loop.
+  ///
+  /// @note Displaced only.
+  bool doubletStereoCut = true;
+
+  /// Tolerance of `doubletStereoCut`, in the units of
+  /// `maxStripLengthFraction`. Looser than that one, as the chord only stands
+  /// in for the fitted tangent and its ends are still nominal. On the
+  /// ggH->aa->4b (ctau 100 mm) LRT sample, 2 against 3 halves the doublets
+  /// and cuts the triplet fits by 70% for 12 of 9055 adjacent true triplets;
+  /// below 2 the losses grow quickly.
+  float doubletStripLengthFraction = 2.0f;
+
+  /// Apply the turn cut to triplets with an endcap strip end too, rather than
+  /// skipping them. The chord of a doublet with such an end is taken between
+  /// the crossings `doubletStereoCut` finds, which settles the slide along the
+  /// strip well enough for the turn, and the cut is then held to a limit
+  /// `curvatureScaleEndcapStrip` times looser. Needs `doubletStereoCut`.
+  ///
+  /// @note Displaced only.
+  bool turnCutEndcapStrip = true;
+
+  /// Cut each doublet on the phi window of its own two radii, after the
+  /// sliding window, which has to cover the whole of both bins, has found it.
+  /// Same window as the bins', only no wider than the pair needs.
+  ///
+  /// @note Displaced only, and only with `useEtaBinning`.
+  bool perPairPhiWindow = true;
+
+  /// Largest phi half window a doublet may span, zero for none. The window
+  /// `d0Max` asks for is wide, near 0.3 rad between the inner strip layers for
+  /// 300 mm, and a cap trades the doublets of the most displaced tracks for
+  /// time, as `doubletDPhiCap` does for the grid triplet seeder.
+  ///
+  /// @note Displaced only, and only with `useEtaBinning`.
+  float maxDoubletDeltaPhi = 0.0f;
+
+  /// Take a doublet's tau with each strip end at the crossing
+  /// `doubletStereoCut` finds rather than at its nominal position: z for a
+  /// barrel strip, the transverse position for an endcap strip. Two doublets
+  /// whose strip ends are all settled this way then take their layer pairs'
+  /// `tauRatioCorrStripSettled` instead of their `tauRatioCorrStrip`, see
+  /// `GbtsLayerConnection`. Needs `doubletStereoCut`.
+  ///
+  /// @note Displaced only.
+  bool settleDoubletTau = true;
+
+  /// Cut a doublet with a strip end on its settled ends rather than its
+  /// nominal ones, as `DoubletSeedFinder` cuts on its calibrated space
+  /// points. The cluster width tau window, max |tau| and the z0 and z(rOut)
+  /// bands of `doubletFilterRZ` read the settled tau and inner end; the
+  /// minimum chord and the pair's phi window the settled transverse ends,
+  /// which only an endcap strip end moves; the doublet curvature cut the
+  /// settled transverse ends too, held to the unloosened limit where every
+  /// end settled; and the pull of `tauRatioMode` the eta rates of the settled
+  /// chord. Each of those cuts then waits for `doubletStereoCut`, which finds
+  /// the crossings, where the doublet has an end it would move. Needs
+  /// `settleDoubletTau`.
+  ///
+  /// @note Displaced only.
+  bool settledDoubletCuts = false;
+
+  /// Start the triplet fit from the doublets' settled ends rather than the
+  /// nominal nodes: the inner node where the inner doublet settled it, the
+  /// outer where the outer doublet did, and the middle node halfway between
+  /// the two places its two chords cross its strip. The strips are then
+  /// resolved against that fit and refitted as before, so this changes which
+  /// tangent they are resolved against, and with it which triplets the
+  /// strip check of `maxStripLengthFraction` keeps. Needs `settleDoubletTau`.
+  ///
+  /// @note Displaced only.
+  bool settledTripletFit = false;
+
+  /// Cut a fitted triplet on its z0 against [minZ0, maxZ0] and its z at
+  /// `maxOuterRadius` against the RoI, using the fitted d0. Gated apart from
+  /// `doubletFilterRZ`, which applies the same ranges to doublets as bands
+  /// over d0.
+  ///
+  /// @note Displaced only.
+  bool tripletFilterRZ = true;
+
+  /// Hold the turn cut of a triplet candidate to the low-eta curvature limit
+  /// where the inner doublet's settled tau sits far enough below
+  /// `curvatureSplitAbsTau` that the fitted triplet will too, rather than to
+  /// the looser of the two limits.
+  ///
+  /// @note Displaced only.
+  bool curvatureFromDoubletTau = true;
+
+  /// How far below `curvatureSplitAbsTau` a doublet's |tau| has to sit for
+  /// `curvatureFromDoubletTau`, as a fraction of it.
+  ///
+  /// @note Displaced only.
+  float curvatureSplitTauMargin = 0.1f;
+
+  /// How the tau ratio window, the loose and the tight tau ratio cuts and the
+  /// high-pT one compare two doublets' slopes. The uncertainty of the
+  /// difference in eta of the two is that of each strip node sliding along
+  /// its strip by `stripAlongResolution`, with `tauRatioPullFloor` added in
+  /// quadrature. A strip node's slide moves the eta of a chord it ends far
+  /// more where the chord is short and steep, which is what the fixed
+  /// tolerance cannot follow: endcap triplets need it widened, barrel ones
+  /// do not.
+  ///
+  /// @note Displaced only.
+  GbtsTauRatioMode tauRatioMode = GbtsTauRatioMode::Fixed;
+
+  /// Resolution of a strip space point along its strip, for `tauRatioMode`.
+  ///
+  /// @note Displaced only.
+  float stripAlongResolution = 0.5f * Acts::UnitConstants::mm;
+
+  /// Uncertainty in eta added in quadrature to the strip term, for
+  /// `tauRatioMode`.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullFloor = 0.004f;
+
+  /// Multiple of the uncertainty the window and the loose cut allow, for
+  /// `tauRatioMode`. The default is the most efficient of those scanned with
+  /// `FixedOrPull` on the ggH->aa->4b LRT sample.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullCut = 6.0f;
+
+  /// Multiple of the uncertainty the tight cut allows on the calibrated
+  /// ends, for `tauRatioMode`; 0.9 of it above five times the minimum pT.
+  ///
+  /// @note Displaced only.
+  float tauRatioPullCutTight = 3.0f;
 };
 
 }  // namespace Acts::Experimental

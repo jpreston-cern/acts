@@ -22,7 +22,8 @@
 
 namespace Acts::Experimental::detail {
 
-/// Maximum number of neighbouring edges recorded per graph edge
+/// Maximum number of neighbouring edges recorded per prompt graph edge. The
+/// displaced graph has its own, @c kDisplacedGbtsMaxEdgeNeighbours.
 static constexpr std::uint32_t kGbtsMaxEdgeNeighbours = 6;
 
 /// Bins of the per-node z0 histogram, which is kept as a bit mask in
@@ -209,5 +210,33 @@ struct GbtsEdge final {
   std::array<std::uint32_t, kGbtsMaxEdgeNeighbours> vNei{};
 };
 //! [gbts edge]
+
+/// exp(eta) of an edge, which the prompt edge keeps as the first of the fit
+/// parameters a doublet is enough to determine.
+///
+/// The displaced edge keeps it somewhere else, so anything that walks either
+/// graph asks through this overload set rather than naming the field.
+///
+/// @param edge The edge
+/// @return exp(eta) of the edge
+inline float edgeExpEta(const GbtsEdge& edge) {
+  return edge.p[0];
+}
+
+/// The doublet graph of the GBTS workflow, as built by `PromptGbtsGraphBuilder`
+/// or `DisplacedGbtsGraphBuilder`.
+/// @tparam edge_t The edge the builder makes, its `EdgeType`
+template <typename edge_t>
+struct GbtsGraph {
+  /// The graph edges, i.e. the doublets.
+  std::vector<edge_t> edgeStorage;
+
+  /// Number of doublets that passed the doublet cuts. The prompt graph keeps
+  /// every one as an edge; the displaced graph only those in a triplet.
+  std::uint32_t nDoublets = 0;
+
+  /// Number of links between edges.
+  std::uint32_t nConnections = 0;
+};
 
 }  // namespace Acts::Experimental::detail

@@ -92,12 +92,14 @@ class GbtsTrackingFilter final {
   const Logger& logger() const { return *m_logger; }
 
   /// Update edge state with edge
+  /// @tparam edge_t The graph edge being followed
   /// @param nodeView View of the node positions and layers
   /// @param pS Edge to update with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool update(const detail::GbtsNodeView& nodeView, const detail::GbtsEdge& pS,
-              detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool update(const detail::GbtsNodeView& nodeView, const edge_t& pS,
+              detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Get layer type from layer index
   /// @param layerIndex Layer index

@@ -9,18 +9,23 @@
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 
 #include "Acts/Seeding/GbtsGeometry.hpp"
+#include "Acts/Seeding/detail/DisplacedGraphTypes.hpp"
 #include "Acts/Utilities/MathHelpers.hpp"
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <numbers>
+#include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace Acts::Experimental::detail {
 
-void detail::GbtsEdgeState::initialize(const detail::GbtsEdge& pS,
-                                       const detail::GbtsNodeView& nodeView,
+template <typename edge_t>
+void GbtsEdgeState<edge_t>::initialize(const edge_t& pS,
+                                       const GbtsNodeView& nodeView,
                                        const std::array<float, 3>& varianceX,
                                        const std::array<float, 2>& varianceY) {
   j = 0;
@@ -65,6 +70,11 @@ void detail::GbtsEdgeState::initialize(const detail::GbtsEdge& pS,
   cy[1][1] = varianceY[1];
 }
 
+// The graph walk reads only the two nodes and the neighbour links, so it runs
+// over either edge; these are the two that exist.
+template struct GbtsEdgeState<GbtsEdge>;
+template struct GbtsEdgeState<DisplacedGbtsEdge>;
+
 }  // namespace Acts::Experimental::detail
 
 namespace Acts::Experimental {
@@ -74,9 +84,10 @@ GbtsTrackingFilter::GbtsTrackingFilter(
     std::unique_ptr<const Logger> logger)
     : m_cfg(config), m_geometry(geometry), m_logger(std::move(logger)) {}
 
+template <typename edge_t>
 bool GbtsTrackingFilter::update(const detail::GbtsNodeView& nodeView,
-                                const detail::GbtsEdge& pS,
-                                detail::GbtsEdgeState& ts) const {
+                                const edge_t& pS,
+                                detail::GbtsEdgeState<edge_t>& ts) const {
   if (ts.cx[2][2] < 0 || ts.cx[1][1] < 0 || ts.cx[0][0] < 0) {
     ACTS_DEBUG("Negative cov_x");
   }
@@ -246,5 +257,14 @@ GbtsLayerType GbtsTrackingFilter::getLayerType(
     const GbtsLayerIndex layerIndex) const {
   return m_geometry->layerDescription(layerIndex).type;
 }
+
+// The seeder fits its paths through update, over either edge.
+template bool GbtsTrackingFilter::update(
+    const detail::GbtsNodeView& nodeView, const detail::GbtsEdge& pS,
+    detail::GbtsEdgeState<detail::GbtsEdge>& ts) const;
+
+template bool GbtsTrackingFilter::update(
+    const detail::GbtsNodeView& nodeView, const detail::DisplacedGbtsEdge& pS,
+    detail::GbtsEdgeState<detail::DisplacedGbtsEdge>& ts) const;
 
 }  // namespace Acts::Experimental

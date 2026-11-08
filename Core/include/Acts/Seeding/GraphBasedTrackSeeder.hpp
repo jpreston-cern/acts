@@ -31,9 +31,6 @@
 
 namespace Acts::Experimental {
 
-struct GbtsGraph;
-class PromptGbtsGraphBuilder;
-
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
  public:
@@ -54,10 +51,17 @@ class GraphBasedTrackSeeder {
     std::uint32_t maxChainLength = 15;
     /// Chain length a seed candidate must reach: a triplet plus one
     /// confirmation.
+    ///
+    /// @note The displaced graph can be run at two, where the prompt graph
+    ///       cannot: a link there already cost a triplet fit, so two edges are
+    ///       three nodes that were fitted and cut on rather than three that
+    ///       merely agreed on tau.
     std::uint8_t minSeedLevel = 3;
     /// optionally add 3 sp seeds within a certain eta range
     ///
     /// @note Matters most where there are few layers.
+    /// @note This accepts a chain one level short, so at a `minSeedLevel` of two
+    ///       it reaches down to a single edge: two nodes and no fit at all.
     bool addTriplets = false;
     /// the maximum allowed eta value in which
     /// three spacepoint seeds are passed through
@@ -157,19 +161,25 @@ class GraphBasedTrackSeeder {
   /// Convenience wrapper that builds and finalizes the node storage itself. The
   /// container must carry the `gbtsLayerIndex`, `clusterWidth` and
   /// `localPositionY` columns.
+  /// @tparam graph_builder_t The graph builder, `PromptGbtsGraphBuilder` for
+  ///                         prompt tracks or `DisplacedGbtsGraphBuilder` for
+  ///                         large radius ones. Its `EdgeType` says which edge
+  ///                         the two carry.
   /// @param spacePoints Space point container
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
   /// @param filter Tracking filter to be applied
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
+  template <typename graph_builder_t>
   void createSeeds(const SpacePointContainer& spacePoints,
                    const GbtsRoiDescriptor& roi,
-                   const PromptGbtsGraphBuilder& graphBuilder,
+                   const graph_builder_t& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
   /// Create seeds from a finalized node storage in a region of interest.
+  /// @tparam graph_builder_t The graph builder, prompt or displaced
   /// @param nodeStorage Finalized graph node storage
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
@@ -177,11 +187,11 @@ class GraphBasedTrackSeeder {
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
   /// @param outputFits Fit of the tracking filter to each generated seed
+  template <typename graph_builder_t>
   void createSeeds(
       GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-      const PromptGbtsGraphBuilder& graphBuilder,
-      const GbtsTrackingFilter& filter, const Options& options,
-      SeedContainer& outputSeeds,
+      const graph_builder_t& graphBuilder, const GbtsTrackingFilter& filter,
+      const Options& options, SeedContainer& outputSeeds,
       std::vector<std::optional<GbtsSeedFit>>* outputFits = nullptr) const;
 
  private:
@@ -235,31 +245,38 @@ class GraphBasedTrackSeeder {
   const Acts::Logger& logger() const { return *m_logger; }
 
   /// Extract seed candidates from the graph.
+  /// @tparam edge_t The edge of the graph, prompt or displaced
   /// @param nodeStorage Storage containing the graph nodes
   /// @param graph The graph
   /// @param vOutputSeeds Output vector for seed candidates
   /// @param filter Tracking filter to be applied
   /// @param withFits Whether the fit of the filter to each seed is kept
+  template <typename edge_t>
   void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
-                                const GbtsGraph& graph,
+                                const detail::GbtsGraph<edge_t>& graph,
                                 std::vector<OutputSeedProperties>& vOutputSeeds,
                                 const GbtsTrackingFilter& filter,
                                 bool withFits) const;
 
   /// A fitted path: the filter's state at its end, and its edges, the head
   /// edge first.
+  /// @tparam edge_t The edge of the graph, prompt or displaced
+  template <typename edge_t>
   struct FittedPath {
-    detail::GbtsEdgeState state;
+    detail::GbtsEdgeState<edge_t> state;
     std::vector<std::uint32_t> edges;
   };
 
   /// Extract the best fitted path from every edge inwards to a root edge.
+  /// @tparam edge_t The edge of the graph, prompt or displaced
   /// @param nodeView View of the node positions and layers
   /// @param graph The graph
   /// @param filter Tracking filter fitting the paths
   /// @return The fitted paths
-  std::vector<FittedPath> extractBestPathPerEdge(
-      const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+  template <typename edge_t>
+  std::vector<FittedPath<edge_t>> extractBestPathPerEdge(
+      const detail::GbtsNodeView& nodeView,
+      const detail::GbtsGraph<edge_t>& graph,
       const GbtsTrackingFilter& filter) const;
 
   /// Mark as clones the three space point candidates beyond
