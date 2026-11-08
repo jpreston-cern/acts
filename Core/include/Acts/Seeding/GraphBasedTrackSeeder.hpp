@@ -32,7 +32,7 @@
 namespace Acts::Experimental {
 
 struct GbtsGraph;
-class GbtsGraphBuilder;
+class PromptGbtsGraphBuilder;
 
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
@@ -140,7 +140,7 @@ class GraphBasedTrackSeeder {
   /// @param outputSeeds Container with generated seeds
   void createSeeds(const SpacePointContainer& spacePoints,
                    const GbtsRoiDescriptor& roi,
-                   const GbtsGraphBuilder& graphBuilder,
+                   const PromptGbtsGraphBuilder& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
@@ -154,8 +154,9 @@ class GraphBasedTrackSeeder {
   /// @param outputFits Fit of the tracking filter to each generated seed
   void createSeeds(
       GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-      const GbtsGraphBuilder& graphBuilder, const GbtsTrackingFilter& filter,
-      const Options& options, SeedContainer& outputSeeds,
+      const PromptGbtsGraphBuilder& graphBuilder,
+      const GbtsTrackingFilter& filter, const Options& options,
+      SeedContainer& outputSeeds,
       std::vector<std::optional<GbtsSeedFit>>* outputFits = nullptr) const;
 
  private:

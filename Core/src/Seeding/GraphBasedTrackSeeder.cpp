@@ -8,8 +8,8 @@
 
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
 
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
+#include "Acts/Seeding/PromptGbtsGraphBuilder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -58,12 +58,11 @@ GbtsNodeStorage GraphBasedTrackSeeder::makeNodeStorage() const {
   return GbtsNodeStorage(config, m_geometry, m_cfg.tauLookupTable);
 }
 
-void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
-                                        const GbtsRoiDescriptor& roi,
-                                        const GbtsGraphBuilder& graphBuilder,
-                                        const GbtsTrackingFilter& filter,
-                                        const Options& options,
-                                        SeedContainer& outputSeeds) const {
+void GraphBasedTrackSeeder::createSeeds(
+    const SpacePointContainer& spacePoints, const GbtsRoiDescriptor& roi,
+    const PromptGbtsGraphBuilder& graphBuilder,
+    const GbtsTrackingFilter& filter, const Options& options,
+    SeedContainer& outputSeeds) const {
   GbtsNodeStorage nodeStorage = makeNodeStorage();
 
   const auto layerColumn = spacePoints.column<GbtsLayerIndex>("gbtsLayerIndex");
@@ -80,8 +79,9 @@ void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
 
 void GraphBasedTrackSeeder::createSeeds(
     GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-    const GbtsGraphBuilder& graphBuilder, const GbtsTrackingFilter& filter,
-    const Options& options, SeedContainer& outputSeeds,
+    const PromptGbtsGraphBuilder& graphBuilder,
+    const GbtsTrackingFilter& filter, const Options& options,
+    SeedContainer& outputSeeds,
     std::vector<std::optional<GbtsSeedFit>>* outputFits) const {
   ACTS_DEBUG("Loaded " << nodeStorage.numberOfNodes() << " graph nodes");
 

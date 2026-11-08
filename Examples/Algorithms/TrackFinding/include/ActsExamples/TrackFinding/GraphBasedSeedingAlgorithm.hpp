@@ -16,10 +16,10 @@
 #include "Acts/Geometry/TrackingGeometry.hpp"
 #include "Acts/MagneticField/MagneticFieldProvider.hpp"
 #include "Acts/Seeding/GbtsGeometry.hpp"
-#include "Acts/Seeding/GbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsLayerConnection.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
 #include "Acts/Seeding/GraphBasedTrackSeeder.hpp"
+#include "Acts/Seeding/PromptGbtsGraphBuilder.hpp"
 #include "ActsExamples/EventData/Cluster.hpp"
 #include "ActsExamples/EventData/Seed.hpp"
 #include "ActsExamples/EventData/SpacePoint.hpp"
@@ -95,7 +95,7 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
 
     /// steers doublet creation, edge linking and chain selection. `minZ0` and
     /// `maxZ0` are overridden from the region of interest.
-    Acts::Experimental::GbtsGraphBuilder::Config graphConfig;
+    Acts::Experimental::GbtsGraphConfig graphConfig;
 
     /// the connection table (parsed from json file) used to make geoemetry cuts
     /// be GBTS
@@ -161,7 +161,7 @@ class GraphBasedSeedingAlgorithm final : public IAlgorithm {
 
   /// graph used in creating and extracting edges, edge connections
   /// and valid chains
-  std::optional<Acts::Experimental::GbtsGraphBuilder> m_gbtsGraphBuilder;
+  std::optional<Acts::Experimental::PromptGbtsGraphBuilder> m_gbtsGraphBuilder;
 
   /// filter used to extract seed candidates from graph
   std::optional<Acts::Experimental::GbtsTrackingFilter> m_filter;

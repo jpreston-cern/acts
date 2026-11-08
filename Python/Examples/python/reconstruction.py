@@ -371,7 +371,7 @@ def addSeeding(
                                 Defaults specified in Examples/Algorithms/TrackFinding/include/ActsExamples/TrackFinding/HashingPrototypeSeedingAlgorithm.hpp
     gbtsConfigArg : GbtsConfigArg(seederConfig, graphConfig, useAdaptiveCuts)
                                 A given config is used as is, otherwise the default one, the graphConfig with minPt from seedFinderConfigArg.
-                                Defaults specified in Core/include/Acts/Seeding/GraphBasedTrackSeeder.hpp, GbtsGraphBuilder.hpp and
+                                Defaults specified in Core/include/Acts/Seeding/GraphBasedTrackSeeder.hpp, GbtsGraphConfig.hpp and
                                 Examples/Algorithms/TrackFinding/include/ActsExamples/TrackFinding/GraphBasedSeedingAlgorithm.hpp
     particleHypothesis : Optional[acts.ParticleHypothesis]
         The hypothesis used for track finding. Defaults to pion.

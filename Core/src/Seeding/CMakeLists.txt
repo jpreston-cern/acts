@@ -18,7 +18,7 @@ target_sources(
         TripletSeedFinder.cpp
         TripletSeeder.cpp
         GbtsNodeStorage.cpp
-        GbtsGraphBuilder.cpp
+        PromptGbtsGraphBuilder.cpp
         GbtsGeometry.cpp
         GbtsSeedFit.cpp
         GbtsTrackingFilter.cpp

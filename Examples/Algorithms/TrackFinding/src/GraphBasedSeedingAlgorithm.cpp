@@ -164,7 +164,7 @@ GraphBasedSeedingAlgorithm::GraphBasedSeedingAlgorithm(
 
   m_gbtsGraphBuilder.emplace(
       m_cfg.graphConfig, m_geometry,
-      this->logger().cloneWithSuffix("GbtsGraphBuilder"));
+      this->logger().cloneWithSuffix("PromptGbtsGraphBuilder"));
 
   m_finder.emplace(Acts::Experimental::GraphBasedTrackSeeder::DerivedConfig(
                        m_cfg.seedFinderConfig),
@@ -458,7 +458,7 @@ void GraphBasedSeedingAlgorithm::printConfig() const {
   ACTS_DEBUG("minSeedLevel: " << static_cast<std::uint32_t>(cfg1.minSeedLevel));
   ACTS_DEBUG("addTriplets: " << cfg1.addTriplets);
   ACTS_DEBUG("maxAbsEtaAddTriplets: " << cfg1.maxAbsEtaAddTriplets);
-  ACTS_DEBUG("=====GbtsGraphBuilder=====");
+  ACTS_DEBUG("=====PromptGbtsGraphBuilder=====");
   const auto &cfg2 = m_cfg.graphConfig;
   ACTS_DEBUG("matchBeforeCreate: " << cfg2.matchBeforeCreate);
   ACTS_DEBUG("tauRatioCut: " << cfg2.tauRatioCut);

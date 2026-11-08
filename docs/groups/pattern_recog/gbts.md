@@ -274,7 +274,7 @@ the angle. Wide clusters in the pixel endcap are dropped entirely
 ## Configuration {#gbts-configuration}
 
 The cuts that build and link the doublets live on
-@ref Acts::Experimental::GbtsGraphBuilder "GbtsGraphBuilder::Config", which
+@ref Acts::Experimental::GbtsGraphConfig "GbtsGraphConfig", which
 `GraphBasedSeedingAlgorithm` takes as `graphConfig` and exposes to Python as
 `GbtsGraphBuilderConfig`:
 
