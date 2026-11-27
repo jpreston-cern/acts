@@ -26,13 +26,11 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
 namespace Acts::Experimental {
-
-struct GbtsGraph;
-class GbtsGraphBuilder;
 
 /// Seed finder implementing the GBTS seeding workflow.
 class GraphBasedTrackSeeder {
@@ -54,10 +52,17 @@ class GraphBasedTrackSeeder {
     std::uint32_t maxChainLength = 15;
     /// Chain length a seed candidate must reach: a triplet plus one
     /// confirmation.
+    ///
+    /// @note The triplet graph can be run at two, where the prompt graph
+    ///       cannot: a link there already cost a triplet fit, so two edges are
+    ///       three nodes that were fitted and cut on rather than three that
+    ///       merely agreed on tau.
     std::uint8_t minSeedLevel = 3;
     /// optionally add 3 sp seeds within a certain eta range
     ///
     /// @note Matters most where there are few layers.
+    /// @note This accepts a chain one level short, so at a `minSeedLevel` of two
+    ///       it reaches down to a single edge: two nodes and no fit at all.
     bool addTriplets = false;
     /// the maximum allowed eta value in which
     /// three spacepoint seeds are passed through
@@ -66,7 +71,8 @@ class GraphBasedTrackSeeder {
     std::uint32_t minSplitSeedSize = 4;
     /// Largest seed size that is split.
     std::uint32_t maxSplitSeedSize = 5;
-    /// Threshold for hit sharing between seeds.
+    /// Share of its space points that better seed candidates may hold before
+    /// a candidate is a clone.
     float hitShareThreshold = 0.49;
     /// Max seed eta value considered for splitting.
     float maxSeedSplitEta = 0.6;
@@ -139,19 +145,23 @@ class GraphBasedTrackSeeder {
   /// Convenience wrapper that builds and finalizes the node storage itself. The
   /// container must carry the `gbtsLayerIndex`, `clusterWidth` and
   /// `localPositionY` columns.
+  /// @tparam graph_builder_t The graph builder, `GbtsGraphBuilder`. Its
+  ///                         `EdgeType` says which edge it makes.
   /// @param spacePoints Space point container
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
   /// @param filter Tracking filter to be applied
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
+  template <typename graph_builder_t>
   void createSeeds(const SpacePointContainer& spacePoints,
                    const GbtsRoiDescriptor& roi,
-                   const GbtsGraphBuilder& graphBuilder,
+                   const graph_builder_t& graphBuilder,
                    const GbtsTrackingFilter& filter, const Options& options,
                    SeedContainer& outputSeeds) const;
 
   /// Create seeds from a finalized node storage in a region of interest.
+  /// @tparam graph_builder_t The graph builder, `GbtsGraphBuilder`
   /// @param nodeStorage Finalized graph node storage
   /// @param roi Region of interest descriptor
   /// @param graphBuilder Doublet graph builder
@@ -159,53 +169,80 @@ class GraphBasedTrackSeeder {
   /// @param options Event based options such as magnetic field strength
   /// @param outputSeeds Container with generated seeds
   /// @param outputFits Fit of the tracking filter to each generated seed
+  template <typename graph_builder_t>
   void createSeeds(
       GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-      const GbtsGraphBuilder& graphBuilder, const GbtsTrackingFilter& filter,
+      const graph_builder_t& graphBuilder, const GbtsTrackingFilter& filter,
       const Options& options, SeedContainer& outputSeeds,
       std::vector<std::optional<GbtsSeedFit>>* outputFits = nullptr) const;
 
- private:
-  /// candidate seed metadata produced by the GBTS algorithm.
-  struct SeedCandidateProperties {
-    /// @param quality Seed quality score
-    /// @param clone Whether the candidate was rejected as a clone
-    /// @param sps Vector of graph node indices
-    /// @param splitFlag used to flag if seed needs to be split in two
-    SeedCandidateProperties(float quality, bool clone,
-                            std::vector<SpacePointIndex> sps, bool splitFlag)
-        : seedQuality(quality),
-          isClone(clone),
-          nodes(std::move(sps)),
-          forSeedSplitting(splitFlag) {}
-
-    /// Seed quality score.
-    float seedQuality{};
-    /// Clone flag.
-    bool isClone{};
-    /// Graph node indices.
+  /// A seed candidate: the best fitted path from one head edge of the graph.
+  struct SeedCandidate {
+    /// Graph nodes of the path, innermost first.
     std::vector<SpacePointIndex> nodes;
-    /// Flag for seed splitting.
+    /// Edges of the path, the head edge first.
+    std::vector<std::uint32_t> edges;
+    /// Minus the filter's score per space point: the lower, the better.
+    float quality{};
+    /// cot(theta) of the filter's fit.
+    float cotTheta{};
+    /// Written as the two seeds without its first and its middle space point
+    /// instead of as a whole (see `maxSeedSplitEta`).
     bool forSeedSplitting{};
-    /// Fit of the tracking filter.
+    /// Left out of the output, a clone or cut.
+    bool rejected{};
+    /// Fit of the tracking filter, if asked for.
     std::optional<GbtsSeedFit> fit;
   };
 
-  /// Output seed metadata
-  struct OutputSeedProperties {
-    /// @param quality Seed quality score
-    /// @param sps Vector of space point indices in the seed
-    OutputSeedProperties(float quality, std::vector<std::uint32_t> sps)
-        : seedQuality(quality), spacePoints(std::move(sps)) {}
-
-    /// Quality of seed.
-    float seedQuality{};
-    /// Index of spacepoints in seed.
-    std::vector<std::uint32_t> spacePoints;
-    /// Fit of the tracking filter.
-    std::optional<GbtsSeedFit> fit;
+  /// The seed candidates of a graph and their ranking.
+  struct SeedCandidates {
+    /// The candidates, in the order of their head edges.
+    std::vector<SeedCandidate> candidates;
+    /// (quality, index into `candidates`), the best first: the order clone
+    /// removal reads and the seeds are written in. A candidate taken out of it
+    /// is not written.
+    std::vector<std::pair<float, std::uint32_t>> ranking;
   };
 
+  /// Find the seed candidates of a graph: from every head edge the best path
+  /// inwards, fitted with the tracking filter, with the seed splitting
+  /// decided. The graph may come from a builder of the seeder's or from
+  /// outside it, such as the large radius graph of `TripletGbtsGraphBuilder`.
+  /// @tparam edge_t The edge of the graph, prompt or triplet
+  /// @param nodeView View of the nodes the graph's edges refer to
+  /// @param graph The graph, ordered outside in
+  /// @param filter Tracking filter fitting the paths
+  /// @param withFits Whether the fit of the filter to each candidate is kept
+  /// @return The candidates, ranked
+  template <typename edge_t>
+  SeedCandidates findSeedCandidates(const detail::GbtsNodeView& nodeView,
+                                    const detail::GbtsGraph<edge_t>& graph,
+                                    const GbtsTrackingFilter& filter,
+                                    bool withFits) const;
+
+  /// The GBTS clone removal: a candidate is rejected when better candidates
+  /// between them hold more than `hitShareThreshold` of its space points.
+  /// @param candidates The candidates, whose rejected flags are set
+  /// @param nNodes Number of graph nodes
+  void removeClones(SeedCandidates& candidates, std::uint32_t nNodes) const;
+
+  /// Write the candidates that are not rejected, in the order of the ranking,
+  /// a split one as its two drop-out seeds.
+  /// @param candidates The candidates
+  /// @param spacePointIndices Space point index of each graph node
+  /// @param outputSeeds Container the seeds are added to
+  /// @param outputFits Fit of the tracking filter to each seed written, if not
+  ///        null; none for the halves of a split candidate
+  void writeSeeds(const SeedCandidates& candidates,
+                  std::span<const SpacePointIndex> spacePointIndices,
+                  SeedContainer& outputSeeds,
+                  std::vector<std::optional<GbtsSeedFit>>* outputFits) const;
+
+  /// @return The configuration
+  const DerivedConfig& config() const { return m_cfg; }
+
+ private:
   DerivedConfig m_cfg;
 
   std::shared_ptr<const GbtsGeometry> m_geometry;
@@ -215,32 +252,25 @@ class GraphBasedTrackSeeder {
 
   const Acts::Logger& logger() const { return *m_logger; }
 
-  /// Extract seed candidates from the graph.
-  /// @param nodeStorage Storage containing the graph nodes
-  /// @param graph The graph
-  /// @param vOutputSeeds Output vector for seed candidates
-  /// @param filter Tracking filter to be applied
-  /// @param withFits Whether the fit of the filter to each seed is kept
-  void extractSeedsFromTheGraph(const GbtsNodeStorage& nodeStorage,
-                                const GbtsGraph& graph,
-                                std::vector<OutputSeedProperties>& vOutputSeeds,
-                                const GbtsTrackingFilter& filter,
-                                bool withFits) const;
-
   /// A fitted path: the filter's state at its end, and its edges, the head
   /// edge first.
+  /// @tparam edge_t The edge of the graph, prompt or triplet
+  template <typename edge_t>
   struct FittedPath {
-    detail::GbtsEdgeState state;
+    detail::GbtsEdgeState<edge_t> state;
     std::vector<std::uint32_t> edges;
   };
 
   /// Extract the best fitted path from every edge inwards to a root edge.
+  /// @tparam edge_t The edge of the graph, prompt or triplet
   /// @param nodeView View of the node positions and layers
   /// @param graph The graph
   /// @param filter Tracking filter fitting the paths
   /// @return The fitted paths
-  std::vector<FittedPath> extractBestPathPerEdge(
-      const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+  template <typename edge_t>
+  std::vector<FittedPath<edge_t>> extractBestPathPerEdge(
+      const detail::GbtsNodeView& nodeView,
+      const detail::GbtsGraph<edge_t>& graph,
       const GbtsTrackingFilter& filter) const;
 
   /// Estimate the inverse radius of the circle through three nodes.

@@ -26,4 +26,8 @@ target_sources(
         GbtsRoiDescriptor.cpp
         GbtsLayerConnectionTool.cpp
         HoughAccumulatorSection.cpp
+        GbtsGridTripletSearch.cpp
+        TripletGbtsGraphBuilder.cpp
+        TripletGbtsNodes.cpp
+        TripletGbtsSeedSelector.cpp
 )

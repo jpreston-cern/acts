@@ -725,8 +725,9 @@ BOOST_AUTO_TEST_CASE(EdgesKeepEveryInnerNeighbour) {
   }
   storage.finalize();
 
-  const Experimental::GbtsGraph graph = setup.graphBuilder.buildTheGraph(
-      setup.roi, storage, setup.options.bFieldInZ);
+  const Experimental::detail::GbtsGraph<Experimental::detail::GbtsEdge> graph =
+      setup.graphBuilder.buildTheGraph(setup.roi, storage,
+                                       setup.options.bFieldInZ);
 
   const auto nEdges = static_cast<std::uint32_t>(graph.edgeStorage.size());
   BOOST_REQUIRE_EQUAL(graph.neighbourOffsets.size(), nEdges + 1);
@@ -830,8 +831,9 @@ BOOST_AUTO_TEST_CASE(DropDeadEndsKeepsTheSeeds) {
                      sp.extra(layerColumn));
     }
     storage.finalize();
-    const Experimental::GbtsGraph graph =
-        graphBuilder.buildTheGraph(setup.roi, storage, setup.options.bFieldInZ);
+    const Experimental::detail::GbtsGraph<Experimental::detail::GbtsEdge>
+        graph = graphBuilder.buildTheGraph(setup.roi, storage,
+                                           setup.options.bFieldInZ);
 
     SeedContainer seeds;
     seeds.assignSpacePointContainer(spacePoints);

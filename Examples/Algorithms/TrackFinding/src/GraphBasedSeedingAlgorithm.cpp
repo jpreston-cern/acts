@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -30,6 +31,7 @@
 #include <numbers>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ActsExamples {
@@ -59,20 +61,26 @@ void assignTauRatioCuts(
     return it->second;
   };
 
+  const auto position =
+      [](const Acts::Experimental::GbtsLayerDescription &layer) {
+        return layer.depth;
+      };
+
   for (auto &connection : connections) {
     const auto *outer = find(connection.src);
     const auto *inner = find(connection.dst);
 
-    const bool outerHasDepth = outer->depth >= 0;
-    const bool innerHasDepth = inner->depth >= 0;
+    const std::int32_t outerPosition = position(*outer);
+    const std::int32_t innerPosition = position(*inner);
+    const bool outerHasDepth = outerPosition >= 0;
+    const bool innerHasDepth = innerPosition >= 0;
     const bool skipsLayer =
-        outerHasDepth && innerHasDepth && outer->depth - inner->depth != 1;
+        outerHasDepth && innerHasDepth && outerPosition - innerPosition != 1;
     const bool leavesDepth = innerHasDepth && !outerHasDepth;
-    const float strip =
-        (outer->technology == Acts::Experimental::GbtsLayerTechnology::Strip ||
-         inner->technology == Acts::Experimental::GbtsLayerTechnology::Strip)
-            ? cuts.tauRatioCorrStrip
-            : 0.f;
+    const bool hasStrip =
+        outer->technology == Acts::Experimental::GbtsLayerTechnology::Strip ||
+        inner->technology == Acts::Experimental::GbtsLayerTechnology::Strip;
+    const float strip = hasStrip ? cuts.tauRatioCorrStrip : 0.f;
 
     // leaving widens only the triplet that leaves after its middle
     connection.tauRatioCutInner =
@@ -216,9 +224,10 @@ ProcessCode GraphBasedSeedingAlgorithm::execute(
   // create the seeds
 
   std::vector<std::optional<Acts::Experimental::GbtsSeedFit>> fits;
-  m_finder->createSeeds(
-      nodeStorage, m_internalRoi.value(), *m_gbtsGraphBuilder, *m_filter,
-      options, seeds, m_outputFreeParameters.isInitialized() ? &fits : nullptr);
+  auto *outputFits = m_outputFreeParameters.isInitialized() ? &fits : nullptr;
+
+  m_finder->createSeeds(nodeStorage, m_internalRoi.value(), *m_gbtsGraphBuilder,
+                        *m_filter, options, seeds, outputFits);
 
   // free track parameters from the fit of the tracking filter
   if (m_outputFreeParameters.isInitialized()) {

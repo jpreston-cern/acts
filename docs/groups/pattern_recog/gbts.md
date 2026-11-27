@@ -27,7 +27,8 @@ The workflow has four stages, each documented below:
 
 1. @ref gbts-nodes — sort the space points into eta/phi-ordered graph nodes.
 2. @ref gbts-graph — create edges between compatible node pairs and link
-   compatible edges to each other.
+   compatible edges to each other. @ref gbts-lrt does the same without assuming
+   the track came from the beamline.
 3. @ref gbts-levels — give every edge a "level", the length of the longest
    chain of linked edges going outwards from it.
 4. @ref gbts-extraction — follow the best fitted path from every edge through a
@@ -188,12 +189,12 @@ Two further cuts apply on the innermost layers, where the combinatorics are
 worst. Each cut has its own limit on the `depth` of the inner layer, and a
 negative limit switches the cut off:
 
-- `matchBeforeCreate` (off by default, limited by
-  `matchBeforeCreateMaxDepth`) demands the @f$\tau@f$ half of the
-  triplet test *before* the edge exists: @f$n_2@f$ must already carry an
-  incoming edge whose @f$\tau@f$ agrees with the candidate's within
-  `tauRatioPrecut`. A node with two or fewer incoming edges passes
-  unconditionally, there being too little evidence to reject it.
+- `matchBeforeCreate` (off by default, limited by `matchBeforeCreateMaxDepth`)
+  demands the @f$\tau@f$ half of the triplet test *before* the edge exists:
+  @f$n_2@f$ must already carry an incoming edge whose @f$\tau@f$ agrees with
+  the candidate's within `tauRatioPrecut`. A node with `matchBeforeCreateMaxEdges`
+  or fewer incoming edges passes unconditionally, there being too little
+  evidence to reject it, so the cut only bites where a node is genuinely busy.
 - Every inner node accumulates a 16-bit @f$z_0@f$ **histogram bitmask** of its
   confirmed edges. On the layers down to `z0HistogramMaxDepth` that mask
   rejects candidates whose @f$z_0@f$ falls in an empty bin, and nodes with no
@@ -210,8 +211,9 @@ the seeds are unchanged while the graph and the edge array shrink.
 With the edge graph built, every edge gets a **level**: the length of the
 longest chain of linked edges going outwards from it, so an edge that nothing
 further out links to is at level 1. An edge only links to edges further in,
-which are always created after it, so a single pass over the edges in creation
-order settles every level. Chains longer than `maxChainLength` edges are left
+so a single pass with every edge before those it links to settles every level:
+creation order for the prompt builder, which always creates an edge before those
+further in, and a sort of the links for the triplet graph, which does not. Chains longer than `maxChainLength` edges are left
 unsettled and take no part in the extraction.
 
 An edge with no settled edge further in exactly one level up is a **root**, the
@@ -275,12 +277,59 @@ the angle. Wide clusters in the pixel endcap are dropped entirely
 > exercised only by experiment-side integrations that supply them through
 > `insert`.
 
+## Large radius tracking {#gbts-lrt}
+
+Everything above assumes the track came from the luminous region. The prompt
+builder reads a curvature off a *pair* of hits as @f$\kappa =
+(\phi_2-\phi_1)/\Delta r@f$, which is only a curvature because the beamline is
+silently used as a third point on the circle, and a @f$z_0@f$ as @f$z_1 -
+r_1\tau@f$, true only for a track leaving the beamline radially. For a track
+from a displaced vertex neither holds at doublet stage.
+
+@ref Acts::Experimental::TripletGbtsGraphBuilder therefore builds the large
+radius graph from *triplets*. A @ref Acts::Experimental::GbtsGridTripletSearch
+runs the grid triplet seeding (the doublet and triplet finders of
+@ref Acts::TripletSeeder, with the strip calibration) on the graph nodes, which
+needs no beamline, and the graph is made of what it finds:
+
+- every distinct pair of nodes in a triplet is an edge, which holds its two
+  nodes and nothing else,
+- every triplet links its outer edge to its inner one, with the triplet's
+  quality as the link's,
+- an edge links to at most `maxInnerNeighbours` inner edges
+  (`kTripletGbtsMaxEdgeNeighbours`, 25), the best quality first.
+
+@snippet{trimleft} include/Acts/Seeding/detail/TripletGbtsGraphTypes.hpp triplet edge
+
+The edges are then ordered so that every edge comes before the edges it links
+to, leaving out those in a closed loop of links, and the same
+@ref gbts-levels and @ref gbts-extraction run on the graph
+(`GraphBasedTrackSeeder::findSeedCandidates`). The selection of the seed
+candidates is the triplet graph's own,
+@ref Acts::Experimental::TripletGbtsSeedSelector: at most a few three space
+point candidates per middle space point, those closest to the interaction
+region, then a clone removal that calls a candidate a clone only against a
+single better one, and a cut on the quality of its grid triplets. Its nodes are
+not the
+@ref Acts::Experimental::GbtsNodeStorage of the prompt graph, whose eta bins,
+phi order and per-node data the triplet graph has no use for, but a
+@ref Acts::Experimental::TripletGbtsNodes: the space points in the order they
+were inserted, with their positions, layers, stereo pairs and variances.
+
+| Option of `TripletGbtsGraphBuilder::Config` | Effect |
+| --- | --- |
+| `maxInnerNeighbours` | cap on the inner edges an edge links to |
+| `pixelExtension` and the `pixel*` matching | extend the strip edges inwards into the pixel nodes, matched on azimuth, curvature and @f$\tau@f$, with their own values for the barrel edges |
+| `pixelLayersFromTable` | the pixel extension only into the pixel layers the layer connection table connects the edge's inner layer to |
+| `stripLayersFromTable` | only the triplets whose two node pairs are both connections of the layer connection table, so that the table decides every layer link |
+
 ## Configuration {#gbts-configuration}
 
 The cuts that build and link the doublets live on
-@ref Acts::Experimental::GbtsGraphBuilder "GbtsGraphBuilder::Config", which
-`GraphBasedSeedingAlgorithm` takes as `graphConfig` and exposes to Python as
-`GbtsGraphBuilderConfig`:
+@ref Acts::Experimental::GbtsGraphBuilder::Config, which `GraphBasedSeedingAlgorithm`
+takes as `graphConfig` and exposes to Python as `GbtsGraphBuilderConfig`.
+They are read by @ref Acts::Experimental::GbtsGraphBuilder; the triplet
+graph of @ref gbts-lrt has its own configuration.
 
 | Option | Stage | Effect |
 | --- | --- | --- |
@@ -289,19 +338,22 @@ The cuts that build and link the doublets live on
 | `doubletFilterRZ` | @ref gbts-graph | luminous-region cuts on the doublet, against the geometry's `GbtsZ0Range` |
 | `cutDPhiMax`, `cutDCurvMax` | @ref gbts-graph | edge-to-edge linking tolerances |
 | `useSumRatioCut`, `sumRatioCutMax` | @ref gbts-graph | bound on the summed linking tolerances, against pairs marginal in all three |
-| `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the `validateTriplets` high-pT check. The linking cut comes from @ref Acts::Experimental::GbtsLayerConnection |
-| `validateTriplets`, `d0Max` | @ref gbts-graph | circle fit on pixel-barrel triplets |
+| `tauRatioCut` | @ref gbts-graph | @f$\tau@f$ scale of the high-pT check, the linking cut coming from @ref Acts::Experimental::GbtsLayerConnection |
+| `calibrateStrips`, `maxStripLengthFraction` | @ref gbts-graph | resolve a strip along its strip, per doublet, against the chord |
+| `validateTriplets` | @ref gbts-graph | circle fit on pixel-barrel triplets |
+| `d0Max` | @ref gbts-graph | largest @f$d_0@f$ a triplet may have |
 | `maxEdgesPerSP` | @ref gbts-graph | cap on the edge array per space point (30 by default); exceeding it costs efficiency |
-| `dropDeadEnds` | @ref gbts-graph | leave out the innermost edges that cannot join a chain (on by default); the seeds are unchanged |
-| `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that depth in the pixel barrel |
+| `dropDeadEnds` | @ref gbts-graph | on by default, the seeds unchanged: leave out the innermost edges that cannot join a chain |
+| `matchBeforeCreate`, `tauRatioPrecut`, `matchBeforeCreateMaxDepth`, `matchBeforeCreateMaxEdges` | @ref gbts-graph | require a compatible incoming edge before creating one, down to that `depth` |
 | `z0HistogramMaxDepth`, `z0Resolution` | @ref gbts-graph | @f$z_0@f$ histogram cut, down to that `depth` |
+
 The rest are on @ref Acts::Experimental::GraphBasedTrackSeeder "GraphBasedTrackSeeder::Config":
 
 | Option | Stage | Effect |
 | --- | --- | --- |
 | `nMaxPhiSlice` | @ref gbts-nodes | sets the @f$\phi@f$ slice width, and with it the base sliding-window width the graph uses |
 | `maxChainLength` | @ref gbts-levels | longest chain of edges taken into account |
-| `minSeedLevel` | @ref gbts-extraction | chain length a candidate must reach |
+| `minSeedLevel` | @ref gbts-extraction | chain length a candidate must reach, in edges. 3 by default; the triplet graph can use 2, since a link there is already a triplet |
 | `postFitCurvatureFactor` | @ref gbts-extraction | tighter curvature bound on the fitted chain, as a factor on the filter's `maxCurvature`; values below 1 does nothing |
 | `addTriplets`, `maxAbsEtaAddTriplets` | @ref gbts-extraction | allow shorter chains within an @f$\eta@f$ range |
 | `hitShareThreshold` | @ref gbts-extraction | fraction of shared hits above which a candidate is a clone |
@@ -326,14 +378,23 @@ separately controls the chain-following filter of @ref gbts-extraction "seed ext
 
 ## Implementation pointers {#gbts-implementation}
 
-- Seeder and configuration: @ref Acts::Experimental::GraphBasedTrackSeeder.
+- Seeder and configuration: @ref Acts::Experimental::GraphBasedTrackSeeder and
+  @ref Acts::Experimental::GbtsGraphBuilder::Config. The seeder
+  and @ref Acts::Experimental::GbtsTrackingFilter are templated on the graph,
+  which names its own edge type, so the call sites deduce it.
+- Graph builders: @ref Acts::Experimental::GbtsGraphBuilder and
+  @ref Acts::Experimental::TripletGbtsGraphBuilder, the latter with its triplet
+  search @ref Acts::Experimental::GbtsGridTripletSearch. Its edge,
+  `TripletGbtsEdge`, lives in `Acts/Seeding/detail/TripletGbtsGraphTypes.hpp`.
 - Node storage: @ref Acts::Experimental::GbtsNodeStorage. The graph EDM it
   holds - `GbtsNodeParams`, `GbtsNodeEdgeInfo`, `GbtsEtaBinInfo`, `GbtsEdge` -
   is internal and lives in `Acts/Seeding/detail/GbtsGraphTypes.hpp`.
+  The triplet graph's nodes: @ref Acts::Experimental::TripletGbtsNodes, and its
+  seed selection: @ref Acts::Experimental::TripletGbtsSeedSelector.
 - Geometry: @ref Acts::Experimental::GbtsGeometry,
   @ref Acts::Experimental::GbtsLayerConnection, the binning it hands back in
   `Acts/Seeding/GbtsBinning.hpp`, and the internal `GbtsLayer`.
-- Chain following: @ref Acts::Experimental::GbtsTrackingFilter and its internal
+- Path fitting: @ref Acts::Experimental::GbtsTrackingFilter and its internal
   `GbtsEdgeState`.
 - Region of interest: @ref Acts::Experimental::GbtsRoiDescriptor.
 - Connection-table training: @ref Acts::Experimental::GbtsLayerConnectionTool.

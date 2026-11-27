@@ -228,10 +228,10 @@ GbtsGraphBuilder::GbtsGraphBuilder(const Config& config,
   }
 }
 
-GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
-                                          GbtsNodeStorage& nodeStorage,
-                                          const float bFieldInZ) const {
-  GbtsGraph graph;
+detail::GbtsGraph<detail::GbtsEdge> GbtsGraphBuilder::buildTheGraph(
+    const GbtsRoiDescriptor& roi, GbtsNodeStorage& nodeStorage,
+    const float bFieldInZ) const {
+  detail::GbtsGraph<detail::GbtsEdge> graph;
   std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
 
   // the one z0 window of the seeding, held by the geometry
@@ -851,6 +851,7 @@ GbtsGraph GbtsGraphBuilder::buildTheGraph(const GbtsRoiDescriptor& roi,
     nextSlot[outer]++;
   }
 
+  graph.nDoublets = static_cast<std::uint32_t>(edgeStorage.size());
   return graph;
 }
 

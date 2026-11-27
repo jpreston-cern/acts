@@ -106,23 +106,26 @@ class GbtsTrackingFilter final {
   const Logger& logger() const { return *m_logger; }
 
   /// Update edge state with edge
+  /// @tparam edge_t The graph edge being followed
   /// @param nodeView View of the node positions and layers
   /// @param pS Edge to update with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool update(const detail::GbtsNodeView& nodeView, const detail::GbtsEdge& pS,
-              detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool update(const detail::GbtsNodeView& nodeView, const edge_t& pS,
+              detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Update an edge state in the inward frame with the edge's outer node: the
   /// state is carried outwards from the edge's inner node, as the strips are
   /// picked up with `pixelsInwardStripsOutward`.
+  /// @tparam edge_t The graph edge being followed
   /// @param nodeView View of the node positions and layers
   /// @param pS Edge whose outer node to update with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool updateOutward(const detail::GbtsNodeView& nodeView,
-                     const detail::GbtsEdge& pS,
-                     detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool updateOutward(const detail::GbtsNodeView& nodeView, const edge_t& pS,
+                     detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Update an edge state with `newNode`, reached from `previousNode`.
   /// @param nodeView View of the node positions and layers
@@ -130,9 +133,10 @@ class GbtsTrackingFilter final {
   /// @param previousNode Node the state was last updated with
   /// @param ts Edge state to update
   /// @return Success flag
-  bool updateImpl(const detail::GbtsNodeView& nodeView,
-                  SpacePointIndex newNode, SpacePointIndex previousNode,
-                  detail::GbtsEdgeState& ts) const;
+  template <typename edge_t>
+  bool updateImpl(const detail::GbtsNodeView& nodeView, SpacePointIndex newNode,
+                  SpacePointIndex previousNode,
+                  detail::GbtsEdgeState<edge_t>& ts) const;
 
   /// Get layer type from layer index
   /// @param layerIndex Layer index

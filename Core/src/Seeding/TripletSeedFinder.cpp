@@ -223,11 +223,23 @@ class Impl final : public TripletSeedFinder {
     return topDoublets;
   }
 
+  /// @param stripCalibration The derived strip calibration details per
+  ///   space point, or nullptr to derive them here
   template <typename TopDoublets>
   TopDoublets createStripTripletTopCandidates(
       const SpacePointContainer& spacePoints, const ConstSpacePointProxy& spM,
       const DoubletsForMiddleSp::Proxy& bottomDoublet, TopDoublets topDoublets,
-      TripletTopCandidates& tripletTopCandidates) const {
+      TripletTopCandidates& tripletTopCandidates,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration =
+          nullptr) const {
+    // the derived details of a space point, read if they were derived once
+    // for the container
+    const auto calibrationOf = [&](const ConstSpacePointProxy& sp) {
+      return stripCalibration != nullptr
+                 ? stripCalibration[sp.index()]
+                 : detail::deriveOuterStripSpacePointCalibrationDetails(
+                       sp.outerStripCalibrationDetails());
+    };
     const float rM = spM.zr()[1];
     const float cosPhiM = spM.xy()[0] / rM;
     const float sinPhiM = spM.xy()[1] / rM;
@@ -279,13 +291,11 @@ class Impl final : public TripletSeedFinder {
 
     // Pre-cache strip data for the loop-invariant middle and bottom SPs
     const OuterStripSpacePointCalibrationDetailsDerived calM =
-        detail::deriveOuterStripSpacePointCalibrationDetails(
-            spM.outerStripCalibrationDetails());
+        calibrationOf(spM);
     const ConstSpacePointProxy spB =
         spacePoints[bottomDoublet.spacePointIndex()];
     const OuterStripSpacePointCalibrationDetailsDerived calB =
-        detail::deriveOuterStripSpacePointCalibrationDetails(
-            spB.outerStripCalibrationDetails());
+        calibrationOf(spB);
 
     std::size_t topDoubletOffset = 0;
     for (auto [topDoublet, topDoubletIndex] :
@@ -377,8 +387,7 @@ class Impl final : public TripletSeedFinder {
       const ConstSpacePointProxy spT =
           spacePoints[topDoublet.spacePointIndex()];
       const OuterStripSpacePointCalibrationDetailsDerived calT =
-          detail::deriveOuterStripSpacePointCalibrationDetails(
-              spT.outerStripCalibrationDetails());
+          calibrationOf(spT);
       std::array<float, 3> rTTransf{};
       if (!detail::calibrateOuterStripSpacePoint(directionTop, calT, rTTransf,
                                                  m_cfg.toleranceParam)) {
@@ -554,7 +563,9 @@ class Impl final : public TripletSeedFinder {
       const SpacePointContainer& spacePoints, const ConstSpacePointProxy& spM,
       DoubletCollections bottomDoublets, DoubletCollections topDoublets,
       TripletTopCandidates& tripletTopCandidates,
-      const CandidatesCallback& callback) const {
+      const CandidatesCallback& callback,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration)
+      const {
     // the candidates are cleared for each bottom doublet and the top doublets
     // only shrink, so this covers every bottom doublet
     tripletTopCandidates.reserve(topDoublets.size());
@@ -566,7 +577,8 @@ class Impl final : public TripletSeedFinder {
       tripletTopCandidates.clear();
       if constexpr (useStripInfo) {
         topDoublets = createStripTripletTopCandidates(
-            spacePoints, spM, bottomDoublet, topDoublets, tripletTopCandidates);
+            spacePoints, spM, bottomDoublet, topDoublets, tripletTopCandidates,
+            stripCalibration);
       } else {
         topDoublets = createPixelTripletTopCandidates(
             spacePoints, spM, bottomDoublet, topDoublets, tripletTopCandidates);
@@ -583,9 +595,12 @@ class Impl final : public TripletSeedFinder {
       DoubletsForMiddleSp::Range bottomDoublets,
       DoubletsForMiddleSp::Range topDoublets,
       TripletTopCandidates& tripletTopCandidates,
-      const CandidatesCallback& callback) const override {
+      const CandidatesCallback& callback,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration)
+      const override {
     createTripletTopCandidatesImpl(spacePoints, spM, bottomDoublets,
-                                   topDoublets, tripletTopCandidates, callback);
+                                   topDoublets, tripletTopCandidates, callback,
+                                   stripCalibration);
   }
 
   void createTripletTopCandidates(
@@ -593,9 +608,12 @@ class Impl final : public TripletSeedFinder {
       DoubletsForMiddleSp::Subset2 bottomDoublets,
       DoubletsForMiddleSp::Subset2 topDoublets,
       TripletTopCandidates& tripletTopCandidates,
-      const CandidatesCallback& callback) const override {
+      const CandidatesCallback& callback,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration)
+      const override {
     createTripletTopCandidatesImpl(spacePoints, spM, bottomDoublets,
-                                   topDoublets, tripletTopCandidates, callback);
+                                   topDoublets, tripletTopCandidates, callback,
+                                   stripCalibration);
   }
 
  private:

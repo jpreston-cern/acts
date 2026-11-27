@@ -266,12 +266,18 @@ class TripletSeedFinder {
   /// @param tripletTopCandidates Cache for triplet top candidates
   /// @param callback Called with each bottom doublet that has triplet top
   ///   candidates
+  /// @param stripCalibration The derived strip calibration details per space
+  ///   point (`DoubletSeedFinder::derivedStripCalibration`), read by the strip
+  ///   triplets instead of deriving them for every doublet; nullptr derives
+  ///   them
   virtual void createTripletTopCandidates(
       const SpacePointContainer& spacePoints, const ConstSpacePointProxy& spM,
       DoubletsForMiddleSp::Range bottomDoublets,
       DoubletsForMiddleSp::Range topDoublets,
       TripletTopCandidates& tripletTopCandidates,
-      const CandidatesCallback& callback) const = 0;
+      const CandidatesCallback& callback,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration)
+      const = 0;
 
   /// Create triplets from the bottom, middle, and top space points.
   ///
@@ -282,12 +288,18 @@ class TripletSeedFinder {
   /// @param tripletTopCandidates Cache for triplet top candidates
   /// @param callback Called with each bottom doublet that has triplet top
   ///   candidates
+  /// @param stripCalibration The derived strip calibration details per space
+  ///   point (`DoubletSeedFinder::derivedStripCalibration`), read by the strip
+  ///   triplets instead of deriving them for every doublet; nullptr derives
+  ///   them
   virtual void createTripletTopCandidates(
       const SpacePointContainer& spacePoints, const ConstSpacePointProxy& spM,
       DoubletsForMiddleSp::Subset2 bottomDoublets,
       DoubletsForMiddleSp::Subset2 topDoublets,
       TripletTopCandidates& tripletTopCandidates,
-      const CandidatesCallback& callback) const = 0;
+      const CandidatesCallback& callback,
+      const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration)
+      const = 0;
 };
 
 }  // namespace Acts

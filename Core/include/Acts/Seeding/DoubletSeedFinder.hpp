@@ -11,6 +11,7 @@
 #include "Acts/Definitions/Direction.hpp"
 #include "Acts/Definitions/Units.hpp"
 #include "Acts/EventData/SpacePointContainer.hpp"
+#include "Acts/EventData/StripSpacePointCalibrationDetails.hpp"
 #include "Acts/Utilities/Delegate.hpp"
 #include "Acts/Utilities/detail/ContainerIterator.hpp"
 
@@ -281,6 +282,12 @@ struct MiddleSpInfo {
   float cosPhiM{};
   /// ratio between middle SP y position and radius
   float sinPhiM{};
+  /// derived outer strip calibration details of the space point container,
+  /// indexed by space point, if it has them (see
+  /// DoubletSeedFinder::addDerivedStripCalibrationColumn); otherwise they are
+  /// derived for every doublet candidate
+  const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration =
+      nullptr;
 };
 
 /// Interface and a collection of standard implementations for a doublet seed
@@ -393,6 +400,24 @@ class DoubletSeedFinder {
   /// @param spM Middle space point for doublet computation
   /// @return MiddleSpInfo structure with computed quantities
   static MiddleSpInfo computeMiddleSpInfo(const ConstSpacePointProxy& spM);
+
+  /// Name of the optional space point column with the derived outer strip
+  /// calibration details
+  static constexpr const char* kDerivedStripCalibrationColumn =
+      "outerStripCalibrationDetailsDerived";
+
+  /// Adds, or refills, the column of derived outer strip calibration details,
+  /// computed once per space point from its outer strip calibration details.
+  /// The strip calibration of the doublets then uses them instead of deriving
+  /// them for every doublet candidate; the doublets do not change.
+  /// @param spacePoints Space points with the strip calibration details column
+  static void addDerivedStripCalibrationColumn(SpacePointContainer& spacePoints);
+
+  /// @param spacePoints Space point container
+  /// @return The derived outer strip calibration details of the container,
+  ///         indexed by space point, or nullptr if it does not have them
+  static const OuterStripSpacePointCalibrationDetailsDerived*
+  derivedStripCalibration(const SpacePointContainer& spacePoints);
 
   /// Creates a new doublet seed finder instance given the configuration.
   /// @param config Configuration for the doublet seed finder

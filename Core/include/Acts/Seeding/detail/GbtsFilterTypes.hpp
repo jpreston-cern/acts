@@ -16,6 +16,11 @@
 namespace Acts::Experimental::detail {
 
 /// Per-edge tracking state used by the GBTS filter.
+///
+/// @tparam edge_t The graph edge being followed, prompt or triplet. The fit
+///                reads only the two nodes of an edge, which both edges carry
+///                alike.
+template <typename edge_t>
 struct GbtsEdgeState final {
  public:
   GbtsEdgeState() = default;
@@ -29,7 +34,7 @@ struct GbtsEdgeState final {
   ///        the edge's own direction
   /// @param stripLengthFraction How far along a strip a calibrated crossing
   ///        may land, as a multiple of the strip half-length
-  void initialize(const GbtsEdge& pS, const GbtsNodeView& nodeView,
+  void initialize(const edge_t& pS, const GbtsNodeView& nodeView,
                   const std::array<float, 3>& varianceX,
                   const std::array<float, 2>& varianceY,
                   bool calibrateStrips = false,

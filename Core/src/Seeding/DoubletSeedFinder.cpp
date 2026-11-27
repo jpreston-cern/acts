@@ -17,8 +17,10 @@
 #include <cmath>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 #include <boost/mp11.hpp>
 #include <boost/mp11/algorithm.hpp>
@@ -100,10 +102,16 @@ class Impl final : public DoubletSeedFinder {
     [[maybe_unused]] float calibrationTolerance = 0;
     [[maybe_unused]] OuterStripSpacePointCalibrationDetailsDerived
         calibrationM{};
+    // the derived details of the candidates, if the container has them
+    [[maybe_unused]] const OuterStripSpacePointCalibrationDetailsDerived*
+        derivedCalibration = middleSpInfo.stripCalibration;
     if constexpr (stripCalibration) {
       calibrationTolerance = *m_cfg.stripCalibrationTolerance;
-      calibrationM = detail::deriveOuterStripSpacePointCalibrationDetails(
-          middleSp.outerStripCalibrationDetails());
+      calibrationM =
+          derivedCalibration != nullptr
+              ? derivedCalibration[middleSp.index()]
+              : detail::deriveOuterStripSpacePointCalibrationDetails(
+                    middleSp.outerStripCalibrationDetails());
     }
 
     const auto outsideRangeCheck = [](const float value, const float min,
@@ -263,12 +271,20 @@ class Impl final : public DoubletSeedFinder {
           std::array<float, 3> calibratedM{};
           std::array<float, 3> calibratedO{};
           if (!detail::calibrateOuterStripSpacePoint(
-                  chord, calibrationM, calibratedM, calibrationTolerance) ||
-              !detail::calibrateOuterStripSpacePoint(
-                  chord,
-                  detail::deriveOuterStripSpacePointCalibrationDetails(
-                      container[indexO].outerStripCalibrationDetails()),
-                  calibratedO, calibrationTolerance)) {
+                  chord, calibrationM, calibratedM, calibrationTolerance)) {
+            continue;
+          }
+          if (derivedCalibration != nullptr) {
+            if (!detail::calibrateOuterStripSpacePoint(
+                    chord, derivedCalibration[indexO], calibratedO,
+                    calibrationTolerance)) {
+              continue;
+            }
+          } else if (!detail::calibrateOuterStripSpacePoint(
+                         chord,
+                         detail::deriveOuterStripSpacePointCalibrationDetails(
+                             container[indexO].outerStripCalibrationDetails()),
+                         calibratedO, calibrationTolerance)) {
             continue;
           }
 
@@ -506,6 +522,37 @@ DoubletSeedFinder::DerivedConfig::DerivedConfig(const Config& config,
   const float pTPerHelixRadius = bFieldInZ;
   minHelixDiameter2 = square(minPt * 2 / pTPerHelixRadius) * helixCutTolerance;
   timeCutNSigma2 = square(timeCutNSigma);
+}
+
+void DoubletSeedFinder::addDerivedStripCalibrationColumn(
+    SpacePointContainer& spacePoints) {
+  const std::string name = kDerivedStripCalibrationColumn;
+  auto column =
+      spacePoints.hasColumn(name)
+          ? spacePoints.column<OuterStripSpacePointCalibrationDetailsDerived>(
+                name)
+          : spacePoints
+                .createColumn<OuterStripSpacePointCalibrationDetailsDerived>(
+                    name);
+  const auto details =
+      std::as_const(spacePoints).outerStripCalibrationDetailsColumn().data();
+  const auto derived = column.data();
+  for (std::size_t i = 0; i < details.size(); ++i) {
+    derived[i] = detail::deriveOuterStripSpacePointCalibrationDetails(details[i]);
+  }
+}
+
+const OuterStripSpacePointCalibrationDetailsDerived*
+DoubletSeedFinder::derivedStripCalibration(
+    const SpacePointContainer& spacePoints) {
+  const std::string name = kDerivedStripCalibrationColumn;
+  if (!spacePoints.hasColumn(name)) {
+    return nullptr;
+  }
+  return spacePoints
+      .column<OuterStripSpacePointCalibrationDetailsDerived>(name)
+      .data()
+      .data();
 }
 
 MiddleSpInfo DoubletSeedFinder::computeMiddleSpInfo(

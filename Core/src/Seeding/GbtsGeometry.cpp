@@ -208,7 +208,12 @@ GbtsGeometry::GbtsGeometry(
   binLayerMap.resize(m_nEtaBins);
   std::optional<std::uint32_t> lastBin1;
 
-  for (const GbtsLayerConnection& connection : layerConnections) {
+  m_layerConnections.assign(layerConnections.begin(), layerConnections.end());
+
+  for (std::uint32_t connectionIdx = 0;
+       connectionIdx < m_layerConnections.size(); ++connectionIdx) {
+    const GbtsLayerConnection& connection = m_layerConnections[connectionIdx];
+
     if (connection.tauRatioCutInner < 0.f ||
         connection.tauRatioCutOuter < 0.f) {
       throw std::invalid_argument(
@@ -244,7 +249,7 @@ GbtsGeometry::GbtsGeometry(
         binLayerMap[bin2Idx] = pL2;
 
         const GbtsBinLink link{bin2Idx, connection.tauRatioCutInner,
-                               connection.tauRatioCutOuter};
+                               connection.tauRatioCutOuter, connectionIdx};
 
         if (bin1Idx != lastBin1) {
           // adding a new group

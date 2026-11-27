@@ -10,15 +10,19 @@
 
 #include "Acts/Seeding/GbtsGraphBuilder.hpp"
 #include "Acts/Seeding/GbtsTrackingFilter.hpp"
+#include "Acts/Seeding/detail/TripletGbtsGraphTypes.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <numbers>
+#include <numeric>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <stdexcept>
@@ -58,9 +62,10 @@ GbtsNodeStorage GraphBasedTrackSeeder::makeNodeStorage() const {
   return GbtsNodeStorage(config, m_geometry, m_cfg.tauLookupTable);
 }
 
+template <typename graph_builder_t>
 void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
                                         const GbtsRoiDescriptor& roi,
-                                        const GbtsGraphBuilder& graphBuilder,
+                                        const graph_builder_t& graphBuilder,
                                         const GbtsTrackingFilter& filter,
                                         const Options& options,
                                         SeedContainer& outputSeeds) const {
@@ -78,60 +83,57 @@ void GraphBasedTrackSeeder::createSeeds(const SpacePointContainer& spacePoints,
   createSeeds(nodeStorage, roi, graphBuilder, filter, options, outputSeeds);
 }
 
+template <typename graph_builder_t>
 void GraphBasedTrackSeeder::createSeeds(
     GbtsNodeStorage& nodeStorage, const GbtsRoiDescriptor& roi,
-    const GbtsGraphBuilder& graphBuilder, const GbtsTrackingFilter& filter,
+    const graph_builder_t& graphBuilder, const GbtsTrackingFilter& filter,
     const Options& options, SeedContainer& outputSeeds,
     std::vector<std::optional<GbtsSeedFit>>* outputFits) const {
   ACTS_DEBUG("Loaded " << nodeStorage.numberOfNodes() << " graph nodes");
 
-  GbtsGraph graph =
+  // the edge the builder makes
+  using edge_t = typename graph_builder_t::EdgeType;
+
+  detail::GbtsGraph<edge_t> graph =
       graphBuilder.buildTheGraph(roi, nodeStorage, options.bFieldInZ);
 
   ACTS_DEBUG("Created graph with " << graph.edgeStorage.size() << " edges and "
-                                   << graph.neighbours.size() << " edge links");
+                                   << graph.neighbours.size()
+                                   << " edge links from " << graph.nDoublets
+                                   << " doublets");
 
   if (graph.edgeStorage.empty() || graph.neighbours.empty()) {
     ACTS_WARNING("Missing edges or edge connections");
   }
 
-  std::vector<OutputSeedProperties> vOutputSeeds;
-  extractSeedsFromTheGraph(nodeStorage, graph, vOutputSeeds, filter,
-                           outputFits != nullptr);
+  SeedCandidates candidates = findSeedCandidates(nodeStorage.nodeView(), graph,
+                                                 filter, outputFits != nullptr);
+  removeClones(candidates, nodeStorage.numberOfNodes());
 
-  ACTS_DEBUG("GBTS created " << vOutputSeeds.size() << " seeds");
-  if (vOutputSeeds.empty()) {
+  const std::size_t nBefore = outputSeeds.size();
+  writeSeeds(candidates, nodeStorage.m_nodes.copiedFromIndexColumn().data(),
+             outputSeeds, outputFits);
+
+  ACTS_DEBUG("GBTS created " << outputSeeds.size() - nBefore << " seeds");
+  if (outputSeeds.size() == nBefore) {
     ACTS_WARNING("No Seed Candidates");
-  }
-
-  // add to output seed container
-  for (const auto& seed : vOutputSeeds) {
-    auto newSeed = outputSeeds.createSeed();
-    newSeed.assignSpacePointIndices(seed.spacePoints);
-    newSeed.quality() = seed.seedQuality;
-    if (outputFits != nullptr) {
-      outputFits->push_back(seed.fit);
-    }
   }
 }
 
-void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
-    const GbtsNodeStorage& nodeStorage, const GbtsGraph& graph,
-    std::vector<OutputSeedProperties>& vOutputSeeds,
-    const GbtsTrackingFilter& filter, const bool withFits) const {
-  const detail::GbtsNodeView nodeView = nodeStorage.nodeView();
-
-  std::vector<SeedCandidateProperties> vSeedCandidates;
-
-  std::vector<std::pair<float, std::uint32_t>> vArgSort;
+template <typename edge_t>
+GraphBasedTrackSeeder::SeedCandidates GraphBasedTrackSeeder::findSeedCandidates(
+    const detail::GbtsNodeView& nodeView,
+    const detail::GbtsGraph<edge_t>& graph, const GbtsTrackingFilter& filter,
+    const bool withFits) const {
+  SeedCandidates result;
+  std::vector<SeedCandidate>& vSeedCandidates = result.candidates;
 
   std::uint32_t seedCounter = 0;
 
   // Turn the fitted path of every head edge into a seed candidate.
-  for (const auto& [rs, edges] :
-       extractBestPathPerEdge(nodeView, graph, filter)) {
-    const detail::GbtsEdge& head = graph.edgeStorage[edges.front()];
-    const float seedAbsEta = std::abs(-std::log(head.p[0]));
+  for (auto& [rs, edges] : extractBestPathPerEdge(nodeView, graph, filter)) {
+    const edge_t& head = graph.edgeStorage[edges.front()];
+    const float seedAbsEta = std::abs(-std::log(detail::edgeExpEta(head)));
 
     std::vector<SpacePointIndex> vN;
     vN.reserve(edges.size() + 1);
@@ -201,33 +203,57 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
       }
     }
 
-    vSeedCandidates.emplace_back(origSeedQuality, false, vN, seedSplitFlag);
+    SeedCandidate& candidate = vSeedCandidates.emplace_back();
+    candidate.quality = origSeedQuality;
+    candidate.cotTheta = rs.y[1];
+    candidate.forSeedSplitting = seedSplitFlag;
 
-    // pixelsInwardStripsOutward leaves the state at the innermost pixel with
-    // the strips outside it, which is not what the fit below describes
-    if (withFits && !filter.m_cfg.pixelsInwardStripsOutward) {
-      // filter state at the innermost node, x' along the first edge (inwards)
-      const double slope2 = 1. + static_cast<double>(rs.x[1]) * rs.x[1];
-      vSeedCandidates.back().fit = GbtsSeedFit{
-          .position = Vector3(rs.refX * rs.c - rs.x[0] * rs.s,
-                              rs.refX * rs.s + rs.x[0] * rs.c, rs.y[0]),
-          // outwards: along -x', with the slope of the state
-          .phi = std::atan2(-rs.s - rs.c * rs.x[1], -rs.c + rs.s * rs.x[1]),
-          .cotTheta = rs.y[1],
-          .curvature = rs.x[2] / (slope2 * std::sqrt(slope2))};
+    // The filter state is a parabola in a fixed frame, x' along the first
+    // edge (inwards), and z linear in r, taken at the last node it was
+    // updated with: the innermost one for a chain searched inwards, the
+    // outermost strip for one whose strips were picked up outwards
+    // (`pixelsInwardStripsOutward`). Taken back along the fit to the innermost
+    // node, which leaves an inward chain's state as it is.
+    if (withFits) {
+      const detail::GbtsNodeProxy inner = nodeView[vN.front()];
+      const double refX = static_cast<double>(inner.x()) * rs.c +
+                          static_cast<double>(inner.y()) * rs.s;
+      const double a = refX - rs.refX;
+      const double x0 = rs.x[0] + rs.x[1] * a + 0.5 * rs.x[2] * a * a;
+      const double x1 = rs.x[1] + rs.x[2] * a;
+      const double z0 = rs.y[0] + rs.y[1] * (inner.r() - rs.refY);
+      const double slope2 = 1. + x1 * x1;
+      candidate.fit =
+          GbtsSeedFit{.position = Vector3(refX * rs.c - x0 * rs.s,
+                                          refX * rs.s + x0 * rs.c, z0),
+                      // outwards: along -x', with the slope of the state
+                      .phi = std::atan2(-rs.s - rs.c * x1, -rs.c + rs.s * x1),
+                      .cotTheta = rs.y[1],
+                      .curvature = rs.x[2] / (slope2 * std::sqrt(slope2)),
+                      .pathScore = rs.j};
     }
 
-    vArgSort.emplace_back(origSeedQuality, seedCounter);
+    candidate.nodes = std::move(vN);
+    candidate.edges = std::move(edges);
+
+    result.ranking.emplace_back(origSeedQuality, seedCounter);
 
     ++seedCounter;
   }
 
-  // clone removal code goes below ...
+  std::ranges::sort(result.ranking);
 
-  std::ranges::sort(vArgSort);
+  return result;
+}
+
+void GraphBasedTrackSeeder::removeClones(SeedCandidates& candidates,
+                                         const std::uint32_t nNodes) const {
+  std::vector<SeedCandidate>& vSeedCandidates = candidates.candidates;
+  const std::vector<std::pair<float, std::uint32_t>>& vArgSort =
+      candidates.ranking;
 
   // hit to track associations, indexed by graph node index
-  std::vector<std::uint32_t> h2t(nodeStorage.numberOfNodes() + 1, 0);
+  std::vector<std::uint32_t> h2t(nNodes + 1, 0);
 
   std::uint32_t trackId = 0;
 
@@ -275,69 +301,68 @@ void GraphBasedTrackSeeder::extractSeedsFromTheGraph(
 
     if (nOther > m_cfg.hitShareThreshold * nTotal) {
       // reject
-      vSeedCandidates[args.second].isClone = true;  // reject
+      vSeedCandidates[args.second].rejected = true;
     }
   }
-  vOutputSeeds.reserve(vSeedCandidates.size());
+}
 
-  // drop the clones and split seeds if need be
+void GraphBasedTrackSeeder::writeSeeds(
+    const SeedCandidates& candidates,
+    const std::span<const SpacePointIndex> spacePointIndices,
+    SeedContainer& outputSeeds,
+    std::vector<std::optional<GbtsSeedFit>>* outputFits) const {
+  std::vector<SpacePointIndex> spacePoints;
+  const auto write = [&](const float quality,
+                         const std::optional<GbtsSeedFit>& fit) {
+    auto newSeed = outputSeeds.createSeed();
+    newSeed.assignSpacePointIndices(spacePoints);
+    newSeed.quality() = quality;
+    if (outputFits != nullptr) {
+      outputFits->push_back(fit);
+    }
+  };
 
-  for (const auto& args : vArgSort) {
-    const auto& seed = vSeedCandidates[args.second];
+  for (const auto& args : candidates.ranking) {
+    const SeedCandidate& seed = candidates.candidates[args.second];
 
-    if (seed.isClone) {
-      continue;  // identified as a clone of a better candidate
+    // identified as a clone of a better candidate, or cut
+    if (seed.rejected) {
+      continue;
     }
 
     const auto& vN = seed.nodes;
 
     if (!seed.forSeedSplitting) {
-      // add seed to output
-
-      std::vector<std::uint32_t> vSpIdx;
-
-      vSpIdx.resize(vN.size());
-
-      for (std::uint32_t k = 0; k < vSpIdx.size(); k++) {
-        vSpIdx[k] = nodeStorage.spacePointIndex(vN[k]);
+      spacePoints.clear();
+      for (const SpacePointIndex node : vN) {
+        spacePoints.push_back(spacePointIndices[node]);
       }
-
-      vOutputSeeds.emplace_back(seed.seedQuality, vSpIdx);
-      vOutputSeeds.back().fit = seed.fit;
-
+      write(seed.quality, seed.fit);
       continue;
     }
 
-    // seed split into "drop-out" seeds
-
+    // seed split into "drop-out" seeds: without the first and without the
+    // middle space point
     const auto seedSize = static_cast<std::uint32_t>(vN.size());
-
-    const std::array<std::size_t, 2> indices2drop = {
-        0, seedSize / 2ul};  // the first and the middle
-
-    for (const auto& skipIdx : indices2drop) {
-      std::vector<std::uint32_t> newSeed;
-
-      newSeed.reserve(seedSize - 1);
-
+    for (const std::size_t skipIdx : {std::size_t{0}, seedSize / 2ul}) {
+      spacePoints.clear();
       for (std::uint32_t k = 0; k < seedSize; k++) {
-        if (k == skipIdx) {
-          continue;
+        if (k != skipIdx) {
+          spacePoints.push_back(spacePointIndices[vN[k]]);
         }
-
-        newSeed.emplace_back(nodeStorage.spacePointIndex(vN[k]));
       }
-
-      vOutputSeeds.emplace_back(seed.seedQuality, newSeed);
+      write(seed.quality, std::nullopt);
     }
   }
 }
 
-std::vector<GraphBasedTrackSeeder::FittedPath>
+template <typename edge_t>
+std::vector<GraphBasedTrackSeeder::FittedPath<edge_t>>
 GraphBasedTrackSeeder::extractBestPathPerEdge(
-    const detail::GbtsNodeView& nodeView, const GbtsGraph& graph,
+    const detail::GbtsNodeView& nodeView,
+    const detail::GbtsGraph<edge_t>& graph,
     const GbtsTrackingFilter& filter) const {
-  const std::vector<detail::GbtsEdge>& edgeStorage = graph.edgeStorage;
+  const std::vector<edge_t>& edgeStorage = graph.edgeStorage;
   const auto nEdges = static_cast<std::uint32_t>(edgeStorage.size());
   const auto maxLength = static_cast<std::uint32_t>(m_cfg.maxChainLength);
 
@@ -349,7 +374,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   std::vector<std::uint8_t> stripEnds(anyStrips ? nEdges : 0, 0);
   if (anyStrips) {
     for (std::uint32_t e = 0; e < nEdges; ++e) {
-      const detail::GbtsEdge& edge = edgeStorage[e];
+      const edge_t& edge = edgeStorage[e];
       stripEnds[e] = static_cast<std::uint8_t>(
           (nodeView.strip(edge.n1) != nullptr ? kInnerStrip : 0) |
           (nodeView.strip(edge.n2) != nullptr ? kOuterStrip : 0));
@@ -358,7 +383,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
 
   // The edges that hold a neighbour, in order. Any other edge ends every chain
   // it is in, so it settles nothing below and heads no path of more than one
-  // edge, which makes no seed.
+  // edge, which makes no seed unless the minimum length is one, see below.
   std::vector<std::uint32_t> linkedEdges;
   for (std::uint32_t e = 0; e < nEdges; ++e) {
     if (!graph.innerNeighbours(e).empty()) {
@@ -367,9 +392,9 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   }
 
   // The level of an edge is the length of the longest chain of edges going
-  // outwards from it. The inner neighbours of an edge are created after it, so
-  // one pass in edge order settles it. Edges in chains longer than `maxLength`
-  // stay above it and are left out.
+  // outwards from it. The inner neighbours of an edge come after it in the
+  // graph, as both builders order it, so one pass in edge order settles it.
+  // Edges in chains longer than `maxLength` stay above it and are left out.
   std::vector<std::uint32_t> level(nEdges, 1);
   for (const std::uint32_t e : linkedEdges) {
     const std::uint32_t next = std::min(level[e] + 1, maxLength + 1);
@@ -431,10 +456,11 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
 
   // The chain length a head's path needs: `addTriplets` accepts one edge short
   // at low eta
-  const auto minLengthOf = [&](const detail::GbtsEdge& head) {
+  const auto minLengthOf = [&](const edge_t& head) {
     std::uint32_t length = m_cfg.minSeedLevel;
     if (m_cfg.addTriplets && length > 0 &&
-        std::abs(-std::log(head.p[0])) <= m_cfg.maxAbsEtaAddTriplets) {
+        std::abs(-std::log(detail::edgeExpEta(head))) <=
+            m_cfg.maxAbsEtaAddTriplets) {
       --length;
     }
     return length;
@@ -450,12 +476,12 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   // From every edge, search all paths inwards to a root, fitting on the way.
   // The complete path with the best score per space point is the candidate
   // of the edge.
-  std::vector<FittedPath> candidates;
+  std::vector<FittedPath<edge_t>> candidates;
   std::uint32_t minLength = 0;
   std::vector<std::uint32_t> path;
   std::vector<std::uint32_t> bestPath;
   float bestQuality = 0;
-  detail::GbtsEdgeState bestState;
+  detail::GbtsEdgeState<edge_t> bestState;
   // with `pixelsInwardStripsOutward`, the strip chains do not enter the pixels
   bool stripsOnlyInward = false;
 
@@ -474,7 +500,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   };
 
   const auto search = [&](const auto& self, const std::uint32_t e,
-                          const detail::GbtsEdgeState& state) -> void {
+                          const detail::GbtsEdgeState<edge_t>& state) -> void {
     path.push_back(e);
     // every step goes one level up, so the depth is bounded by `maxLength`
     assert(path.size() <= maxLength);
@@ -517,7 +543,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
             continue;
           }
         }
-        detail::GbtsEdgeState innerState = state;
+        detail::GbtsEdgeState<edge_t> innerState = state;
         if (filter.update(nodeView, edgeStorage[inner], innerState)) {
           self(self, inner, innerState);
         }
@@ -528,8 +554,8 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
   };
 
   // a head's state, from the head edge alone
-  const auto startState = [&](const detail::GbtsEdge& head,
-                              detail::GbtsEdgeState& state) {
+  const auto startState = [&](const edge_t& head,
+                              detail::GbtsEdgeState<edge_t>& state) {
     state.initialize(head, nodeView, filter.m_cfg.initialVarianceX,
                      filter.m_cfg.initialVarianceY,
                      filter.m_cfg.calibrateStrips,
@@ -576,10 +602,10 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     std::vector<std::uint32_t> candidateOfHead(nEdges, kNoCandidate);
     std::vector<float> qualityOfHead(nEdges,
                                      std::numeric_limits<float>::max());
-    std::vector<FittedPath> headCandidates;
+    std::vector<FittedPath<edge_t>> headCandidates;
     // `edges` from the head inwards
     const auto store = [&](const std::uint32_t head,
-                           const detail::GbtsEdgeState& state,
+                           const detail::GbtsEdgeState<edge_t>& state,
                            const float quality,
                            const std::vector<std::uint32_t>& edges) {
       qualityOfHead[head] = quality;
@@ -588,7 +614,8 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
             static_cast<std::uint32_t>(headCandidates.size());
         headCandidates.emplace_back(state, edges);
       } else {
-        headCandidates[candidateOfHead[head]] = FittedPath{state, edges};
+        headCandidates[candidateOfHead[head]] =
+            FittedPath<edge_t>{state, edges};
       }
     };
 
@@ -597,8 +624,9 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     std::vector<std::uint32_t> pixelPath;
     std::vector<std::uint32_t> stripPath;
     std::vector<std::uint32_t> fullPath;
-    const auto extend = [&](const auto& self, const std::uint32_t e,
-                            const detail::GbtsEdgeState& state) -> void {
+    const auto extend =
+        [&](const auto& self, const std::uint32_t e,
+            const detail::GbtsEdgeState<edge_t>& state) -> void {
       stripPath.push_back(e);
       const auto total =
           static_cast<std::uint32_t>(pixelPath.size() + stripPath.size());
@@ -620,7 +648,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       if (!tooFew || nStrips + level[e] - 1 >= m_cfg.mixedMinStrips) {
         for (std::uint32_t k = outOffset[e]; k < outOffset[e + 1]; ++k) {
           const std::uint32_t outer = outLinks[k];
-          detail::GbtsEdgeState outerState = state;
+          detail::GbtsEdgeState<edge_t> outerState = state;
           if (filter.updateOutward(nodeView, edgeStorage[outer], outerState)) {
             self(self, outer, outerState);
           }
@@ -632,7 +660,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     // Each pixel head's best path, kept as a seed if long enough, then
     // extended with strips from the head's outer node.
     for (std::uint32_t head = 0; head < nEdges; ++head) {
-      const detail::GbtsEdge& headEdge = edgeStorage[head];
+      const edge_t& headEdge = edgeStorage[head];
       if ((stripEnds[head] & kOuterStrip) != 0 || edgesToRoot[head] == 0) {
         continue;
       }
@@ -643,7 +671,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       if (edgesToRoot[head] < minLength) {
         continue;
       }
-      detail::GbtsEdgeState state;
+      detail::GbtsEdgeState<edge_t> state;
       if (!startState(headEdge, state)) {
         continue;
       }
@@ -665,7 +693,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       pixelPath = bestPath;
       for (std::uint32_t k = outOffset[head]; k < outOffset[head + 1]; ++k) {
         const std::uint32_t outer = outLinks[k];
-        detail::GbtsEdgeState outerState = bestState;
+        detail::GbtsEdgeState<edge_t> outerState = bestState;
         if (filter.updateOutward(nodeView, edgeStorage[outer], outerState)) {
           extend(extend, outer, outerState);
         }
@@ -675,7 +703,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     // Chains of strips alone, inwards as usual.
     stripsOnlyInward = true;
     for (std::uint32_t head = 0; head < nEdges; ++head) {
-      const detail::GbtsEdge& headEdge = edgeStorage[head];
+      const edge_t& headEdge = edgeStorage[head];
       if ((stripEnds[head] & (kInnerStrip | kOuterStrip)) !=
           (kInnerStrip | kOuterStrip)) {
         continue;
@@ -684,7 +712,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       if (stripEdgesToRoot[head] == 0 || stripEdgesToRoot[head] < minLength) {
         continue;
       }
-      detail::GbtsEdgeState state;
+      detail::GbtsEdgeState<edge_t> state;
       if (!startState(headEdge, state)) {
         continue;
       }
@@ -707,8 +735,19 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
     return candidates;
   }
 
-  for (const std::uint32_t head : linkedEdges) {
-    const detail::GbtsEdge& headEdge = edgeStorage[head];
+  // An edge without an inner neighbour is a path of one edge, a seed only
+  // where the minimum length comes down to one: at a `minSeedLevel` of two
+  // with `addTriplets`, as the triplet graph can be run.
+  const bool singleEdgeSeeds =
+      m_cfg.minSeedLevel <= 1 || (m_cfg.addTriplets && m_cfg.minSeedLevel <= 2);
+  std::vector<std::uint32_t> allEdges;
+  if (singleEdgeSeeds) {
+    allEdges.resize(nEdges);
+    std::iota(allEdges.begin(), allEdges.end(), 0u);
+  }
+
+  for (const std::uint32_t head : singleEdgeSeeds ? allEdges : linkedEdges) {
+    const edge_t& headEdge = edgeStorage[head];
 
     minLength = minLengthOf(headEdge);
 
@@ -716,7 +755,7 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
       continue;
     }
 
-    detail::GbtsEdgeState state;
+    detail::GbtsEdgeState<edge_t> state;
     if (!startState(headEdge, state)) {
       continue;
     }
@@ -733,6 +772,29 @@ GraphBasedTrackSeeder::extractBestPathPerEdge(
 
   return candidates;
 }
+
+// The seeder is written once and built for each graph builder and each edge
+// that exists.
+template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
+    const SpacePointContainer&, const GbtsRoiDescriptor&,
+    const GbtsGraphBuilder&, const GbtsTrackingFilter&, const Options&,
+    SeedContainer&) const;
+
+template void GraphBasedTrackSeeder::createSeeds<GbtsGraphBuilder>(
+    GbtsNodeStorage&, const GbtsRoiDescriptor&, const GbtsGraphBuilder&,
+    const GbtsTrackingFilter&, const Options&, SeedContainer&,
+    std::vector<std::optional<GbtsSeedFit>>*) const;
+
+template GraphBasedTrackSeeder::SeedCandidates
+GraphBasedTrackSeeder::findSeedCandidates<detail::GbtsEdge>(
+    const detail::GbtsNodeView&, const detail::GbtsGraph<detail::GbtsEdge>&,
+    const GbtsTrackingFilter&, bool) const;
+
+template GraphBasedTrackSeeder::SeedCandidates
+GraphBasedTrackSeeder::findSeedCandidates<detail::TripletGbtsEdge>(
+    const detail::GbtsNodeView&,
+    const detail::GbtsGraph<detail::TripletGbtsEdge>&,
+    const GbtsTrackingFilter&, bool) const;
 
 float GraphBasedTrackSeeder::estimateCurvature(
     const detail::GbtsNodeView& nodeView,

@@ -203,4 +203,52 @@ struct GbtsEdge final {
 };
 //! [gbts edge]
 
+/// exp(eta) of an edge, which the prompt edge keeps as the first of the fit
+/// parameters a doublet is enough to determine.
+///
+/// The triplet graph's edge keeps it somewhere else, so anything that walks
+/// either graph asks through this overload set rather than naming the field.
+///
+/// @param edge The edge
+/// @return exp(eta) of the edge
+inline float edgeExpEta(const GbtsEdge& edge) {
+  return edge.p[0];
+}
+
+/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder`
+/// or `TripletGbtsGraphBuilder`.
+///
+/// Every edge comes before its inner neighbours, so that one pass in edge
+/// order sees an edge before the edges it links to.
+/// @tparam edge_t The edge the builder makes, its `EdgeType`
+template <typename edge_t>
+struct GbtsGraph {
+  /// The graph edges, i.e. the doublets.
+  std::vector<edge_t> edgeStorage;
+
+  /// The inner neighbours of edge `e` are `neighbours[neighbourOffsets[e]]` up
+  /// to, not including, `neighbours[neighbourOffsets[e + 1]]`, in the order
+  /// they were linked.
+  std::vector<std::uint32_t> neighbourOffsets;
+  /// Inner neighbour edges of all edges, see `neighbourOffsets`.
+  std::vector<std::uint32_t> neighbours;
+  /// Quality of the triplet each link of `neighbours` was made from, in the
+  /// same order; NaN for a link not made from one. Empty if the builder
+  /// provides none (only the triplet graph does).
+  std::vector<float> linkQuality;
+
+  /// Number of doublets that passed the doublet cuts. The prompt graph keeps
+  /// every one as an edge; the triplet graph only those in a triplet.
+  std::uint32_t nDoublets = 0;
+
+  /// The inner neighbour edges of an edge
+  /// @param edge Index of the edge in `edgeStorage`
+  /// @return The indices of its inner neighbours
+  std::span<const std::uint32_t> innerNeighbours(std::uint32_t edge) const {
+    return std::span(neighbours)
+        .subspan(neighbourOffsets[edge],
+                 neighbourOffsets[edge + 1] - neighbourOffsets[edge]);
+  }
+};
+
 }  // namespace Acts::Experimental::detail

@@ -24,28 +24,6 @@
 
 namespace Acts::Experimental {
 
-/// The doublet graph of the GBTS workflow, as built by `GbtsGraphBuilder`.
-struct GbtsGraph {
-  /// The graph edges, i.e. the doublets.
-  std::vector<detail::GbtsEdge> edgeStorage;
-
-  /// The inner neighbours of edge `e` are `neighbours[neighbourOffsets[e]]` up
-  /// to, not including, `neighbours[neighbourOffsets[e + 1]]`, in the order
-  /// they were linked.
-  std::vector<std::uint32_t> neighbourOffsets;
-  /// Inner neighbour edges of all edges, see `neighbourOffsets`.
-  std::vector<std::uint32_t> neighbours;
-
-  /// The inner neighbour edges of an edge
-  /// @param edge Index of the edge in `edgeStorage`
-  /// @return The indices of its inner neighbours
-  std::span<const std::uint32_t> innerNeighbours(std::uint32_t edge) const {
-    return std::span(neighbours)
-        .subspan(neighbourOffsets[edge],
-                 neighbourOffsets[edge + 1] - neighbourOffsets[edge]);
-  }
-};
-
 /// Builds the doublet graph of the GBTS workflow.
 ///
 /// Turns a finalized `GbtsNodeStorage` into a graph whose edges are doublets
@@ -57,15 +35,19 @@ struct GbtsGraph {
 /// indexing they slide over cannot disagree.
 class GbtsGraphBuilder {
  public:
+  /// The edge this graph builds, so that the seeder and the filter can follow
+  /// a graph to its edge type rather than being told both.
+  using EdgeType = detail::GbtsEdge;
+
   /// Config for the prompt graph
   struct Config {
     /// Match seeds before creating them.
     bool matchBeforeCreate = false;
 
-    /// Optional validation for barrel triplets.
+    /// Cut a barrel triplet on the pT and d0 of its own fit.
     bool validateTriplets = true;
 
-    /// Tau ratio scale of the `validateTriplets` high-pT check. The linking cut
+    /// Scale of the tau ratio check on high-pT triplets. The linking cut itself
     /// comes from the layer pairs, see `GbtsLayerConnection`.
     float tauRatioCut = 0.007f;
 
@@ -108,7 +90,7 @@ class GbtsGraphBuilder {
     float d0Max = 3.0f * Acts::UnitConstants::mm;
 
     /// Maximum difference in allowed tangent between candidate edge
-    /// connections.
+    /// connections, the two tangents coming from the two doublets.
     float cutDPhiMax = 0.012f;
 
     /// Maximum allowed curvature tolerance for candidate edge connections.
@@ -127,7 +109,8 @@ class GbtsGraphBuilder {
     /// `tuningPt / minPt`.
     float tuningPt = 0.9f * Acts::UnitConstants::GeV;
 
-    /// Maximum |curvature| above `curvatureSplitAbsTau`, before that scaling.
+    /// Maximum |curvature| of a doublet above `curvatureSplitAbsTau`, before
+    /// that scaling.
     float maxCurvatureHighEta = 4.75e-4f / Acts::UnitConstants::mm;
 
     /// Maximum |curvature| below `curvatureSplitAbsTau`, before that scaling.
@@ -161,6 +144,7 @@ class GbtsGraphBuilder {
     /// Deepest `GbtsLayerDescription::depth` whose nodes are cut against the z0
     /// histogram of their outer neighbourhood and whose isolated nodes are
     /// skipped. A negative value disables the cut.
+
     std::int32_t z0HistogramMaxDepth = 0;
 
     /// Deepest `GbtsLayerDescription::depth` to which `matchBeforeCreate`
@@ -174,9 +158,9 @@ class GbtsGraphBuilder {
     /// Maximum radius of the pixel detector.
     float maxOuterRadius = 550.0f;
 
-    /// Resolve a doublet's strip endpoints against its own direction before
-    /// cutting on them. Nothing is written back; the correction belongs to the
-    /// pair.
+    /// Resolve a strip node along its strip against the track direction before
+    /// cutting on it. Nothing is written back; the correction belongs to the
+    /// candidate that made it, per doublet, against the chord.
     bool calibrateStrips = true;
 
     /// How far along a strip a crossing may land and still be recovered, as a
@@ -203,8 +187,9 @@ class GbtsGraphBuilder {
   /// @param nodeStorage Data storage containing nodes
   /// @param bFieldInZ Magnetic field in z, in GeV/(e*mm)
   /// @return The graph, with its edges and the links between them
-  GbtsGraph buildTheGraph(const GbtsRoiDescriptor& roi,
-                          GbtsNodeStorage& nodeStorage, float bFieldInZ) const;
+  detail::GbtsGraph<EdgeType> buildTheGraph(const GbtsRoiDescriptor& roi,
+                                            GbtsNodeStorage& nodeStorage,
+                                            float bFieldInZ) const;
 
  private:
   Config m_cfg;

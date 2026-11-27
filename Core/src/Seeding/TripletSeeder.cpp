@@ -46,8 +46,10 @@ void createSeedsFromGroupsImpl(
     const SpacePointContainer& spacePoints,
     SpacePointCollections& bottomSpGroups, const ConstSpacePointProxy& middleSp,
     SpacePointCollections& topSpGroups, bool spacePointsSortedByRadius,
-    float bottomDeltaRMax, float topDeltaRMin, SeedContainer& outputSeeds) {
+    float bottomDeltaRMax, float topDeltaRMin, SeedContainer& outputSeeds,
+    const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration) {
   MiddleSpInfo middleSpInfo = DoubletSeedFinder::computeMiddleSpInfo(middleSp);
+  middleSpInfo.stripCalibration = stripCalibration;
   const float rM = middleSp.zr()[1];
 
   // create middle-top doublets
@@ -117,11 +119,12 @@ void createSeedsFromGroupsImpl(
     tripletFinder.createTripletTopCandidates(
         spacePoints, middleSp, cache.bottomDoublets.subset(cache.sortedBottoms),
         cache.topDoublets.subset(cache.sortedTops), cache.tripletTopCandidates,
-        filterCallback);
+        filterCallback, stripCalibration);
   } else {
     tripletFinder.createTripletTopCandidates(
         spacePoints, middleSp, cache.bottomDoublets.range(),
-        cache.topDoublets.range(), cache.tripletTopCandidates, filterCallback);
+        cache.topDoublets.range(), cache.tripletTopCandidates, filterCallback,
+        stripCalibration);
   }
 
   filter.filterTripletsMiddleFixed(spacePoints, outputSeeds);
@@ -157,7 +160,9 @@ void TripletSeeder::createSeedsFromGroup(
                             middleSp, topSpGroups,
                             bottomFinder.config().spacePointsSortedByRadius,
                             bottomFinder.config().deltaRMax,
-                            topFinder.config().deltaRMin, outputSeeds);
+                            topFinder.config().deltaRMin, outputSeeds,
+                            DoubletSeedFinder::derivedStripCalibration(
+                                spacePoints));
 }
 
 void TripletSeeder::createSeedsFromGroups(
@@ -180,6 +185,9 @@ void TripletSeeder::createSeedsFromGroups(
   if (middleSpGroup.empty()) {
     return;
   }
+
+  const OuterStripSpacePointCalibrationDetailsDerived* stripCalibration =
+      DoubletSeedFinder::derivedStripCalibration(spacePoints);
 
   // the cursors are ours, so the caller's groups stay untouched and can be
   // handed to another call unchanged
@@ -229,7 +237,8 @@ void TripletSeeder::createSeedsFromGroups(
     createSeedsFromGroupsImpl(
         *m_logger, cache, bottomFinder, topFinder, tripletFinder, filter,
         spacePoints, cache.bottomSpGroups, spM, cache.topSpGroups,
-        spacePointsSortedByRadius, bottomDeltaRMax, topDeltaRMin, outputSeeds);
+        spacePointsSortedByRadius, bottomDeltaRMax, topDeltaRMin, outputSeeds,
+        stripCalibration);
   }
 }
 

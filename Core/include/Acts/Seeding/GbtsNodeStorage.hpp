@@ -17,6 +17,7 @@
 #include "Acts/Seeding/detail/GbtsGraphTypes.hpp"
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -114,6 +115,15 @@ class GbtsNodeStorage final {
               const ConstSpacePointColumnProxy<GbtsLayerIndex>& layerColumn,
               const ConstSpacePointColumnProxy<float>& clusterWidthColumn,
               const ConstSpacePointColumnProxy<float>& localPositionYColumn);
+
+  /// Reserve the staging space for this many nodes, of which this many carry
+  /// a stereo pair, so that inserting them one by one does not reallocate.
+  /// @param nNodes Number of nodes to be inserted at most
+  /// @param nStrips Number of them with a stereo pair at most
+  void reserve(std::size_t nNodes, std::size_t nStrips) {
+    m_staged.reserve(nNodes);
+    m_strips.reserve(nStrips);
+  }
 
   /// Sort the nodes by (eta bin, phi) and build the derived per-node data.
   /// Must be called once after all inserts and before the storage is read.

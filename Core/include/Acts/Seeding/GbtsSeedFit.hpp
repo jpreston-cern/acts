@@ -25,6 +25,9 @@ struct GbtsSeedFit final {
   double cotTheta{0};
   /// Signed curvature in the transverse plane.
   double curvature{0};
+  /// Score of the tracking filter along the seed's path; the seed quality is
+  /// minus this over the number of space points.
+  double pathScore{0};
 };
 
 /// Estimate free track parameters from the fit of the GBTS tracking filter.
